@@ -2,7 +2,7 @@ import os
 from setuptools import setup, find_packages
 
 setup(
-    name='LinTorch',
+    name='lintorch',
     version="0.0.1",
     description='Pytorch-based linear algebra library for large matrix',
     url='https://github.com/mfkasim91/lintorch',

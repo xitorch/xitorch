@@ -1,61 +1,91 @@
 from abc import abstractmethod, abstractproperty
 import torch
+from lintorch.utils.exceptions import UnimplementedError
 
-class BaseLinearModule(object):
+class Module(torch.nn.Module):
     def __init__(self, shape,
-                 is_symmetric=True, is_real=True):
+               is_symmetric=True,
+               is_real=True):
+        super(Module, self).__init__()
+
         self._shape = shape
         self._is_symmetric = is_symmetric
         self._is_real = is_real
 
-        # functions
         self._fcn_forward = None
         self._fcn_transpose = None
         self._fcn_precond = None
+        self._is_forward_set = False
+        self._is_transpose_set = False
+        self._is_precond_set = False
 
-    ##################### functions #####################
-    def __call__(self, *params, **kwargs):
-        return self.forward(*params, **kwargs)
+        # if the class is inherited, then check the implemented method
+        self._inherited = self.__class__ != Module
+        if self._inherited:
+            # check the methods available in the class
+            self._is_forward_set = self._check_fcn("forward")
+            self._is_transpose_set = self._check_fcn("transpose")
+            self._is_precond_set = self._check_fcn("precond")
 
-    def forward(self, *params, **kwargs):
+    def _check_fcn(self, fcnname):
+        fcn = getattr(self, fcnname)
+        x = torch.zeros(1,self.shape[1],1)
+        try:
+            fcn(x)
+        except UnimplementedError:
+            return False
+        except:
+            return True
+        return True
+
+    def __call__(self, x, *params):
+        return self.forward(x, *params)
+
+    def forward(self, x, *params):
         if self.is_forward_set():
-            return self._fcn_forward(*params, **kwargs)
-        raise RuntimeError("The forward function has not been defined.")
+            return self._fcn_forward(x, *params)
+        raise UnimplementedError("The transpose function has not been defined.")
 
-    def transpose(self, *params, **kwargs):
+    def transpose(self, x, *params):
         if self.is_transpose_set():
-            return self._fcn_transpose(*params, **kwargs)
-        raise RuntimeError("The transpose function has not been defined.")
+            return self._fcn_transpose(x, *params)
+        raise UnimplementedError("The transpose function has not been defined.")
 
-    def precond(self, *params, **kwargs):
+    def precond(self, x, *params, biases=None):
         if self.is_precond_set():
-            return self._fcn_precond(*params, **kwargs)
-        raise RuntimeError("The preconditioning function has not been defined.")
+            return self._fcn_precond(x, *params, biases=None)
+        raise UnimplementedError("The preconditioning function has not been defined.")
 
     ##################### checkers #####################
     def is_forward_set(self):
-        return self._fcn_forward is not None
+        return self._is_forward_set
 
     def is_transpose_set(self):
-        return self._fcn_transpose is not None
+        return self._is_transpose_set
 
     def is_precond_set(self):
-        return self._fcn_precond is not None
+        return self._is_precond_set
 
     ##################### setters #####################
     def set_forward(self, fcn):
-        # check arguments and check if _fcn_forward is defined ???
+        # check arguments and check if _fcn_precond is defined ???
         self._fcn_forward = fcn
+        self._is_forward_set = True
         if self.is_symmetric:
-            self._fcn_transpose = fcn
+            self.set_transpose(fcn)
+        return fcn
 
     def set_transpose(self, fcn):
         # check arguments and check if _fcn_transpose is defined ???
         self._fcn_transpose = fcn
+        self._is_transpose_set = True
+        return fcn
 
     def set_precond(self, fcn):
         # check arguments and check if _fcn_precond is defined ???
         self._fcn_precond = fcn
+        self._is_precond_set = True
+        return fcn
 
     ##################### properties #####################
     @property
@@ -70,6 +100,16 @@ class BaseLinearModule(object):
     def is_real(self):
         return self._is_real
 
+    ##################### checkers #####################
+    def is_forward_set(self):
+        return self._is_forward_set
+
+    def is_transpose_set(self):
+        return self._is_transpose_set
+
+    def is_precond_set(self):
+        return self._is_precond_set
+
 #################################### decor ####################################
 def module(shape,
            is_symmetric=True,
@@ -77,8 +117,42 @@ def module(shape,
 
     def decor(fcn):
         # check if it is a function (???)
-        cls_module = BaseLinearModule(shape, is_symmetric, is_real)
+        cls_module = Module(shape, is_symmetric, is_real)
         cls_module.set_forward(fcn)
         return cls_module
 
     return decor
+
+if __name__ == "__main__":
+    na = 25
+
+    @module(shape=(na,na))
+    def A(x, diag):
+        return x * diag
+
+    @A.set_precond
+    def precond(x, diag, biases=None):
+        return x / diag
+
+    class B(Module):
+        def __init__(self):
+            super(B, self).__init__(shape=(na, na))
+
+        def forward(self, x, diag):
+            return x * diag
+
+        def precond(self, y, diag, biases=None):
+            return y / diag
+
+    dtype = torch.float64
+    x = torch.ones(1,na,1).to(dtype)
+    diag = (torch.arange(na)+1.0).unsqueeze(0).unsqueeze(-1).to(dtype)
+    y = A(x, diag)
+    x0 = A.precond(y, diag)
+    print(A.transpose(y, diag).squeeze())
+    print(y.squeeze())
+    print(x0.squeeze())
+    b = B()
+    by = b(x, diag)
+    print(by.squeeze())
+    print(b.precond(by, diag).squeeze())
