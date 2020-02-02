@@ -1,7 +1,7 @@
 import torch
 from lintorch.utils.misc import set_default_option
 
-def conjgrad(A, params, B, biases=None, posdef=True, **options):
+def conjgrad(A, params, B, biases=None, **options):
     """
     Performing conjugate gradient descent to solve the equation Ax=b or
     (A-biases*I)x=b.
@@ -25,8 +25,6 @@ def conjgrad(A, params, B, biases=None, posdef=True, **options):
     * precond: callable
         Matrix precondition that takes an input X and return an approximate of
         A^{-1}(X).
-    * posdef: bool
-        False if the matrix is non-posdef, so A^T(A(x)) will be applied.
     * **options: kwargs
         Options of the iterative solver
     """
@@ -54,14 +52,11 @@ def conjgrad(A, params, B, biases=None, posdef=True, **options):
     else:
         Aa = lambda X: At(X, *params)
 
-    # double the transformation if not posdef
-    if not posdef:
-        precondt = precond
-        B = Aa(B)
-        A = lambda X: Aa(Aa(X))
-        precond = lambda X: precondt(precondt(X))
-    else:
-        A = lambda X: Aa(X)
+    # double the transformation to ensure posdefness
+    precondt = precond
+    B = Aa(B)
+    A = lambda X: Aa(Aa(X))
+    precond = lambda X: precondt(precondt(X))
 
     # assign a variable to some of the options
     verbose = config["verbose"]

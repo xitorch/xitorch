@@ -80,7 +80,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
         # calculate the contributions from the eigenvectors
         # orthogonalize the grad_evecs with evecs
         B = grad_evecs - (grad_evecs * evecs).sum(dim=1, keepdim=True) * evecs
-        gevecs = conjgrad(ctx.A, ctx.params, -B, biases=evals, posdef=False, **ctx.bck_config)
+        gevecs = conjgrad(ctx.A, ctx.params, -B, biases=evals, **ctx.bck_config)
         # orthogonalize gevecs w.r.t. evecs
         gevecs = gevecs - (gevecs * evecs).sum(dim=1, keepdim=True) * evecs
 
