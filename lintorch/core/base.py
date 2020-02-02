@@ -39,19 +39,82 @@ class Module(torch.nn.Module):
         return True
 
     def __call__(self, x, *params):
+        """
+        Apply the transformation to x.
+
+        Arguments
+        ---------
+        * x: torch.tensor (nbatch, nc, ncols)
+            The tensor to be applied the transformation.
+        * *params: list of torch.tensor (nbatch, ...)
+            List of torch tensor that set the transformation.
+
+        Returns
+        -------
+        * y: torch.tensor (nbatch, nr, ncols)
+            The tensor of the transformation result.
+        """
         return self.forward(x, *params)
 
     def forward(self, x, *params):
+        """
+        Apply the transformation to x.
+
+        Arguments
+        ---------
+        * x: torch.tensor (nbatch, nc, ncols)
+            The tensor to be applied the transformation.
+        * *params: list of torch.tensor (nbatch, ...)
+            List of torch tensor that set the transformation.
+
+        Returns
+        -------
+        * y: torch.tensor (nbatch, nr, ncols)
+            The tensor of the transformation result.
+        """
         if self.is_forward_set():
             return self._fcn_forward(x, *params)
         raise UnimplementedError("The transpose function has not been defined.")
 
     def transpose(self, x, *params):
+        """
+        Apply the transpose transformation to x.
+
+        Arguments
+        ---------
+        * x: torch.tensor (nbatch, nr, ncols)
+            The tensor to be applied the transpose transformation.
+        * *params: list of torch.tensor (nbatch, ...)
+            List of torch tensor that set the transformation.
+
+        Returns
+        -------
+        * y: torch.tensor (nbatch, nc, ncols)
+            The tensor of the transpose transformation result.
+        """
         if self.is_transpose_set():
             return self._fcn_transpose(x, *params)
         raise UnimplementedError("The transpose function has not been defined.")
 
     def precond(self, x, *params, biases=None):
+        """
+        Approximate the solution of Ay=x or (A-biases*I)y=x.
+
+        Arguments
+        ---------
+        * x: torch.tensor (nbatch, nr, ncols)
+            The tensor to be applied the inverse transformation.
+        * *params: list of torch.tensor (nbatch, ...)
+            List of torch tensor that set the transformation.
+        * biases: torch.tensor (nbatch, ncols) or None
+            If None, then it solves Ay=x. Otherwise, it solves (A-biases*I)y=x
+            for different biases for every columns.
+
+        Returns
+        -------
+        * y: torch.tensor (nbatch, nc, ncols)
+            The tensor of the inverse result.
+        """
         if self.is_precond_set():
             return self._fcn_precond(x, *params, biases=None)
         raise UnimplementedError("The preconditioning function has not been defined.")
