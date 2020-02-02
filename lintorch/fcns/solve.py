@@ -1,9 +1,9 @@
 import torch
 from lintorch.utils.misc import set_default_option
 
-def conjgrad(A, params, B, biases=None, **options):
+def solve(A, params, B, biases=None, fwd_options={}, bck_options={}):
     """
-    Performing conjugate gradient descent to solve the equation Ax=b or
+    Performing iterative method to solve the equation Ax=b or
     (A-biases*I)x=b.
     This function can also solve batched multiple inverse equation at the
         same time by applying A to a tensor X with shape (nbatch, na, ncols).
@@ -22,12 +22,77 @@ def conjgrad(A, params, B, biases=None, **options):
     * biases: torch.tensor (nbatch,ncols) or None
         If not None, it will solve (A-biases*I)*X = B. Otherwise, it just solves
         A*X = B. biases would be applied to every column.
-    * precond: callable
-        Matrix precondition that takes an input X and return an approximate of
-        A^{-1}(X).
-    * **options: kwargs
-        Options of the iterative solver
+    * fwd_options: dict
+        Options of the iterative solver in the forward calculation
+    * bck_options: dict
+        Options of the iterative solver in the backward calculation
     """
+    return solve_torchfcn.apply(A, B, biases, fwd_options, bck_options, *params)
+
+class solve_torchfcn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, A, B, biases, fwd_options, bck_options, *params):
+        # B: (nbatch, nr, ncols)
+        # biases: (nbatch, ncols) or None
+        # params: (nbatch,...)
+        # x: (nbatch, nc, ncols)
+        config = set_default_option({
+            "method": "conjgrad",
+        }, fwd_options)
+        ctx.bck_config = set_default_option({
+            "method": "conjgrad",
+        }, bck_options)
+
+        # check symmetricity and must be a square matrix
+        if not A.is_symmetric:
+            msg = "The solve function cannot be used for non-symmetric transformation at the moment."
+            raise RuntimeError(msg)
+        if A.shape[0] != A.shape[1]:
+            msg = "The solve function cannot be used for non-square transformation."
+            raise RuntimeError(msg)
+
+        method = config["method"].lower()
+        if method == "conjgrad":
+            x = conjgrad(A, params, B, biases=biases, **config)
+        else:
+            raise RuntimeError("Unknown solve method: %s" % config["method"])
+
+        ctx.A = A
+        ctx.biases = biases
+        ctx.x = x
+        ctx.params = params
+        return x
+
+    @staticmethod
+    def backward(ctx, grad_x):
+        # grad_x: (nbatch, nc, ncols)
+        # ctx.x: (nbatch, nc, ncols)
+
+        # detach x from the graph to avoid infinite loop with this function
+        x = ctx.x.detach()
+
+        # solve (A-biases*I)^T v = grad_x
+        # this is the grad of B
+        # (nbatch, nr, ncols)
+        v = solve_torchfcn.apply(ctx.A, grad_x, ctx.biases, {}, ctx.bck_config,
+            *ctx.params)
+        grad_B = v
+
+        # calculate the biases gradient
+        grad_biases = None
+        if ctx.biases is not None:
+            grad_biases = (v * ctx.x).sum(dim=1) # (nbatch, ncols)
+
+        # calculate the grad of matrices parameters
+        with torch.enable_grad():
+            loss = -ctx.A(x, *ctx.params) # (nbatch, nr, ncols)
+        grad_params = torch.autograd.grad((loss,), ctx.params, grad_outputs=(v,),
+            create_graph=torch.is_grad_enabled())
+
+        return (None, grad_B, grad_biases, None, None, *grad_params)
+
+def conjgrad(A, params, B, biases=None, **options):
+    # use conjugate gradient descent to solve the inverse equation
     nbatch, na, ncols = B.shape
     config = set_default_option({
         "max_niter": na,
@@ -115,7 +180,10 @@ if __name__ == "__main__":
 
     xtrue = torch.rand(1,n,1).to(dtype)
     b = A(xtrue)
-    xinv = conjgrad(A, [], b, verbose=True)
+    xinv = solve(A, [], b,
+        fwd_options={
+            "verbose": True,
+        })
 
     print((xinv - xtrue).abs().max())
     print(xinv - xtrue)
