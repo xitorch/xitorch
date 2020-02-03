@@ -160,30 +160,68 @@ def _dot(C, D):
     return (C*D).sum(dim=1, keepdim=True) # (nbatch, 1, ncols)
 
 if __name__ == "__main__":
+    import time
     from lintorch.core.base import Module, module
+    from lintorch.utils.fd import finite_differences
 
-    n = 1200
+    n = 20
     dtype = torch.float64
-    A1 = torch.rand(1,n,n).to(dtype) * 1e-2
-    A2 = A1.transpose(-2,-1) + A1
-    diag = torch.arange(n).to(dtype)+1.0 # (na,)
-    Amat = A2 + diag.diag_embed()
+    A1 = (torch.rand(1,n,n).to(dtype) * 1e-2).requires_grad_()
+    diag = (torch.arange(n).to(dtype)+1.0).requires_grad_() # (na,)
 
     @module(shape=(n,n))
-    def A(X):
+    def A(X, A1, diag):
+        Amat = A1.transpose(-2,-1) + A1 + diag.diag_embed()
         return torch.bmm(Amat, X)
 
     @A.set_precond
-    def precond(X, biases=None):
+    def precond(X, A1, diag, biases=None):
         # X: (nbatch, na, ncols)
         return X / diag.unsqueeze(-1)
 
     xtrue = torch.rand(1,n,1).to(dtype)
-    b = A(xtrue)
-    xinv = solve(A, [], b,
-        fwd_options={
+    b = A(xtrue, A1, diag).detach().requires_grad_()
+    def getloss(A1, diag, b):
+        fwd_options = {
             "verbose": True,
-        })
+            "min_eps": 1e-9
+        }
+        bck_options = {
+            "verbose": False,
+        }
+        xinv = solve(A, (A1, diag), b, fwd_options=fwd_options)
+        # print(xinv - xtrue)
+        # raise RuntimeError
+        lss = (xinv**2).sum()
+        return lss
 
-    print((xinv - xtrue).abs().max())
-    print(xinv - xtrue)
+    t0 = time.time()
+    loss = getloss(A1, diag, b)
+    t1 = time.time()
+    print("Forward done in %fs" % (t1 - t0))
+    loss.backward()
+    t2 = time.time()
+    print("Backward done in %fs" % (t2 - t1))
+    Agrad = A1.grad.data
+    dgrad = diag.grad.data
+    bgrad = b.grad.data
+
+    Afd = finite_differences(getloss, (A1, diag, b), 0, eps=1e-4)
+    dfd = finite_differences(getloss, (A1, diag, b), 1, eps=1e-5)
+    bfd = finite_differences(getloss, (A1, diag, b), 2, eps=1e-5)
+    print("Finite differences done")
+
+    print("A1:")
+    print(Agrad)
+    print(Afd)
+    print(Agrad/Afd)
+
+    print("diag:")
+    print(dgrad)
+    print(dfd)
+    print(dgrad/dfd)
+
+    print("B:")
+    print(bgrad)
+    print(bfd)
+    print(bgrad/bfd)
