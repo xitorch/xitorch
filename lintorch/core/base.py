@@ -186,6 +186,13 @@ def module(shape,
 
     return decor
 
+def module_like(A):
+    return module(
+        shape = A.shape,
+        is_symmetric = A.is_symmetric,
+        is_real = A.is_real
+    )
+
 if __name__ == "__main__":
     na = 25
 
