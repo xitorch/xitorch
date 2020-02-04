@@ -295,10 +295,13 @@ def davidson(A, params, neig, **options):
                 min_eig_est[change_idx] = next_value[change_idx]
 
         # orthogonalize t with the rest of the V
-        V = torch.cat((V, t), dim=-1)
-        V, R = torch.qr(V) # (nbatch, na, nguess+neig)
-        nguess = nguess + neig
-        AVnew = A(V[:,:,-neig:], *params) # (nbatch,neig,na,1)
+        Vnew = torch.cat((V, t), dim=-1)
+        if Vnew.shape[-1] > Vnew.shape[1]:
+            Vnew = Vnew[:,:,:Vnew.shape[1]]
+        nadd = Vnew.shape[-1]-V.shape[-1]
+        nguess = nguess + nadd
+        V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
+        AVnew = A(V[:,:,-nadd:], *params) # (nbatch,neig,na,1)
         AV = torch.cat((AV, AVnew), dim=-1)
 
     eigvals = eigvalT # (nbatch, neig)
