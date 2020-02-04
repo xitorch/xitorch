@@ -7,6 +7,8 @@ This file contains methods to obtain eigenpairs of a linear transformation
     which is a subclass of ddft.modules.base_linear.BaseLinearModule
 """
 
+__all__ = ["lsymeig"]
+
 def lsymeig(A, params, neig, fwd_options={}, bck_options={}):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a large matrix.

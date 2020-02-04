@@ -2,6 +2,8 @@ from abc import abstractmethod, abstractproperty
 import torch
 from lintorch.utils.exceptions import UnimplementedError
 
+__all__ = ["Module", "module", "module_like"]
+
 class Module(torch.nn.Module):
     def __init__(self, shape,
                is_symmetric=True,

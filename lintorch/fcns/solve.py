@@ -1,6 +1,8 @@
 import torch
 from lintorch.utils.misc import set_default_option
 
+__all__ = ["solve"]
+
 def solve(A, params, B, biases=None, fwd_options={}, bck_options={}):
     """
     Performing iterative method to solve the equation Ax=b or
