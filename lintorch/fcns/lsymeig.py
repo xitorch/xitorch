@@ -1,6 +1,6 @@
 import torch
 from lintorch.utils.misc import set_default_option
-from lintorch.fcns.solve import conjgrad
+from lintorch.fcns.solve import solve
 
 """
 This file contains methods to obtain eigenpairs of a linear transformation
@@ -82,7 +82,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
         # calculate the contributions from the eigenvectors
         # orthogonalize the grad_evecs with evecs
         B = grad_evecs - (grad_evecs * evecs).sum(dim=1, keepdim=True) * evecs
-        gevecs = conjgrad(ctx.A, ctx.params, -B, biases=evals, **ctx.bck_config)
+        gevecs = solve(ctx.A, ctx.params, -B, biases=evals, fwd_options=ctx.bck_config)
         # orthogonalize gevecs w.r.t. evecs
         gevecs = gevecs - (gevecs * evecs).sum(dim=1, keepdim=True) * evecs
 
@@ -301,7 +301,7 @@ def davidson(A, params, neig, **options):
         nadd = Vnew.shape[-1]-V.shape[-1]
         nguess = nguess + nadd
         V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
-        AVnew = A(V[:,:,-nadd:], *params) # (nbatch,neig,na,1)
+        AVnew = A(V[:,:,-nadd:], *params) # (nbatch,na,nadd)
         AV = torch.cat((AV, AVnew), dim=-1)
 
     eigvals = eigvalT # (nbatch, neig)
