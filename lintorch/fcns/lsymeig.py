@@ -1,6 +1,7 @@
 import torch
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
+from lintorch.utils.tensor import tallqr, to_fortran_order
 
 """
 This file contains methods to obtain eigenpairs of a linear transformation
@@ -295,13 +296,16 @@ def davidson(A, params, neig, **options):
                 min_eig_est[change_idx] = next_value[change_idx]
 
         # orthogonalize t with the rest of the V
+        t = to_fortran_order(t)
         Vnew = torch.cat((V, t), dim=-1)
         if Vnew.shape[-1] > Vnew.shape[1]:
             Vnew = Vnew[:,:,:Vnew.shape[1]]
         nadd = Vnew.shape[-1]-V.shape[-1]
         nguess = nguess + nadd
-        V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
+        V, R = tallqr(Vnew)
+        # V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
         AVnew = A(V[:,:,-nadd:], *params) # (nbatch,na,nadd)
+        AVnew = to_fortran_order(AVnew)
         AV = torch.cat((AV, AVnew), dim=-1)
 
     eigvals = eigvalT # (nbatch, neig)
