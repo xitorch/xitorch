@@ -69,6 +69,53 @@ def test_grad_solve(dtype, device):
         max_rtol=4e-3, max_median_rtol=1e-3, fd_to64=True)
 
 @device_dtype_float_test(only64=True)
+def test_2grad_lsymeig(dtype, device):
+    # generate the matrix
+    na = 10
+    torch.manual_seed(123)
+    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+    Acls = get_diagonally_dominant_class(na)
+
+    def getloss(A1, diag, contrib):
+        A = Acls()
+        neig = 4
+        options = {
+            "method": "davidson",
+            "verbose": False,
+        }
+        bck_options = {
+            "verbose": False,
+            "min_eps": 1e-9,
+        }
+        with torch.enable_grad():
+            A1.requires_grad_()
+            diag.requires_grad_()
+            evals, evecs = lt.lsymeig(A,
+                neig=neig,
+                params=(A1, diag,),
+                fwd_options=options,
+                bck_options=bck_options)
+
+            lss = 0
+            if contrib == "eigvals":
+                lss = lss + evals.abs().sum()
+            elif contrib == "eigvecs":
+                lss = lss + evecs.abs().sum()
+            grad_A1, grad_diag = torch.autograd.grad(lss, (A1, diag),
+                create_graph=True)
+
+        loss = 0
+        loss = loss + (grad_A1**2).abs().sum()
+        loss = loss + (grad_diag**2).abs().sum()
+        return loss
+
+    compare_grad_with_fd(getloss, (A1, diag, "eigvals"), [0, 1], eps=1e-3,
+        max_rtol=None, max_median_rtol=4e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1], eps=1e-3,
+        max_rtol=None, max_median_rtol=3e-2, fd_to64=True)
+
+@device_dtype_float_test(only64=True)
 def test_2grad_solve(dtype, device):
     # generate the matrix
     na = 10
