@@ -24,6 +24,7 @@ def device_dtype_float_test(only64=False, onlycpu=False):
 def compare_grad_with_fd(fcn, args, idxs, eps=1e-6, max_rtol=1e-3,
         max_median_rtol=1e-3, fd_to64=True, verbose=False):
 
+    args = [a.clone().detach().requires_grad_() if type(a) == torch.Tensor else a for a in args]
     device = args[idxs[0]].device
     if not hasattr(eps, "__iter__"):
         eps = [eps for i in range(len(idxs))]
