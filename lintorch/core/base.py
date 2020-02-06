@@ -26,7 +26,11 @@ class Module(torch.nn.Module):
         if self._inherited:
             # check the methods available in the class
             self._is_forward_set = self._check_fcn("forward")
-            self._is_transpose_set = self._check_fcn("transpose")
+            if self._is_symmetric and self._is_forward_set:
+                self._is_transpose_set = True
+                self._fcn_transpose = self.forward
+            else:
+                self._is_transpose_set = self._check_fcn("transpose")
             self._is_precond_set = self._check_fcn("precond")
 
     def _check_fcn(self, fcnname):
