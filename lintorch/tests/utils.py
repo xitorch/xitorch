@@ -62,5 +62,7 @@ def compare_grad_with_fd(fcn, args, idxs, eps=1e-6, max_rtol=1e-3,
             print(ratio)
 
         dev = (ratio-1.0).abs()
-        assert dev.max() < max_rtol, "Max dev ratio: %.3e (tolerated: %.3e)" % (dev.max(), max_rtol)
-        assert dev.median() < max_median_rtol, "Median dev ratio: %.3e (tolerated: %.3e)" % (dev.median(), max_median_rtol)
+        if max_rtol is not None:
+            assert dev.max() < max_rtol, "Max dev ratio: %.3e (tolerated: %.3e)" % (dev.max(), max_rtol)
+        if max_median_rtol is not None:
+            assert dev.median() < max_median_rtol, "Median dev ratio: %.3e (tolerated: %.3e)" % (dev.median(), max_median_rtol)

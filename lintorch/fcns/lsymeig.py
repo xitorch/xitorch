@@ -70,12 +70,13 @@ class lsymeig_torchfcn(torch.autograd.Function):
         # grad_evecs: (nbatch, na, neig)
 
         # detach the evals and evecs
-        evals = ctx.evals.detach()
-        evecs = ctx.evecs.detach()
+        evals = ctx.evals
+        evecs = ctx.evecs
 
         # the loss function where the gradient will be retrieved
+        params = [p.clone().detach().requires_grad_() for p in ctx.params]
         with torch.enable_grad():
-            loss = ctx.A(evecs, *ctx.params) # (nbatch, na, neig)
+            loss = ctx.A(evecs, *params) # (nbatch, na, neig)
 
         # calculate the contributions from the eigenvalues
         gevals = grad_evals.unsqueeze(1) * evecs # (nbatch, na, neig)
@@ -83,7 +84,8 @@ class lsymeig_torchfcn(torch.autograd.Function):
         # calculate the contributions from the eigenvectors
         # orthogonalize the grad_evecs with evecs
         B = grad_evecs - (grad_evecs * evecs).sum(dim=1, keepdim=True) * evecs
-        gevecs = solve(ctx.A, ctx.params, -B, biases=evals, fwd_options=ctx.bck_config)
+        gevecs = solve(ctx.A, ctx.params, -B, biases=evals,
+            fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         # orthogonalize gevecs w.r.t. evecs
         gevecs = gevecs - (gevecs * evecs).sum(dim=1, keepdim=True) * evecs
 
@@ -91,9 +93,8 @@ class lsymeig_torchfcn(torch.autograd.Function):
         gaccum = gevals + gevecs
         grad_params = torch.autograd.grad(
             outputs=(loss,),
-            inputs=ctx.params,
+            inputs=params,
             grad_outputs=(gaccum,),
-            retain_graph=True,
             create_graph=torch.is_grad_enabled(),
         )
         return (None, None, None, None, *grad_params)
@@ -421,29 +422,32 @@ if __name__ == "__main__":
         neig = 4
         options = {
             "method": "davidson",
-            "verbose": True,
+            "verbose": False,
             "nguess": neig,
             "v_init": "randn",
         }
         bck_options = {
             "verbose": True,
-            "min_eps": 1e-7,
+            "min_eps": 1e-9,
         }
-        evals, evecs = lsymeig(A,
-            neig=neig,
-            params=(A1, diag,),
-            fwd_options=options,
-            bck_options=bck_options)
-        evals2, evecs2 = lsymeig(A,
-            neig=neig,
-            params=(A1, diag,),
-            fwd_options={"method": "exacteig"})
-        # print(evals)
-        # print(evals2)
-        # raise RuntimeError
+        with torch.enable_grad():
+            A1.requires_grad_()
+            diag.requires_grad_()
+            evals, evecs = lsymeig(A,
+                neig=neig,
+                params=(A1, diag,),
+                fwd_options=options,
+                bck_options=bck_options)
+
+            lss = 0
+            # lss = lss + (evals**1).abs().sum() # correct
+            lss = lss + (evecs**1).abs().sum()
+            grad_A1, grad_diag = torch.autograd.grad(lss, (A1, diag),
+                create_graph=True)
+
         loss = 0
-        # loss = loss + (evals**2).sum()
-        loss = loss + (evecs**4).sum()
+        loss = loss + (grad_A1**2).abs().sum()
+        loss = loss + (grad_diag**2).abs().sum()
         return loss
 
     t0 = time.time()
@@ -456,8 +460,8 @@ if __name__ == "__main__":
     Agrad = A1.grad.data
     dgrad = diag.grad.data
 
-    Afd = finite_differences(getloss, (A1, diag,), 0, eps=1e-5)
-    dfd = finite_differences(getloss, (A1, diag,), 1, eps=1e-5)
+    Afd = finite_differences(getloss, (A1, diag,), 0, eps=1e-3)
+    dfd = finite_differences(getloss, (A1, diag,), 1, eps=1e-3)
     print("Finite differences done")
 
     print(Agrad)
