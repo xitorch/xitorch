@@ -73,8 +73,9 @@ class solve_torchfcn(torch.autograd.Function):
         # solve (A-biases*I)^T v = grad_x
         # this is the grad of B
         # (nbatch, nr, ncols)
-        v = solve_torchfcn.apply(ctx.A, grad_x, ctx.biases, {}, ctx.bck_config,
-            *ctx.params)
+        v = solve(ctx.A, ctx.params, grad_x,
+            biases=ctx.biases,
+            fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         grad_B = v
 
         # calculate the biases gradient
