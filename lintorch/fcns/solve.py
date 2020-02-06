@@ -70,9 +70,6 @@ class solve_torchfcn(torch.autograd.Function):
         # grad_x: (nbatch, nc, ncols)
         # ctx.x: (nbatch, nc, ncols)
 
-        # detach x from the graph to avoid infinite loop with this function
-        x = ctx.x.detach()
-
         # solve (A-biases*I)^T v = grad_x
         # this is the grad of B
         # (nbatch, nr, ncols)
@@ -86,9 +83,11 @@ class solve_torchfcn(torch.autograd.Function):
             grad_biases = (v * ctx.x).sum(dim=1) # (nbatch, ncols)
 
         # calculate the grad of matrices parameters
+        params = [p.clone().detach().requires_grad_() for p in ctx.params]
         with torch.enable_grad():
-            loss = -ctx.A(x, *ctx.params) # (nbatch, nr, ncols)
-        grad_params = torch.autograd.grad((loss,), ctx.params, grad_outputs=(v,),
+            loss = -ctx.A(ctx.x, *params) # (nbatch, nr, ncols)
+
+        grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
             create_graph=torch.is_grad_enabled())
 
         return (None, grad_B, grad_biases, None, None, *grad_params)
@@ -173,6 +172,7 @@ if __name__ == "__main__":
 
     n = 20
     dtype = torch.float64
+    torch.manual_seed(123)
     A1 = (torch.rand(1,n,n).to(dtype) * 1e-2).requires_grad_()
     diag = (torch.arange(n).to(dtype)+1.0).requires_grad_() # (na,)
 
@@ -188,22 +188,34 @@ if __name__ == "__main__":
 
     xtrue = torch.rand(1,n,1).to(dtype)
     b = A(xtrue, A1, diag).detach().requires_grad_()
-    def getloss(A1, diag, b):
+    biases = (torch.ones((b.shape[0], b.shape[-1]))*1.2).to(dtype).requires_grad_()
+    def getloss(A1, diag, b, biases):
         fwd_options = {
-            "verbose": True,
+            "verbose": False,
             "min_eps": 1e-9
         }
         bck_options = {
             "verbose": False,
         }
-        xinv = solve(A, (A1, diag), b, fwd_options=fwd_options)
-        # print(xinv - xtrue)
-        # raise RuntimeError
-        lss = (xinv**2).sum()
-        return lss
+        with torch.enable_grad():
+            A1.requires_grad_()
+            b.requires_grad_()
+            diag.requires_grad_()
+            biases.requires_grad_()
+            xinv = solve(A, (A1, diag), b, biases=biases, fwd_options=fwd_options)
+            lss = (xinv**2).sum()
+            grad_A1, grad_diag, grad_b, grad_biases = torch.autograd.grad(
+                lss,
+                (A1, diag, b, biases), create_graph=True)
+        loss = 0
+        loss = loss + (grad_A1**2).sum()
+        loss = loss + (grad_diag**2).sum()
+        # loss = loss + (grad_b**2).sum()
+        # loss = loss + (grad_biases**2).sum()
+        return loss
 
     t0 = time.time()
-    loss = getloss(A1, diag, b)
+    loss = getloss(A1, diag, b, biases)
     t1 = time.time()
     print("Forward done in %fs" % (t1 - t0))
     loss.backward()
@@ -212,10 +224,12 @@ if __name__ == "__main__":
     Agrad = A1.grad.data
     dgrad = diag.grad.data
     bgrad = b.grad.data
+    biasesgrad = biases.grad.data
 
-    Afd = finite_differences(getloss, (A1, diag, b), 0, eps=1e-4)
-    dfd = finite_differences(getloss, (A1, diag, b), 1, eps=1e-5)
-    bfd = finite_differences(getloss, (A1, diag, b), 2, eps=1e-5)
+    Afd = finite_differences(getloss, (A1, diag, b, biases), 0, eps=1e-4)
+    dfd = finite_differences(getloss, (A1, diag, b, biases), 1, eps=1e-5)
+    bfd = finite_differences(getloss, (A1, diag, b, biases), 2, eps=1e-5)
+    biasesfd = finite_differences(getloss, (A1, diag, b, biases), 3, eps=1e-5)
     print("Finite differences done")
 
     print("A1:")
@@ -232,3 +246,8 @@ if __name__ == "__main__":
     print(bgrad)
     print(bfd)
     print(bgrad/bfd)
+
+    print("biases:")
+    print(biasesgrad)
+    print(biasesfd)
+    print(biasesgrad/biasesfd)
