@@ -140,7 +140,7 @@ def conjgrad(A, params, B, biases=None, **options):
     Rs_old = _dot(R, P) # (nbatch, 1, ncols)
     for i in range(config["max_niter"]):
         Ap = A(P) # (nbatch, na, ncols)
-        alpha = _save_divide(Rs_old, _dot(P, Ap)) # (nbatch, na, ncols)
+        alpha = _safe_divide(Rs_old, _dot(P, Ap)) # (nbatch, na, ncols)
         X = X + alpha * P
         R = R - alpha * Ap
         prR = precond(R)
@@ -153,12 +153,12 @@ def conjgrad(A, params, B, biases=None, **options):
         if eps_max < min_eps:
             break
 
-        P = prR + _save_divide(Rs_new, Rs_old) * P
+        P = prR + _safe_divide(Rs_new, Rs_old) * P
         Rs_old = Rs_new
 
     return X
 
-def _save_divide(A, B, eps=1e-10):
+def _safe_divide(A, B, eps=1e-10):
     C = B.clone()
     C[C.abs() < eps] = eps
     return A / C
