@@ -1,3 +1,4 @@
+import inspect
 from abc import abstractmethod, abstractproperty
 import torch
 from lintorch.utils.exceptions import UnimplementedError
@@ -20,6 +21,13 @@ class Module(torch.nn.Module):
         self._is_forward_set = False
         self._is_transpose_set = False
         self._is_precond_set = False
+
+        # optional arguments
+        self._precond_opt_args = {
+            "biases": None,
+            "M": None,
+            "mparams": []
+        }
 
         # if the class is inherited, then check the implemented method
         self._inherited = self.__class__ != Module
@@ -102,7 +110,7 @@ class Module(torch.nn.Module):
             return self._fcn_transpose(x, *params)
         raise UnimplementedError("The transpose function has not been defined.")
 
-    def precond(self, x, *params, biases=None):
+    def precond(self, x, *params, biases=None, M=None, mparams=[]):
         """
         Approximate the solution of Ay=x or (A-biases*I)y=x.
 
@@ -115,6 +123,11 @@ class Module(torch.nn.Module):
         * biases: torch.tensor (nbatch, ncols) or None
             If None, then it solves Ay=x. Otherwise, it solves (A-biases*I)y=x
             for different biases for every columns.
+        * M: lintorch.Module or None
+            The transformation on the biases side. If biases is None,
+            then this argument is ignored. If None or ignored, then M=I.
+        * mparams: list of differentiable torch.tensor
+            List of differentiable torch.tensor to be put to M.
 
         Returns
         -------
@@ -122,7 +135,7 @@ class Module(torch.nn.Module):
             The tensor of the inverse result.
         """
         if self.is_precond_set():
-            return self._fcn_precond(x, *params, biases=None)
+            return self._fcn_precond(x, *params, biases=biases, M=M, mparams=mparams)
         raise UnimplementedError("The preconditioning function has not been defined.")
 
     ##################### checkers #####################

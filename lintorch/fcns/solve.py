@@ -3,10 +3,11 @@ from lintorch.utils.misc import set_default_option
 
 __all__ = ["solve"]
 
-def solve(A, params, B, biases=None, fwd_options={}, bck_options={}):
+def solve(A, params, B, biases=None, M=None, mparams=[],
+          fwd_options={}, bck_options={}):
     """
     Performing iterative method to solve the equation Ax=b or
-    (A-biases*I)x=b.
+    (A-biases*M)x=b.
     This function can also solve batched multiple inverse equation at the
         same time by applying A to a tensor X with shape (nbatch, na, ncols).
     The applied biases are not necessarily identical for each column.
@@ -24,20 +25,33 @@ def solve(A, params, B, biases=None, fwd_options={}, bck_options={}):
     * biases: torch.tensor (nbatch,ncols) or None
         If not None, it will solve (A-biases*I)*X = B. Otherwise, it just solves
         A*X = B. biases would be applied to every column.
+    * M: lintorch.Module or None
+        The transformation on the biases side. If biases is None,
+        then this argument is ignored. If None or ignored, then M=I.
+    * mparams: list of differentiable torch.tensor
+        List of differentiable torch.tensor to be put to M.
     * fwd_options: dict
         Options of the iterative solver in the forward calculation
     * bck_options: dict
         Options of the iterative solver in the backward calculation
     """
-    return solve_torchfcn.apply(A, B, biases, fwd_options, bck_options, *params)
+    na = len(params)
+    if biases is None:
+        M = None
+    return solve_torchfcn.apply(A, B, biases, M, fwd_options, bck_options, na, *params, *mparams)
 
 class solve_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, B, biases, fwd_options, bck_options, *params):
+    def forward(ctx, A, B, biases, M, fwd_options, bck_options, na, *AMparams):
         # B: (nbatch, nr, ncols)
         # biases: (nbatch, ncols) or None
         # params: (nbatch,...)
         # x: (nbatch, nc, ncols)
+
+        # separate the parameters for A and for M
+        params = AMparams[:na]
+        mparams = AMparams[na:]
+
         config = set_default_option({
             "method": "conjgrad",
         }, fwd_options)
@@ -55,14 +69,16 @@ class solve_torchfcn(torch.autograd.Function):
 
         method = config["method"].lower()
         if method == "conjgrad":
-            x = conjgrad(A, params, B, biases=biases, **config)
+            x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
         ctx.A = A
+        ctx.M = M
         ctx.biases = biases
         ctx.x = x
         ctx.params = params
+        ctx.mparams = mparams
         return x
 
     @staticmethod
@@ -70,18 +86,22 @@ class solve_torchfcn(torch.autograd.Function):
         # grad_x: (nbatch, nc, ncols)
         # ctx.x: (nbatch, nc, ncols)
 
-        # solve (A-biases*I)^T v = grad_x
+        # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
         # (nbatch, nr, ncols)
         v = solve(ctx.A, ctx.params, grad_x,
-            biases=ctx.biases,
+            biases=ctx.biases, M=ctx.M, mparams=ctx.mparams,
             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         grad_B = v
 
         # calculate the biases gradient
         grad_biases = None
         if ctx.biases is not None:
-            grad_biases = (v * ctx.x).sum(dim=1) # (nbatch, ncols)
+            if ctx.M is None:
+                Mx = ctx.x
+            else:
+                Mx = ctx.M(ctx.x, *ctx.mparams)
+            grad_biases = (v * Mx).sum(dim=1) # (nbatch, ncols)
 
         # calculate the grad of matrices parameters
         params = [p.clone().detach().requires_grad_() for p in ctx.params]
@@ -91,9 +111,22 @@ class solve_torchfcn(torch.autograd.Function):
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
             create_graph=torch.is_grad_enabled())
 
-        return (None, grad_B, grad_biases, None, None, *grad_params)
+        # calculate the gradient to the biases matrices
+        grad_mparams = []
+        if ctx.M is not None:
+            mparams = [p.clone().detach().requires_grad_() for p in ctx.mparams]
+            with torch.enable_grad():
+                lmbdax = ctx.x * ctx.biases.unsqueeze(1)
+                mloss = ctx.M(lmbdax, *mparams)
 
-def conjgrad(A, params, B, biases=None, **options):
+            grad_mparams = torch.autograd.grad((mloss,), mparams,
+                grad_outputs=(v,),
+                create_graph=torch.is_grad_enabled())
+
+        return (None, grad_B, grad_biases, None, None, None, None,
+                *grad_params, *grad_mparams)
+
+def conjgrad(A, params, B, biases=None, M=None, mparams=[], **options):
     # use conjugate gradient descent to solve the inverse equation
     nbatch, na, ncols = B.shape
     config = set_default_option({
@@ -109,13 +142,18 @@ def conjgrad(A, params, B, biases=None, **options):
     # set up the preconditioning
     At = A
     if At.is_precond_set():
-        precond = lambda X: At.precond(X, *params, biases=biases)
+        precond = lambda X: At.precond(X, *params, biases=biases,
+                                       M=M, mparams=mparams)
     else:
         precond = lambda X: X
 
     # set up the biases
     if biases is not None:
-        Aa = lambda X: At(X, *params) - X*biases.unsqueeze(1)
+        b = biases.unsqueeze(1)
+        if M is not None:
+            Aa = lambda X: At(X, *params) - M(X, *mparams) * b
+        else:
+            Aa = lambda X: At(X, *params) - X * b
     else:
         Aa = lambda X: At(X, *params)
 
@@ -183,7 +221,7 @@ if __name__ == "__main__":
         return torch.bmm(Amat, X)
 
     @A.set_precond
-    def precond(X, A1, diag, biases=None):
+    def precond(X, A1, diag, biases=None, M=None, mparams=[]):
         # X: (nbatch, na, ncols)
         return X / diag.unsqueeze(-1)
 

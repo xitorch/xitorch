@@ -19,7 +19,7 @@ def test_decor(dtype, device):
     assert not A.is_precond_set()
 
     @A.set_precond
-    def precond(x, diag, biases=None):
+    def precond(x, diag, biases=None, M=None, mparams=None):
         return x / diag
 
     assert A.is_precond_set()
@@ -46,7 +46,7 @@ def test_class(dtype, device):
         def forward(self, x, diag):
             return x * diag
 
-        def precond(self, y, diag, biases=None):
+        def precond(self, y, diag, biases=None, M=None, mparams=None):
             return y / diag
 
     # check the properties

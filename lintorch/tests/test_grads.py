@@ -173,7 +173,7 @@ def get_diagonally_dominant_class(na):
             y = torch.bmm(A, x)
             return y
 
-        def precond(self, y, A1, dg, biases=None):
+        def precond(self, y, A1, dg, biases=None, M=None, mparams=None):
             # return y
             # y: (nbatch, na, ncols)
             # dg: (nbatch, na)
