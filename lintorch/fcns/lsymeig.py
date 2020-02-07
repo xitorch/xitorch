@@ -10,9 +10,10 @@ This file contains methods to obtain eigenpairs of a linear transformation
 
 __all__ = ["lsymeig"]
 
-def lsymeig(A, params, neig, fwd_options={}, bck_options={}):
+def lsymeig(A, params, neig, M=None, mparams=[], fwd_options={}, bck_options={}):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a large matrix.
+    If M is specified, it solve the eigendecomposition Ax = eMx.
 
     Arguments
     ---------
@@ -23,6 +24,10 @@ def lsymeig(A, params, neig, fwd_options={}, bck_options={}):
         Each of params must have shape of (nbatch,...)
     * neig: int
         The number of eigenpairs to be retrieved.
+    * M: lintorch.Module or None
+        The transformation on the right hand side. If None, then M=I.
+    * mparams: list of differentiable torch.tensor
+        List of differentiable torch.tensor to be put to M.
     * fwd_options:
         Eigendecomposition iterative algorithm options.
     * bck_options:
@@ -35,11 +40,16 @@ def lsymeig(A, params, neig, fwd_options={}, bck_options={}):
     * eigvecs: (nbatch, na, neig)
         The lowest eigenvalues and eigenvectors.
     """
-    return lsymeig_torchfcn.apply(A, neig, fwd_options, bck_options, *params)
+    na = len(params)
+    return lsymeig_torchfcn.apply(A, neig, M, fwd_options, bck_options, na, *params, *mparams)
 
 class lsymeig_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, neig, fwd_options, bck_options, *params):
+    def forward(ctx, A, neig, M, fwd_options, bck_options, na, *amparams):
+        # separate the sets of parameters
+        params = amparams[:na]
+        mparams = amparams[na:]
+
         config = set_default_option({
             "method": "davidson",
         }, fwd_options)
@@ -49,7 +59,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         method = config["method"].lower()
         if method == "davidson":
-            evals, evecs = davidson(A, params, neig, **config)
+            evals, evecs = davidson(A, params, neig, M, mparams, **config)
         elif method == "exacteig":
             evals, evecs = exacteig(A, params, neig, **config)
         else:
@@ -60,6 +70,8 @@ class lsymeig_torchfcn(torch.autograd.Function):
         ctx.evecs = evecs # (nbatch, na, neig)
         ctx.params = params
         ctx.A = A
+        ctx.M = M
+        ctx.mparams = mparams
         return evals, evecs
 
     @staticmethod
@@ -95,9 +107,13 @@ class lsymeig_torchfcn(torch.autograd.Function):
             grad_outputs=(gaccum,),
             create_graph=torch.is_grad_enabled(),
         )
-        return (None, None, None, None, *grad_params)
 
-def davidson(A, params, neig, **options):
+        grad_mparams = []
+        if ctx.M is not None:
+            pass # ???
+        return (None, None, None, None, None, None, *grad_params, *grad_mparams)
+
+def davidson(A, params, neig, M=None, mparams=[], **options):
     """
     Iterative methods to obtain the `neig` lowest eigenvalues and eigenvectors.
     This function is written so that the backpropagation can be done.
@@ -111,6 +127,10 @@ def davidson(A, params, neig, **options):
         Each of params must have shape of (nbatch,...)
     * neig: int
         The number of eigenpairs to be retrieved.
+    * M: lintorch.Module or None
+        The transformation on the right hand side. If None, then M=I.
+    * mparams: list of differentiable torch.tensor
+        List of differentiable torch.tensor to be put to M.
     * **options:
         Iterative algorithm options.
 
@@ -237,7 +257,7 @@ def davidson(A, params, neig, **options):
     eigvecs = eigvecA # (nbatch, na, neig)
     return eigvals, eigvecs
 
-def exacteig(A, params, neig, **options):
+def exacteig(A, params, neig, M=None, mparams=[], **options):
     """
     The exact method to obtain the `neig` lowest eigenvalues and eigenvectors.
     This function is written so that the backpropagation can be done.
@@ -251,6 +271,10 @@ def exacteig(A, params, neig, **options):
         Each of params must have shape of (nbatch,...)
     * neig: int
         The number of eigenpairs to be retrieved.
+    * M: lintorch.Module or None
+        The transformation on the right hand side. If None, then M=I.
+    * mparams: list of differentiable torch.tensor
+        List of differentiable torch.tensor to be put to M.
     * **options:
         The algorithm options.
 
@@ -322,7 +346,7 @@ if __name__ == "__main__":
             y = torch.bmm(A, x)
             return y
 
-        def precond(self, y, A1, dg, biases=None):
+        def precond(self, y, A1, dg, biases=None, M=None, mparams=None):
             # return y
             # y: (nbatch, na, ncols)
             # dg: (nbatch, na)
