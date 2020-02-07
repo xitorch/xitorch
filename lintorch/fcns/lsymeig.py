@@ -260,13 +260,8 @@ def exacteig(A, params, neig, **options):
     * eigvecs: torch.tensor (nbatch, na, neig)
         The `neig` smallest eigenpairs
     """
-    na = _check_and_get_shape(A)
-    nbatch = params[0].shape[0]
-    dtype, device = _get_dtype_device(params, A)
-    V = torch.eye(na).unsqueeze(0).expand(nbatch,-1,-1).to(dtype).to(device)
-
     # obtain the full matrix of A
-    Amatrix = A(V, *params)
+    Amatrix = A.fullmatrix(*params)
     evals, evecs = torch.symeig(Amatrix, eigenvectors=True)
 
     return evals[:,:neig], evecs[:,:,:neig]

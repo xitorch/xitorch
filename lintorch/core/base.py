@@ -179,6 +179,34 @@ class Module(torch.nn.Module):
     def is_precond_set(self):
         return self._is_precond_set
 
+    ##################### implemented functions #####################
+    def fullmatrix(self, *params):
+        """
+        Returns the full matrix of the module.
+        Warning: if your matrix is too big, then calling this function will
+        drain your memory.
+        """
+
+        nbatch = params[0].shape[0]
+        na = self.shape[0]
+        dtype, device = self._get_dtype_device(params)
+        V = torch.eye(na).unsqueeze(0).expand(nbatch,-1,-1).to(dtype).to(device)
+
+        # obtain the full matrix of A
+        return self.forward(V, *params)
+
+    ##################### private functions #####################
+    def _get_dtype_device(params):
+        A_params = list(self.parameters())
+        if len(A_params) == 0:
+            p = params[0]
+        else:
+            p = A_params[0]
+        dtype = p.dtype
+        device = p.device
+        return dtype, device
+
+
 #################################### decor ####################################
 def module(shape,
            is_symmetric=True,
