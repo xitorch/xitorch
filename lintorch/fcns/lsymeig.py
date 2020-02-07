@@ -50,8 +50,6 @@ class lsymeig_torchfcn(torch.autograd.Function):
         method = config["method"].lower()
         if method == "davidson":
             evals, evecs = davidson(A, params, neig, **config)
-        elif method == "lanczos":
-            evals, evecs = lanczos(A, params, neig, **config)
         elif method == "exacteig":
             evals, evecs = exacteig(A, params, neig, **config)
         else:
@@ -98,80 +96,6 @@ class lsymeig_torchfcn(torch.autograd.Function):
             create_graph=torch.is_grad_enabled(),
         )
         return (None, None, None, None, *grad_params)
-
-def lanczos(A, params, neig, **options):
-    """
-    Lanczos iterative method to obtain the `neig` lowest eigenpairs.
-    This function is written so that the backpropagation can be done.
-
-    Arguments
-    ---------
-    * A: BaseLinearModule instance
-        The linear module object on which the eigenpairs are constructed.
-    * params: list of differentiable torch.tensor
-        List of differentiable torch.tensor to be put to A.forward(x,*params).
-        Each of params must have shape of (nbatch,...)
-    * neig: int
-        The number of eigenpairs to be retrieved.
-    * **options:
-        Iterative algorithm options.
-
-    Returns
-    -------
-    * eigvals: torch.tensor (nbatch, neig)
-    * eigvecs: torch.tensor (nbatch, na, neig)
-        The `neig` smallest eigenpairs
-    """
-    config = set_default_option({
-        "max_niter": 120,
-        "min_eps": 1e-6,
-        "verbose": False,
-        "v_init": "randn",
-    }, options)
-    verbose = config["verbose"]
-    min_eps = config["min_eps"]
-
-    # get the shape of the transformation
-    na = _check_and_get_shape(A)
-    nbatch = params[0].shape[0]
-    dtype, device = _get_dtype_device(params, A)
-
-    # set up the initial Krylov space
-    V = _set_initial_v(config["v_init"].lower(), nbatch, na, 1) # (nbatch,na,1)
-    V = V.to(dtype).to(device)
-
-    prev_eigvals = None
-    stop_reason = "max_niter"
-    for i in range(config["max_niter"]):
-        v = V[:,:,i] # (nbatch, na)
-        Av = A(v, *params) # (nbatch, na)
-
-        # construct the Krylov space
-        V = torch.cat((V, Av.unsqueeze(-1)), dim=-1) # (nbatch, na, i+1)
-
-        # orthogonalize
-        Q, R = torch.qr(V) # Q: (nbatch, na, i+1)
-        V = Q
-
-        AV = A(V, *params) # (nbatch, na, i+1)
-        T = torch.bmm(V.transpose(-2,-1), AV) # (nbatch, i+1, i+1)
-
-        # check convergence
-        if i+1 < neig: continue
-        eigvalT, eigvecT = torch.symeig(T, eigenvectors=True) # val: (nbatch, i+1)
-        eigvecA = torch.bmm(V, eigvecT) # (nbatch, na, i+1)
-        if prev_eigvals is not None:
-            dev = (eigvalT[:,:neig].data - prev_eigvals).abs().max()
-            if verbose:
-                print("Iter %3d (guess size: %d): %.3e" % (i, eigvecA.shape[-1], dev))
-            if dev < min_eps:
-                stop_reason = "min_eps"
-                break
-        prev_eigvals = eigvalT[:,:neig]
-
-    eigvals = eigvalT[:,:neig]
-    eigvecs = eigvecA[:,:,:neig]
-    return eigvals, eigvecs
 
 def davidson(A, params, neig, **options):
     """
