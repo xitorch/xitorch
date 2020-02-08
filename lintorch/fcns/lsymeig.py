@@ -214,7 +214,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             if verbose:
                 print("Iter %3d (guess size: %d): resid: %.3e, devals: %.3e" % \
                       (i+1, nguess, max_resid, max_deigval))
-            if max_resid < min_eps:
+            if max_resid < min_eps or AV.shape[-1] == AV.shape[1]:
                 break
         prev_eigvalT = eigvalT
 

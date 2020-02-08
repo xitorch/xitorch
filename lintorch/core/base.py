@@ -209,7 +209,7 @@ class Module(torch.nn.Module):
         return self.forward(V, *params)
 
     ##################### private functions #####################
-    def _get_dtype_device(params):
+    def _get_dtype_device(self, params):
         A_params = list(self.parameters())
         if len(A_params) == 0:
             p = params[0]
