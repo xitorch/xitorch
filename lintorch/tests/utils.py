@@ -10,7 +10,7 @@ def device_dtype_float_test(only64=False, onlycpu=False):
     devices = [torch.device("cpu"), torch.device("cuda")]
     if only64:
         dtypes = [torch.float64]
-    if onlycpu:
+    if onlycpu or not torch.cuda.is_available():
         devices = [torch.device("cpu")]
 
     def device_dtype_float_test_fcn(fcn):

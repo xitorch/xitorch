@@ -46,26 +46,37 @@ def test_grad_lsymeig(dtype, device):
 def test_grad_solve(dtype, device):
     # generate the matrix
     na = 10
+    ncols = 2
     torch.manual_seed(124)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
-    xtrue = torch.rand(1,na,1).to(dtype).to(device)
+    M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+    Mcls = get_diagonally_dominant_class(na)
+    xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
     A = Acls()
-    b = A(xtrue, A1, diag).detach().requires_grad_()
+    M = Mcls()
+    biases = torch.rand(1,ncols).to(dtype).to(device)
+    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
 
-    def getloss(A1, diag, b):
+    def getloss(A1, diag, b, biases, M1, mdiag):
         fwd_options = {
             "min_eps": 1e-9
         }
         bck_options = {
             "verbose": False,
         }
-        xinv = lt.solve(A, (A1, diag), b, fwd_options=fwd_options)
+        xinv = lt.solve(A, (A1, diag), b,
+            biases = biases,
+            M = M,
+            mparams = (M1, mdiag),
+            fwd_options = fwd_options)
         lss = (xinv**2).sum()
         return lss
 
-    compare_grad_with_fd(getloss, (A1, diag, b), [0, 1, 2], eps=1e-6,
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag),
+        [0,1,2,3,4,5], eps=1e-6,
         max_rtol=4e-3, max_median_rtol=1e-3, fd_to64=True)
 
 @device_dtype_float_test(only64=True)
@@ -119,17 +130,25 @@ def test_2grad_lsymeig(dtype, device):
 def test_2grad_solve(dtype, device):
     # generate the matrix
     na = 10
+    ncols = 2
     torch.manual_seed(124)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
-    xtrue = torch.rand(1,na,1).to(dtype).to(device)
+    M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+    Mcls = get_diagonally_dominant_class(na)
+    xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
     A = Acls()
-    b = A(xtrue, A1, diag).detach().requires_grad_()
-    biases = (torch.ones((b.shape[0], b.shape[-1]))*1.2).to(dtype).to(device).requires_grad_()
+    M = Mcls()
+    biases = torch.rand(1,ncols).to(dtype).to(device)
+    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
 
-    def getloss(A1, diag, b, biases, contrib):
+    def getloss(A1, diag, b, biases, M1, mdiag, contrib):
         fwd_options = {
+            "min_eps": 1e-9
+        }
+        bck_options = {
             "min_eps": 1e-9
         }
         bck_options = {
@@ -140,27 +159,40 @@ def test_2grad_solve(dtype, device):
             b.requires_grad_()
             diag.requires_grad_()
             biases.requires_grad_()
-            xinv = lt.solve(A, (A1, diag), b, biases=biases, fwd_options=fwd_options)
+            M1.requires_grad_()
+            mdiag.requires_grad_()
+            xinv = lt.solve(A, (A1, diag), b,
+                biases = biases,
+                M = M,
+                mparams = (M1, mdiag),
+                fwd_options = fwd_options,
+                bck_options = bck_options)
             lss = (xinv**2).sum()
-            grad_A1, grad_diag, grad_b, grad_biases = torch.autograd.grad(
-                lss,
-                (A1, diag, b, biases), create_graph=True)
+            grad_A1, grad_diag, grad_b, grad_biases, grad_M1, grad_mdiag = \
+                    torch.autograd.grad(
+                        lss,
+                        (A1, diag, b, biases, M1, mdiag), create_graph=True)
         loss = 0
         if contrib == "params":
             loss = loss + (grad_A1**2).sum()
             loss = loss + (grad_diag**2).sum()
+        elif contrib == "mparams":
+            loss = loss + (grad_M1**2).sum()
+            loss = loss + (grad_mdiag**2).sum()
         elif contrib == "b":
             loss = loss + (grad_b**2).sum()
         elif contrib == "biases":
             loss = loss + (grad_biases**2).sum()
         return loss
 
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, "params"), [0, 1, 2, 3],
-        eps=1e-6, max_rtol=2e-2, max_median_rtol=2e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, "b"), [0, 1, 2, 3],
-        eps=1e-6, max_rtol=2e-2, max_median_rtol=2e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, "biases"), [0, 1, 2, 3],
-        eps=1e-6, max_rtol=2e-2, max_median_rtol=2e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "params"),
+            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=4e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "mparams"),
+            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=6e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "b"),
+            [0,1,2,3,4,5], eps=1e-3, max_rtol=None, max_median_rtol=1e-2, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "biases"),
+            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=2e-3, fd_to64=True)
 
 def get_diagonally_dominant_class(na):
     class Acls(lt.Module):
