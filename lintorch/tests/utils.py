@@ -1,9 +1,10 @@
 import torch
+import lintorch as lt
 import pytest
 import argparse
 from lintorch.utils.fd import finite_differences
 
-__all__ = ["device_dtype_float_test", "compare_grad_with_fd"]
+__all__ = ["device_dtype_float_test", "compare_grad_with_fd", "get_diagonally_dominant_class"]
 
 def device_dtype_float_test(only64=False, onlycpu=False):
     dtypes = [torch.float, torch.float64]
@@ -66,3 +67,29 @@ def compare_grad_with_fd(fcn, args, idxs, eps=1e-6, max_rtol=1e-3,
             assert dev.max() < max_rtol, "Max dev ratio: %.3e (tolerated: %.3e)" % (dev.max(), max_rtol)
         if max_median_rtol is not None:
             assert dev.median() < max_median_rtol, "Median dev ratio: %.3e (tolerated: %.3e)" % (dev.median(), max_median_rtol)
+
+def get_diagonally_dominant_class(na):
+    class Acls(lt.Module):
+        def __init__(self):
+            super(Acls, self).__init__(shape=(na,na))
+
+        def forward(self, x, A1, diag):
+            Amatrix = (A1 + A1.transpose(-2,-1))
+            A = Amatrix + diag.diag_embed(dim1=-2, dim2=-1)
+            y = torch.bmm(A, x)
+            return y
+
+        def precond(self, y, A1, dg, biases=None, M=None, mparams=None):
+            # return y
+            # y: (nbatch, na, ncols)
+            # dg: (nbatch, na)
+            # biases: (nbatch, ncols) or None
+            Adiag = A1.diagonal(dim1=-2, dim2=-1) * 2
+            dd = (Adiag + dg).unsqueeze(-1)
+
+            if biases is not None:
+                dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
+            dd[dd.abs() < 1e-6] = 1.0
+            yprec = y / dd
+            return yprec
+    return Acls

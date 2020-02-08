@@ -1,7 +1,7 @@
 import time
 import torch
 import lintorch as lt
-from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test
+from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, get_diagonally_dominant_class
 
 @device_dtype_float_test(only64=True)
 def test_grad_lsymeig(dtype, device):
@@ -193,29 +193,3 @@ def test_2grad_solve(dtype, device):
             [0,1,2,3,4,5], eps=1e-3, max_rtol=None, max_median_rtol=1e-2, fd_to64=True)
     compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "biases"),
             [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=2e-3, fd_to64=True)
-
-def get_diagonally_dominant_class(na):
-    class Acls(lt.Module):
-        def __init__(self):
-            super(Acls, self).__init__(shape=(na,na))
-
-        def forward(self, x, A1, diag):
-            Amatrix = (A1 + A1.transpose(-2,-1))
-            A = Amatrix + diag.diag_embed(dim1=-2, dim2=-1)
-            y = torch.bmm(A, x)
-            return y
-
-        def precond(self, y, A1, dg, biases=None, M=None, mparams=None):
-            # return y
-            # y: (nbatch, na, ncols)
-            # dg: (nbatch, na)
-            # biases: (nbatch, ncols) or None
-            Adiag = A1.diagonal(dim1=-2, dim2=-1) * 2
-            dd = (Adiag + dg).unsqueeze(-1)
-
-            if biases is not None:
-                dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
-            dd[dd.abs() < 1e-6] = 1.0
-            yprec = y / dd
-            return yprec
-    return Acls
