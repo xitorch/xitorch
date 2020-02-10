@@ -88,7 +88,13 @@ def get_diagonally_dominant_class(na):
             dd = (Adiag + dg).unsqueeze(-1)
 
             if biases is not None:
-                dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
+                if M is not None:
+                    M1, Mdg = mparams
+                    Mdiag = M1.diagonal(dim1=-2, dim2=-1) * 2
+                    md = (Mdiag + Mdg).unsqueeze(-1)
+                    dd = dd - biases.unsqueeze(1) * md
+                else:
+                    dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
             dd[dd.abs() < 1e-6] = 1.0
             yprec = y / dd
             return yprec
