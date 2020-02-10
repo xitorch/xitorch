@@ -86,6 +86,11 @@ def test_lsymeig_with_M(dtype, device):
             "method": "davidson",
             "nguess": 10,
             "min_eps": 1e-9
+        },
+        {
+            "method": "davidson",
+            "nguess": 4,
+            "min_eps": 1e-9
         }
     ]
     for options in all_options:

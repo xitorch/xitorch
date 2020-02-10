@@ -213,6 +213,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             LVs = M(LVs, *mparams)
         resid = AVs - LVs
 
+        # print information and check convergence
         if prev_eigvalT is not None:
             deigval = eigvalT - prev_eigvalT
             max_deigval = deigval.abs().max()
@@ -256,7 +257,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         nadd = Vnew.shape[-1]-V.shape[-1]
         nguess = nguess + nadd
         if M is not None:
-            V, R = tallqr(Vnew, MV=M(Vnew, *params))
+            V, R = tallqr(Vnew, MV=M(Vnew, *mparams))
         else:
             V, R = tallqr(Vnew)
         # V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
