@@ -165,8 +165,9 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
     dtype, device = _get_dtype_device(params, A)
 
     # set up the initial guess
-    V = _set_initial_v(config["v_init"].lower(), nbatch, na, nguess) # (nbatch,na,nguess)
-    V = V.to(dtype).to(device)
+    V = _set_initial_v(config["v_init"].lower(), dtype, device,
+        nbatch, na, nguess,
+        M=M, mparams=mparams) # (nbatch,na,nguess)
 
     prev_eigvals = None
     stop_reason = "max_niter"
@@ -206,7 +207,11 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         eigvecA = torch.bmm(V, eigvecT) # (nbatch, na, neig)
 
         # calculate the residual
-        resid = torch.bmm(AV, eigvecT) - eigvalT.unsqueeze(1) * eigvecA # (nbatch, na, neig)
+        AVs = torch.bmm(AV, eigvecT)
+        LVs = eigvalT.unsqueeze(1) * eigvecA # (nbatch, na, neig)
+        if M is not None:
+            LVs = M(LVs, *mparams)
+        resid = AVs - LVs
 
         if prev_eigvalT is not None:
             deigval = eigvalT - prev_eigvalT
@@ -215,8 +220,10 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             if verbose:
                 print("Iter %3d (guess size: %d): resid: %.3e, devals: %.3e" % \
                       (i+1, nguess, max_resid, max_deigval))
-            if max_resid < min_eps or AV.shape[-1] == AV.shape[1]:
+            if max_resid < min_eps:
                 break
+        if AV.shape[-1] == AV.shape[1]:
+            break
         prev_eigvalT = eigvalT
 
         # apply the preconditioner
@@ -292,12 +299,19 @@ def exacteig(A, params, neig, M=None, mparams=[], **options):
     Amatrix = A.fullmatrix(*params)
     if M is None:
         evals, evecs = torch.symeig(Amatrix, eigenvectors=True)
+        return evals[:,:neig], evecs[:,:,:neig]
     else:
         Mmatrix = M.fullmatrix(*mparams)
-        MA = torch.matmul(Mmatrix.inverse(), Amatrix)
+        MA,_ = torch.solve(Amatrix, Mmatrix)
         evals, evecs = eig.apply(MA)
+        evals = evals[:,:neig]
+        evecs = evecs[:,:,:neig]
 
-    return evals[:,:neig], evecs[:,:,:neig]
+        # normalize in M-space
+        UMU = torch.sqrt((evecs * torch.matmul(Mmatrix, evecs)).sum(dim=-2, keepdim=True))
+        evecs = evecs / UMU
+        return evals, evecs
+
 
 def _get_dtype_device(params, A):
     A_params = list(A.parameters())
@@ -315,12 +329,11 @@ def _check_and_get_shape(A):
         raise TypeError("The linear transformation of davidson method must be a square matrix")
     return na
 
-def _set_initial_v(vinit_type, nbatch, na, nguess):
+def _set_initial_v(vinit_type, dtype, device, nbatch, na, nguess,
+                   M=None, mparams=None):
     torch.manual_seed(12421)
-    ortho = False
     if vinit_type == "eye":
         V = torch.eye(na, nguess).unsqueeze(0).repeat(nbatch,1,1)
-        ortho = True
     elif vinit_type == "randn":
         V = torch.randn(nbatch, na, nguess)
     elif vinit_type == "random" or vinit_type == "rand":
@@ -328,9 +341,12 @@ def _set_initial_v(vinit_type, nbatch, na, nguess):
     else:
         raise ValueError("Unknown v_init type: %s" % vinit_type)
 
+    V = V.to(dtype).to(device)
     # orthogonalize V
-    if not ortho:
-        V, R = torch.qr(V)
+    if M is not None:
+        V, R = tallqr(V, MV=M(V, *mparams))
+    else:
+        V, R = tallqr(V)
     return V
 
 if __name__ == "__main__":

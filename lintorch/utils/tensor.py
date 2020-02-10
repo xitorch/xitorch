@@ -5,10 +5,14 @@ This file contains functions for some linear algebra and basic operations of
 torch.tensor.
 """
 
-def tallqr(V):
+def tallqr(V, MV=None):
     # faster QR for tall and skinny matrix
     # V: (nbatch, na, nguess)
-    VTV = torch.bmm(V.transpose(-2,-1), V) # (nbatch, nguess, nguess)
+    # MV: (nbatch, na, nguess) where M is the basis to make Q M-orthogonal
+    # if MV is None, then MV=V
+    if MV is None:
+        MV = V
+    VTV = torch.bmm(V.transpose(-2,-1), MV) # (nbatch, nguess, nguess)
     R = torch.cholesky(VTV, upper=True) # (nbatch, nguess, nguess)
     Rinv = torch.inverse(R) # (nbatch, nguess, nguess)
     Q = torch.bmm(V, Rinv)

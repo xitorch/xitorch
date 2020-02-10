@@ -45,36 +45,51 @@ def test_lsymeig(dtype, device):
 @device_dtype_float_test()
 def test_lsymeig_with_M(dtype, device):
     # generate the matrix
-    na = 10
-    torch.manual_seed(123)
-    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
-    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
-    Acls = get_diagonally_dominant_class(na)
-    params = (A1, diag)
-    M1 = (torch.rand((1,na,na))*0.01).to(dtype).to(device)
-    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
-    Mcls = get_diagonally_dominant_class(na)
-    mparams = (M1, mdiag)
+    def runtest(options):
+        na = 10
+        torch.manual_seed(123)
+        A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+        diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+        Acls = get_diagonally_dominant_class(na)
+        params = (A1, diag)
+        M1 = (torch.rand((1,na,na))*0.01).to(dtype).to(device)
+        mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
+        Mcls = get_diagonally_dominant_class(na)
+        mparams = (M1, mdiag)
 
-    A = Acls()
-    M = Mcls()
-    neig = 4
-    options = {
-        "method": "exacteig",
-        "min_eps": 1e-9,
-    }
-    # evals: (nbatch, neig)
-    # evecs: (nbatch, na, neig)
-    evals, evecs = lt.lsymeig(A,
-        neig=neig,
-        params=params,
-        M=M,
-        mparams=mparams,
-        fwd_options=options)
+        A = Acls()
+        M = Mcls()
+        neig = 4
+        # evals: (nbatch, neig)
+        # evecs: (nbatch, na, neig)
+        evals, evecs = lt.lsymeig(A,
+            neig=neig,
+            params=params,
+            M=M,
+            mparams=mparams,
+            fwd_options=options)
 
-    AU = A(evecs, *params)
-    MUE = M(evals.unsqueeze(1) * evecs, *mparams)
-    assert torch.allclose(AU, MUE, atol=1e-5, rtol=1e-5)
+        AU = A(evecs, *params)
+        MUE = M(evals.unsqueeze(1) * evecs, *mparams)
+        assert torch.allclose(AU, MUE, atol=1e-5, rtol=1e-4)
+
+        # check orthogonality
+        UMU = torch.bmm(evecs.transpose(-2,-1), M(evecs, *mparams))
+        eye = torch.eye(UMU.shape[-1]).to(UMU.dtype).to(UMU.device)
+        assert torch.allclose(UMU, eye, atol=1e-4, rtol=1e-6)
+
+    all_options = [
+        {
+            "method": "exacteig",
+        },
+        {
+            "method": "davidson",
+            "nguess": 10,
+            "min_eps": 1e-9
+        }
+    ]
+    for options in all_options:
+        runtest(options)
 
 @device_dtype_float_test()
 def test_solve(dtype, device):
