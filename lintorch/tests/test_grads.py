@@ -6,7 +6,7 @@ from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, 
 @device_dtype_float_test(only64=True)
 def test_grad_lsymeig(dtype, device):
     # generate the matrix
-    na = 10
+    na = 4
     torch.manual_seed(123)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
@@ -45,7 +45,7 @@ def test_grad_lsymeig(dtype, device):
 @device_dtype_float_test(only64=True)
 def test_grad_solve(dtype, device):
     # generate the matrix
-    na = 10
+    na = 4
     ncols = 2
     torch.manual_seed(124)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
@@ -82,7 +82,7 @@ def test_grad_solve(dtype, device):
 @device_dtype_float_test(only64=True)
 def test_2grad_lsymeig(dtype, device):
     # generate the matrix
-    na = 10
+    na = 5
     torch.manual_seed(123)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
@@ -129,7 +129,7 @@ def test_2grad_lsymeig(dtype, device):
 @device_dtype_float_test(only64=True)
 def test_2grad_solve(dtype, device):
     # generate the matrix
-    na = 10
+    na = 4
     ncols = 2
     torch.manual_seed(124)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
