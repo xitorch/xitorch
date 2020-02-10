@@ -146,7 +146,7 @@ def test_solve_with_M(dtype, device):
         mparams = (M1, mdiag),
         fwd_options = fwd_options)
 
-    assert torch.allclose(x, xtrue, atol=1e-6, rtol=1e-6)
+    assert torch.allclose(x, xtrue, atol=1e-5, rtol=1e-6)
 
 @device_dtype_float_test(only64=True)
 def test_converge_solve(dtype, device):
