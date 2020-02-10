@@ -5,20 +5,62 @@ from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, 
 @device_dtype_float_test()
 def test_lsymeig(dtype, device):
     # generate the matrix
+    def runtest(options):
+        na = 10
+        torch.manual_seed(123)
+        A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+        diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+        Acls = get_diagonally_dominant_class(na)
+        params = (A1, diag)
+
+        A = Acls()
+        neig = 4
+        # evals: (nbatch, neig)
+        # evecs: (nbatch, na, neig)
+        evals, evecs = lt.lsymeig(A,
+            neig=neig,
+            params=params,
+            fwd_options=options)
+
+        # check with the eigendecomposition equation
+        AU = A(evecs, *params)
+        UE = evals.unsqueeze(1) * evecs
+        assert torch.allclose(AU, UE, atol=1e-5, rtol=1e-5)
+
+        # check orthogonality
+        UTU = torch.bmm(evecs.transpose(-2,-1), evecs)
+        eye = torch.eye(UTU.shape[-1]).unsqueeze(0).to(UTU.dtype).to(UTU.device)
+        assert torch.allclose(UTU, eye, atol=1e-5, rtol=1e-5)
+
+    all_options = [{
+        "method": "davidson",
+        "min_eps": 1e-9,
+        },
+        {
+        "method": "exacteig",
+        }]
+    for options in all_options:
+        runtest(options)
+
+@device_dtype_float_test()
+def test_lsymeig_with_M(dtype, device):
+    # generate the matrix
     na = 10
     torch.manual_seed(123)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
     params = (A1, diag)
+    M1 = (torch.rand((1,na,na))*0.01).to(dtype).to(device)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
+    Mcls = get_diagonally_dominant_class(na)
+    mparams = (M1, mdiag)
 
     A = Acls()
+    M = Mcls()
     neig = 4
     options = {
-        "method": "davidson",
-        "min_eps": 1e-9,
-    }
-    bck_options = {
+        "method": "exacteig",
         "min_eps": 1e-9,
     }
     # evals: (nbatch, neig)
@@ -26,12 +68,13 @@ def test_lsymeig(dtype, device):
     evals, evecs = lt.lsymeig(A,
         neig=neig,
         params=params,
-        fwd_options=options,
-        bck_options=bck_options)
+        M=M,
+        mparams=mparams,
+        fwd_options=options)
 
     AU = A(evecs, *params)
-    UE = evals.unsqueeze(1) * evecs
-    assert torch.allclose(AU, UE, atol=1e-5, rtol=1e-5)
+    MUE = M(evals.unsqueeze(1) * evecs, *mparams)
+    assert torch.allclose(AU, MUE, atol=1e-5, rtol=1e-5)
 
 @device_dtype_float_test()
 def test_solve(dtype, device):

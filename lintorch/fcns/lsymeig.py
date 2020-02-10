@@ -2,6 +2,7 @@ import torch
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
 from lintorch.utils.tensor import tallqr, to_fortran_order
+from lintorch.utils.eig import eig
 
 """
 This file contains methods to obtain eigenpairs of a linear transformation
@@ -61,7 +62,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
         if method == "davidson":
             evals, evecs = davidson(A, params, neig, M, mparams, **config)
         elif method == "exacteig":
-            evals, evecs = exacteig(A, params, neig, **config)
+            evals, evecs = exacteig(A, params, neig, M, mparams, **config)
         else:
             raise RuntimeError("Unknown eigen decomposition method: %s" % config["method"])
 
@@ -225,7 +226,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         else:
             z = eigvalT
         if A.is_precond_set():
-            t = A.precond(-resid, *params, biases=z) # (nbatch, na, neig)
+            t = A.precond(-resid, *params, biases=z, M=M, mparams=mparams) # (nbatch, na, neig)
         else:
             t = -resid
 
@@ -247,7 +248,10 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             Vnew = Vnew[:,:,:Vnew.shape[1]]
         nadd = Vnew.shape[-1]-V.shape[-1]
         nguess = nguess + nadd
-        V, R = tallqr(Vnew)
+        if M is not None:
+            V, R = tallqr(Vnew, MV=M(Vnew, *params))
+        else:
+            V, R = tallqr(Vnew)
         # V, R = torch.qr(Vnew) # (nbatch, na, nguess+neig)
         AVnew = A(V[:,:,-nadd:], *params) # (nbatch,na,nadd)
         AVnew = to_fortran_order(AVnew)
@@ -284,9 +288,14 @@ def exacteig(A, params, neig, M=None, mparams=[], **options):
     * eigvecs: torch.tensor (nbatch, na, neig)
         The `neig` smallest eigenpairs
     """
-    # obtain the full matrix of A
+    # obtain the full matrices
     Amatrix = A.fullmatrix(*params)
-    evals, evecs = torch.symeig(Amatrix, eigenvectors=True)
+    if M is None:
+        evals, evecs = torch.symeig(Amatrix, eigenvectors=True)
+    else:
+        Mmatrix = M.fullmatrix(*mparams)
+        MA = torch.matmul(Mmatrix.inverse(), Amatrix)
+        evals, evecs = eig.apply(MA)
 
     return evals[:,:neig], evecs[:,:,:neig]
 
