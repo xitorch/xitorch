@@ -80,9 +80,10 @@ class lsymeig_torchfcn(torch.autograd.Function):
         # grad_evals: (nbatch, neig)
         # grad_evecs: (nbatch, na, neig)
 
-        # detach the evals and evecs
+        # get the variables from ctx
         evals = ctx.evals
         evecs = ctx.evecs
+        M = ctx.M
 
         # the loss function where the gradient will be retrieved
         params = [p.clone().detach().requires_grad_() for p in ctx.params]
@@ -94,14 +95,15 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         # calculate the contributions from the eigenvectors
         # orthogonalize the grad_evecs with evecs
-        B = grad_evecs - (grad_evecs * evecs).sum(dim=1, keepdim=True) * evecs
-        gevecs = solve(ctx.A, ctx.params, -B, biases=evals,
+        B = _ortho(grad_evecs, evecs, dim=1, M=M, mparams=ctx.mparams)
+        gevecs = solve(ctx.A, ctx.params, -B,
+            biases=evals, M=M, mparams=ctx.mparams,
             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         # orthogonalize gevecs w.r.t. evecs
-        gevecs = gevecs - (gevecs * evecs).sum(dim=1, keepdim=True) * evecs
+        gevecsA = _ortho(gevecs, evecs, dim=1, M=M, mparams=ctx.mparams)
 
         # accummulate the gradient contributions
-        gaccum = gevals + gevecs
+        gaccum = gevals + gevecsA
         grad_params = torch.autograd.grad(
             outputs=(loss,),
             inputs=params,
@@ -111,8 +113,24 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         grad_mparams = []
         if ctx.M is not None:
-            pass # ???
+            mparams = [p.clone().detach().requires_grad_() for p in ctx.mparams]
+            with torch.enable_grad():
+                mloss = ctx.M(evecs, *mparams) # (nbatch, na, neig)
+            gevecsM = gevecs * evals.unsqueeze(1)
+            grad_mparams = torch.autograd.grad(
+                outputs=(mloss,),
+                inputs=mparams,
+                grad_outputs=gevecsM,
+                create_graph=torch.is_grad_enabled(),
+            )
+
         return (None, None, None, None, None, None, *grad_params, *grad_mparams)
+
+def _ortho(A, B, dim=1, M=None, mparams=[]):
+    if M is None:
+        return A - (A * B).sum(dim=1, keepdim=True) * B
+    else:
+        return A - (M(A, *mparams) * B).sum(dim=1, keepdim=True) * B
 
 def davidson(A, params, neig, M=None, mparams=[], **options):
     """
@@ -361,6 +379,8 @@ if __name__ == "__main__":
     torch.manual_seed(123)
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).requires_grad_(True)
     diag = (torch.arange(na, dtype=dtype)+1.0).unsqueeze(0).requires_grad_(True)
+    M1 = (torch.rand((1,na,na))*0.1).to(dtype).requires_grad_(True)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).unsqueeze(0).requires_grad_(True)
 
     class Acls(Module):
         def __init__(self):
@@ -381,16 +401,23 @@ if __name__ == "__main__":
             dd = (Adiag + dg).unsqueeze(-1)
 
             if biases is not None:
-                dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
+                if M is not None:
+                    M1, Mdg = mparams
+                    Mdiag = M1.diagonal(dim1=-2, dim2=-1) * 2
+                    md = (Mdiag + Mdg).unsqueeze(-1)
+                    dd = dd - biases.unsqueeze(1) * md
+                else:
+                    dd = dd - biases.unsqueeze(1) # (nbatch, na, ncols)
             dd[dd.abs() < 1e-6] = 1.0
             yprec = y / dd
             return yprec
 
-    def getloss(A1, diag):
+    def getloss(A1, diag, M1, mdiag):
         A = Acls()
+        M = Acls()
         neig = 4
         options = {
-            "method": "davidson",
+            "method": "exacteig",
             "verbose": False,
             "nguess": neig,
             "v_init": "randn",
@@ -402,25 +429,30 @@ if __name__ == "__main__":
         with torch.enable_grad():
             A1.requires_grad_()
             diag.requires_grad_()
+            M1.requires_grad_()
+            mdiag.requires_grad_()
             evals, evecs = lsymeig(A,
                 neig=neig,
                 params=(A1, diag,),
+                M=M,
+                mparams=(M1, mdiag,),
                 fwd_options=options,
                 bck_options=bck_options)
 
             lss = 0
-            # lss = lss + (evals**1).abs().sum() # correct
-            lss = lss + (evecs**1).abs().sum()
+            lss = lss + (evals**1).abs().sum() # correct
+            # lss = lss + (evecs**1).abs().sum()
             grad_A1, grad_diag = torch.autograd.grad(lss, (A1, diag),
                 create_graph=True)
 
         loss = 0
-        loss = loss + (grad_A1**2).abs().sum()
-        loss = loss + (grad_diag**2).abs().sum()
+        loss = loss + lss
+        # loss = loss + (grad_A1**2).abs().sum()
+        # loss = loss + (grad_diag**2).abs().sum()
         return loss
 
     t0 = time.time()
-    loss = getloss(A1, diag)
+    loss = getloss(A1, diag, M1, mdiag)
     t1 = time.time()
     print("Forward done in %fs" % (t1 - t0))
     loss.backward()
@@ -428,15 +460,31 @@ if __name__ == "__main__":
     print("Backward done in %fs" % (t2 - t1))
     Agrad = A1.grad.data
     dgrad = diag.grad.data
+    Mgrad = M1.grad.data
+    mdgrad = mdiag.grad.data
 
-    Afd = finite_differences(getloss, (A1, diag,), 0, eps=1e-3)
-    dfd = finite_differences(getloss, (A1, diag,), 1, eps=1e-3)
+    Afd = finite_differences(getloss, (A1, diag, M1, mdiag), 0, eps=1e-3)
+    dfd = finite_differences(getloss, (A1, diag, M1, mdiag), 1, eps=1e-3)
+    Mfd = finite_differences(getloss, (A1, diag, M1, mdiag), 2, eps=1e-3)
+    mdfd = finite_differences(getloss, (A1, diag, M1, mdiag), 3, eps=1e-3)
     print("Finite differences done")
 
+    print("A1:")
     print(Agrad)
     print(Afd)
     print(Agrad/Afd)
 
+    print("diag:")
     print(dgrad)
     print(dfd)
     print(dgrad/dfd)
+
+    print("M1:")
+    print(Mgrad)
+    print(Mfd)
+    print(Mgrad/Afd)
+
+    print("mdiag:")
+    print(mdgrad)
+    print(mdfd)
+    print(mdgrad/mdfd)
