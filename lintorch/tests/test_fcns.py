@@ -105,6 +105,29 @@ def test_solve(dtype, device):
     A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Acls = get_diagonally_dominant_class(na)
+    xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
+    A = Acls()
+    biases = torch.rand(1,ncols).to(dtype).to(device)
+    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * xtrue)
+
+    fwd_options = {
+        "min_eps": 1e-9,
+    }
+    x = lt.solve(A, (A1, diag), b,
+        biases = biases,
+        fwd_options = fwd_options)
+
+    assert torch.allclose(x, xtrue, atol=1e-5, rtol=1e-4)
+
+@device_dtype_float_test()
+def test_solve_with_M(dtype, device):
+    # generate the matrix
+    na = 10
+    ncols = 2
+    torch.manual_seed(124)
+    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
+    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
+    Acls = get_diagonally_dominant_class(na)
     M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
     mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Mcls = get_diagonally_dominant_class(na)
@@ -112,7 +135,7 @@ def test_solve(dtype, device):
     A = Acls()
     M = Mcls()
     biases = torch.rand(1,ncols).to(dtype).to(device)
-    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
+    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag))
 
     fwd_options = {
         "min_eps": 1e-9,
