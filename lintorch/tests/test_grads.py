@@ -77,7 +77,7 @@ def test_grad_solve(dtype, device):
 
     compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag),
         [0,1,2,3,4,5], eps=1e-6,
-        max_rtol=4e-3, max_median_rtol=1e-3, fd_to64=True)
+        max_rtol=5e-3, max_median_rtol=1e-3, fd_to64=True)
 
 @device_dtype_float_test(only64=True)
 def test_2grad_lsymeig(dtype, device):
