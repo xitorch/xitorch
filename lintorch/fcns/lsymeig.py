@@ -95,12 +95,12 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         # calculate the contributions from the eigenvectors
         # orthogonalize the grad_evecs with evecs
-        B = _ortho(grad_evecs, evecs, dim=1, M=M, mparams=ctx.mparams)
+        B = _ortho(grad_evecs, evecs, dim=1, M=M, mparams=ctx.mparams, mright=False)
         gevecs = solve(ctx.A, ctx.params, -B,
             biases=evals, M=M, mparams=ctx.mparams,
             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         # orthogonalize gevecs w.r.t. evecs
-        gevecsA = _ortho(gevecs, evecs, dim=1, M=M, mparams=ctx.mparams)
+        gevecsA = _ortho(gevecs, evecs, dim=1, M=M, mparams=ctx.mparams, mright=True)
 
         # accummulate the gradient contributions
         gaccumA = gevalsA + gevecsA
@@ -128,11 +128,13 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         return (None, None, None, None, None, None, *grad_params, *grad_mparams)
 
-def _ortho(A, B, dim=1, M=None, mparams=[]):
+def _ortho(A, B, dim=1, M=None, mparams=[], mright=True):
     if M is None:
         return A - (A * B).sum(dim=dim, keepdim=True) * B
-    else:
+    elif mright:
         return A - (M(A, *mparams) * B).sum(dim=dim, keepdim=True) * B
+    else:
+        return A - M((A * B).sum(dim=dim, keepdim=True) * B, *mparams)
 
 def davidson(A, params, neig, M=None, mparams=[], **options):
     """
@@ -419,7 +421,7 @@ if __name__ == "__main__":
         M = Acls()
         neig = 4
         options = {
-            "method": "exacteig",
+            "method": "davidson",
             "verbose": False,
             "nguess": neig,
             "v_init": "randn",
@@ -442,8 +444,8 @@ if __name__ == "__main__":
                 bck_options=bck_options)
 
             lss = 0
-            lss = lss + (evals**1).abs().sum() # correct
-            # lss = lss + (evecs**3).abs().sum()
+            # lss = lss + (evals**1).abs().sum() # correct
+            lss = lss + (evecs**1).abs().sum()
             # grad_A1, grad_diag = torch.autograd.grad(lss, (A1, diag),
             #     create_graph=True)
 
@@ -465,10 +467,10 @@ if __name__ == "__main__":
     Mgrad = M1.grad.data
     mdgrad = mdiag.grad.data
 
-    Afd = finite_differences(getloss, (A1, diag, M1, mdiag), 0, eps=1e-4)
-    dfd = finite_differences(getloss, (A1, diag, M1, mdiag), 1, eps=1e-4)
-    Mfd = finite_differences(getloss, (A1, diag, M1, mdiag), 2, eps=1e-4)
-    mdfd = finite_differences(getloss, (A1, diag, M1, mdiag), 3, eps=1e-4)
+    Afd = finite_differences(getloss, (A1, diag, M1, mdiag), 0, eps=1e-6)
+    dfd = finite_differences(getloss, (A1, diag, M1, mdiag), 1, eps=1e-6)
+    Mfd = finite_differences(getloss, (A1, diag, M1, mdiag), 2, eps=1e-6)
+    mdfd = finite_differences(getloss, (A1, diag, M1, mdiag), 3, eps=1e-6)
     print("Finite differences done")
 
     print("A1:")
