@@ -14,6 +14,10 @@ def finite_differences(fcn, args, iarg, eps=1e-6):
             newarg = args[iarg].detach() + dxs[i,:].view(shape)
             newargs = [(args[j] if j != iarg else newarg) for j in range(len(args))]
             loss = fcn(*newargs)
-            dlossdx[i] = (loss - loss0) / eps
+
+            newarg1 = args[iarg].detach() - dxs[i,:].view(shape)
+            newargs1 = [(args[j] if j != iarg else newarg1) for j in range(len(args))]
+            loss1 = fcn(*newargs1)
+            dlossdx[i] = (loss - loss1).detach() / (2*eps)
 
         return dlossdx.view(shape)
