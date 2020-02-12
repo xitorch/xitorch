@@ -37,10 +37,8 @@ def test_grad_lsymeig(dtype, device):
             loss = loss + (evecs**4).sum()
         return loss
 
-    compare_grad_with_fd(getloss, (A1, diag, "eigvals"), [0, 1], eps=1e-6,
-        max_rtol=5e-3, max_median_rtol=1e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1], eps=1e-6,
-        max_rtol=8e-2, max_median_rtol=2e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, "eigvals"), [0, 1])
+    compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1])
 
 @device_dtype_float_test(only64=True)
 def test_grad_solve(dtype, device):
@@ -75,9 +73,7 @@ def test_grad_solve(dtype, device):
         lss = (xinv**2).sum()
         return lss
 
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag),
-        [0,1,2,3,4,5], eps=1e-6,
-        max_rtol=5e-3, max_median_rtol=1e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag), [0,1,2,3,4,5])
 
 @device_dtype_float_test(only64=True)
 def test_2grad_lsymeig(dtype, device):
@@ -185,11 +181,7 @@ def test_2grad_solve(dtype, device):
             loss = loss + (grad_biases**2).sum()
         return loss
 
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "params"),
-            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=4e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "mparams"),
-            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=6e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "b"),
-            [0,1,2,3,4,5], eps=1e-3, max_rtol=None, max_median_rtol=1e-2, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "biases"),
-            [0,1,2,3,4,5], eps=1e-6, max_rtol=None, max_median_rtol=2e-3, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "params"), [0,1,2,3,4,5])
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "mparams"), [0,1,2,3,4,5])
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "b"), [0,1,2,3,4,5])
+    compare_grad_with_fd(getloss, (A1, diag, b, biases, M1, mdiag, "biases"), [0,1,2,3,4,5])

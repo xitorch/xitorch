@@ -23,7 +23,7 @@ def device_dtype_float_test(only64=False, onlycpu=False):
     return device_dtype_float_test_fcn
 
 def compare_grad_with_fd(fcn, args, idxs, eps=1e-6, max_rtol=1e-3,
-        max_median_rtol=1e-3, fd_to64=True, verbose=False):
+        max_median_rtol=1e-4, fd_to64=True, verbose=False):
 
     args = [a.clone().detach().requires_grad_() if type(a) == torch.Tensor else a for a in args]
     device = args[idxs[0]].device
