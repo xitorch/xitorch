@@ -51,6 +51,7 @@ class Module(torch.nn.Module):
             self._is_precond_set = self._check_fcn("precond")
 
     def to(self, dtype_or_device):
+        super(Module, self).to(dtype_or_device)
         if isinstance(dtype_or_device, torch.dtype):
             self._dtype = dtype_or_device
         elif isinstance(dtype_or_device, torch.device):
