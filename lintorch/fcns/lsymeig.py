@@ -42,7 +42,11 @@ def lsymeig(A, params, neig, M=None, mparams=[], fwd_options={}, bck_options={})
         The lowest eigenvalues and eigenvectors.
     """
     na = len(params)
-    return lsymeig_torchfcn.apply(A, neig, M, fwd_options, bck_options, na, *params, *mparams)
+    if "method" in fwd_options and fwd_options["method"].lower() == "exacteig":
+        return exacteig(A, params, neig, M, mparams, **fwd_options)
+    else:
+        # iterative method
+        return lsymeig_torchfcn.apply(A, neig, M, fwd_options, bck_options, na, *params, *mparams)
 
 class lsymeig_torchfcn(torch.autograd.Function):
     @staticmethod
@@ -61,8 +65,6 @@ class lsymeig_torchfcn(torch.autograd.Function):
         method = config["method"].lower()
         if method == "davidson":
             evals, evecs = davidson(A, params, neig, M, mparams, **config)
-        elif method == "exacteig":
-            evals, evecs = exacteig(A, params, neig, M, mparams, **config)
         else:
             raise RuntimeError("Unknown eigen decomposition method: %s" % config["method"])
 
