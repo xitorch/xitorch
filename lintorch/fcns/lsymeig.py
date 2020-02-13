@@ -112,7 +112,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
         )
 
         grad_mparams = []
-        if ctx.M is not None:
+        if ctx.M is not None and len(ctx.mparams) > 0:
             mparams = [p.clone().detach().requires_grad_() for p in ctx.mparams]
             with torch.enable_grad():
                 mloss = ctx.M(evecs, *mparams) # (nbatch, na, neig)
