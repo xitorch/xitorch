@@ -87,6 +87,10 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         # the loss function where the gradient will be retrieved
         params = [p.clone().detach().requires_grad_() for p in ctx.params]
+        # warnings: if not all params have the connection to the output of A,
+        # it could cause an infinite loop because pytorch will keep looking
+        # for the *params node and propagate further backward via the `evecs`
+        # path. So make sure all the *params are all connected in the graph.
         with torch.enable_grad():
             loss = ctx.A(evecs, *params) # (nbatch, na, neig)
 
