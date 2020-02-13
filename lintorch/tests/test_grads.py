@@ -13,7 +13,7 @@ def test_grad_lsymeig(dtype, device):
     Acls = get_diagonally_dominant_class(na)
 
     def getloss(A1, diag, contrib):
-        A = Acls()
+        A = Acls().to(dtype).to(device)
         neig = 4
         options = {
             # "method": "davidson",
@@ -53,8 +53,8 @@ def test_grad_solve(dtype, device):
     mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Mcls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
-    M = Mcls()
+    A = Acls().to(dtype).to(device)
+    M = Mcls().to(dtype).to(device)
     biases = torch.rand(1,ncols).to(dtype).to(device)
     b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
 
@@ -85,7 +85,7 @@ def test_2grad_lsymeig(dtype, device):
     Acls = get_diagonally_dominant_class(na)
 
     def getloss(A1, diag, contrib):
-        A = Acls()
+        A = Acls().to(dtype).to(device)
         neig = 4
         options = {
             "method": "davidson",
@@ -135,8 +135,8 @@ def test_2grad_solve(dtype, device):
     mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Mcls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
-    M = Mcls()
+    A = Acls().to(dtype).to(device)
+    M = Mcls().to(dtype).to(device)
     biases = torch.rand(1,ncols).to(dtype).to(device)
     b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
 

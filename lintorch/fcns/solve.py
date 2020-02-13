@@ -226,6 +226,7 @@ if __name__ == "__main__":
         return X / diag.unsqueeze(-1)
 
     xtrue = torch.rand(1,n,1).to(dtype)
+    A = A.to(dtype)
     b = A(xtrue, A1, diag).detach().requires_grad_()
     biases = (torch.ones((b.shape[0], b.shape[-1]))*1.2).to(dtype).requires_grad_()
     def getloss(A1, diag, b, biases):

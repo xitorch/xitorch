@@ -8,7 +8,9 @@ __all__ = ["Module", "module", "module_like"]
 class Module(torch.nn.Module):
     def __init__(self, shape,
                is_symmetric=True,
-               is_real=True):
+               is_real=True,
+               dtype=None,
+               device=None):
         super(Module, self).__init__()
 
         self._shape = shape
@@ -21,6 +23,13 @@ class Module(torch.nn.Module):
         self._is_forward_set = False
         self._is_transpose_set = False
         self._is_precond_set = False
+
+        if dtype is None:
+            dtype = torch.float32
+        if device is None:
+            device = torch.device("cpu")
+        self._device = device
+        self._dtype = dtype
 
         # optional arguments
         self._precond_opt_args = {
@@ -40,6 +49,15 @@ class Module(torch.nn.Module):
             else:
                 self._is_transpose_set = self._check_fcn("transpose")
             self._is_precond_set = self._check_fcn("precond")
+
+    def to(self, dtype_or_device):
+        if isinstance(dtype_or_device, torch.dtype):
+            self._dtype = dtype_or_device
+        elif isinstance(dtype_or_device, torch.device):
+            self._device = dtype_or_device
+        else:
+            raise TypeError("The arguments of .to() can only be torch dtype or device.")
+        return self
 
     def _check_fcn(self, fcnname):
         fcn = getattr(self, fcnname)
@@ -182,6 +200,14 @@ class Module(torch.nn.Module):
     def is_real(self):
         return self._is_real
 
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def device(self):
+        return self._device
+
     ##################### checkers #####################
     def is_forward_set(self):
         return self._is_forward_set
@@ -200,34 +226,25 @@ class Module(torch.nn.Module):
         drain your memory.
         """
 
-        nbatch = params[0].shape[0]
+        nbatch = params[0].shape[0] if len(params) > 0 else 1
         na = self.shape[0]
-        dtype, device = self._get_dtype_device(params)
+        dtype = self._dtype
+        device = self._device
         V = torch.eye(na).unsqueeze(0).expand(nbatch,-1,-1).to(dtype).to(device)
 
         # obtain the full matrix of A
         return self.forward(V, *params)
 
-    ##################### private functions #####################
-    def _get_dtype_device(self, params):
-        A_params = list(self.parameters())
-        if len(A_params) == 0:
-            p = params[0]
-        else:
-            p = A_params[0]
-        dtype = p.dtype
-        device = p.device
-        return dtype, device
-
-
 #################################### decor ####################################
 def module(shape,
            is_symmetric=True,
-           is_real=True):
+           is_real=True,
+           dtype=None,
+           device=None):
 
     def decor(fcn):
         # check if it is a function (???)
-        cls_module = Module(shape, is_symmetric, is_real)
+        cls_module = Module(shape, is_symmetric, is_real, dtype=dtype, device=device)
         cls_module.set_forward(fcn)
         return cls_module
 
@@ -237,7 +254,9 @@ def module_like(A):
     return module(
         shape = A.shape,
         is_symmetric = A.is_symmetric,
-        is_real = A.is_real
+        is_real = A.is_real,
+        dtype = A.dtype,
+        device = A.device
     )
 
 if __name__ == "__main__":

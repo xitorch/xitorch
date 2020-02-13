@@ -13,7 +13,7 @@ def test_lsymeig(dtype, device):
         Acls = get_diagonally_dominant_class(na)
         params = (A1, diag)
 
-        A = Acls()
+        A = Acls().to(dtype).to(device)
         neig = 4
         # evals: (nbatch, neig)
         # evecs: (nbatch, na, neig)
@@ -57,8 +57,8 @@ def test_lsymeig_with_M(dtype, device):
         Mcls = get_diagonally_dominant_class(na)
         mparams = (M1, mdiag)
 
-        A = Acls()
-        M = Mcls()
+        A = Acls().to(dtype).to(device)
+        M = Mcls().to(dtype).to(device)
         neig = 4
         # evals: (nbatch, neig)
         # evecs: (nbatch, na, neig)
@@ -106,7 +106,7 @@ def test_solve(dtype, device):
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Acls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
+    A = Acls().to(dtype).to(device)
     biases = torch.rand(1,ncols).to(dtype).to(device)
     b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * xtrue)
 
@@ -132,8 +132,8 @@ def test_solve_with_M(dtype, device):
     mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Mcls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
-    M = Mcls()
+    A = Acls().to(dtype).to(device)
+    M = Mcls().to(dtype).to(device)
     biases = torch.rand(1,ncols).to(dtype).to(device)
     b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag))
 
@@ -158,7 +158,7 @@ def test_converge_solve(dtype, device):
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Acls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
+    A = Acls().to(dtype).to(device)
     biases = torch.rand(1,ncols).to(dtype).to(device)
     params = (A1, diag)
     b = (A(xtrue, *params) - biases.unsqueeze(1) * xtrue)
@@ -189,8 +189,8 @@ def test_converge_solve_with_M(dtype, device):
     mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
     Mcls = get_diagonally_dominant_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
-    A = Acls()
-    M = Mcls()
+    A = Acls().to(dtype).to(device)
+    M = Mcls().to(dtype).to(device)
     params = (A1, diag)
     mparams = (M1, mdiag)
     biases = torch.rand(1,ncols).to(dtype).to(device)
@@ -223,7 +223,7 @@ def test_converge_lsymeig(dtype, device):
         Acls = get_diagonally_dominant_class(na)
         params = (A1, diag)
 
-        A = Acls()
+        A = Acls().to(dtype).to(device)
         neig = 4
         # evals: (nbatch, neig)
         # evecs: (nbatch, na, neig)
@@ -266,8 +266,8 @@ def test_converge_lsymeig_with_M(dtype, device):
         Mcls = get_diagonally_dominant_class(na)
         mparams = (M1, mdiag)
 
-        A = Acls()
-        M = Mcls()
+        A = Acls().to(dtype).to(device)
+        M = Mcls().to(dtype).to(device)
         neig = 4
         # evals: (nbatch, neig)
         # evecs: (nbatch, na, neig)

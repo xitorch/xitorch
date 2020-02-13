@@ -417,8 +417,8 @@ if __name__ == "__main__":
             return yprec
 
     def getloss(A1, diag, M1, mdiag):
-        A = Acls()
-        M = Acls()
+        A = Acls().to(dtype)
+        M = Acls().to(dtype)
         neig = 4
         options = {
             "method": "davidson",

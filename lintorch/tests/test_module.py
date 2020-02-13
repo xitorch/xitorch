@@ -6,7 +6,7 @@ from lintorch.tests.utils import device_dtype_float_test
 def test_decor(dtype, device):
     na = 25
 
-    @lt.module(shape=(na,na))
+    @lt.module(shape=(na,na), dtype=dtype, device=device)
     def A(x, diag):
         return x * diag
 
