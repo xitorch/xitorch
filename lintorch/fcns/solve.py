@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from lintorch.utils.misc import set_default_option
 
 __all__ = ["solve"]
@@ -71,6 +72,8 @@ class solve_torchfcn(torch.autograd.Function):
             x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "lbfgs":
             x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
+        elif method == "fista":
+            x = fista(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
@@ -300,6 +303,71 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
     res = xk.view(nbatch, ncols, na).transpose(-2,-1)
     return res
 
+def fista(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
+    # B: (nbatch, na, ncols)
+    # biases: (nbatch, ncols)
+    nbatch, na, ncols = B.shape
+
+    config = set_default_option({
+        "max_niter": 20,
+        "min_eps": 1e-6,
+        "eta": 2.0,
+        "verbose": False,
+    }, options)
+    min_eps = config["min_eps"]
+    verbose = config["verbose"]
+
+    A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
+    A, B = _mix_precond(A, B, precond) # making A well-conditioned
+
+    X = torch.zeros_like(B).to(B.device)
+    Y = X
+    t = 1.0
+    eta = config["eta"]
+    L = 1.0
+
+    # power iteration to find the largest eigenvalues
+    Xpow = B / B.norm(dim=1, keepdim=True) # (nbatch, na, ncols)
+    for i in range(10):
+        Axpow = A(Xpow)
+        Xpow = Axpow / Axpow.norm(dim=1, keepdim=True)
+    eval1 = _dot(Axpow, Xpow) # (nbatch, 1, ncols)
+    L = eval1
+
+    def pL(X, L):
+        dfx = (A(X) - B)
+        return X - 1./L * dfx, dfx
+
+    for i in range(config["max_niter"]):
+        # do the backtracking
+        pLy, dfy = pL(Y, L)
+        # while True:
+        #     Fx = 0.5 * _dot(pLy, A(pLy) - B)
+        #     pLymY = pLy-Y
+        #     Qxy = 0.5 * _dot(dfy, Y) + _dot(pLymY, dfy) + L*0.5 * _dot(pLymY, pLymY)
+        #     if Fx <= Qxy:
+        #         break
+        #     L *= eta
+        #     print("L: %.3e, Fx: %.3e, Qxy: %.3e" % (L, Fx, Qxy))
+        #     pLy, dfy = pL(Y, L)
+
+        Xnew = pLy
+        tnew = 0.5 * (1.0 + np.sqrt(1 + 4.0 * t*t))
+        Y = Xnew + (t - 1.0) / tnew * (Xnew - X)
+
+        X = Xnew
+        t = tnew
+
+        # check convergence
+        df = A(X) - B
+        resid = _dot(df, df)
+        minresid = resid.min()
+        if verbose:
+            print("Iter %3d: minresid %.3e, 1/L: %.3e" % (i+1, minresid, 1./L))
+        if minresid < min_eps:
+            break
+    return X
+
 def _setup_matrices(A, params, B, biases, M, mparams, posdef):
     # set up the preconditioning
     At = A
@@ -328,6 +396,12 @@ def _setup_matrices(A, params, B, biases, M, mparams, posdef):
     else:
         A = Aa
     return A, B, precond
+
+def _mix_precond(A, B, precond):
+    At = A
+    A = lambda X: precond(At(X))
+    B = precond(B)
+    return A, B
 
 def _set_jinv0_diag(jinv0, x0):
     if type(jinv0) == torch.Tensor:
