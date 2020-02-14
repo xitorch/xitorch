@@ -4,7 +4,7 @@ from lintorch.utils.misc import set_default_option
 __all__ = ["solve"]
 
 def solve(A, params, B, biases=None, M=None, mparams=[],
-          fwd_options={}, bck_options={}):
+          posdef=False, fwd_options={}, bck_options={}):
     """
     Performing iterative method to solve the equation Ax=b or
     (A-biases*M)x=b.
@@ -30,6 +30,8 @@ def solve(A, params, B, biases=None, M=None, mparams=[],
         then this argument is ignored. If None or ignored, then M=I.
     * mparams: list of differentiable torch.tensor
         List of differentiable torch.tensor to be put to M.
+    * posdef: bool
+        Flag to indicate if the transformation (A-lambda*M) is positive definite.
     * fwd_options: dict
         Options of the iterative solver in the forward calculation
     * bck_options: dict
@@ -38,11 +40,11 @@ def solve(A, params, B, biases=None, M=None, mparams=[],
     na = len(params)
     if biases is None:
         M = None
-    return solve_torchfcn.apply(A, B, biases, M, fwd_options, bck_options, na, *params, *mparams)
+    return solve_torchfcn.apply(A, B, biases, M, posdef, fwd_options, bck_options, na, *params, *mparams)
 
 class solve_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, B, biases, M, fwd_options, bck_options, na, *AMparams):
+    def forward(ctx, A, B, biases, M, posdef, fwd_options, bck_options, na, *AMparams):
         # B: (nbatch, nr, ncols)
         # biases: (nbatch, ncols) or None
         # params: (nbatch,...)
@@ -66,9 +68,9 @@ class solve_torchfcn(torch.autograd.Function):
 
         method = config["method"].lower()
         if method == "conjgrad":
-            x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, **config)
+            x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "lbfgs":
-            x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, **config)
+            x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
@@ -122,10 +124,10 @@ class solve_torchfcn(torch.autograd.Function):
                 grad_outputs=(v,),
                 create_graph=torch.is_grad_enabled())
 
-        return (None, grad_B, grad_biases, None, None, None, None,
+        return (None, grad_B, grad_biases, None, None, None, None, None,
                 *grad_params, *grad_mparams)
 
-def conjgrad(A, params, B, biases=None, M=None, mparams=[], **options):
+def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
     # use conjugate gradient descent to solve the inverse equation
     nbatch, na, ncols = B.shape
     config = set_default_option({
@@ -138,29 +140,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], **options):
     if not A.is_symmetric:
         raise RuntimeError("This function only works for real-symmetric matrix.")
 
-    # set up the preconditioning
-    At = A
-    if At.is_precond_set():
-        precond = lambda X: At.precond(X, *params, biases=biases,
-                                       M=M, mparams=mparams)
-    else:
-        precond = lambda X: X
-
-    # set up the biases
-    if biases is not None:
-        b = biases.unsqueeze(1)
-        if M is not None:
-            Aa = lambda X: At(X, *params) - M(X, *mparams) * b
-        else:
-            Aa = lambda X: At(X, *params) - X * b
-    else:
-        Aa = lambda X: At(X, *params)
-
-    # double the transformation to ensure posdefness
-    precondt = precond
-    B = Aa(B)
-    A = lambda X: Aa(Aa(X))
-    precond = lambda X: precondt(precondt(X))
+    A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
 
     # assign a variable to some of the options
     verbose = config["verbose"]
@@ -195,7 +175,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], **options):
 
     return X
 
-def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
+def lbfgs(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
     # B: (nbatch, na, ncols)
     # biases: (nbatch, ncols)
     nbatch, na, ncols = B.shape
@@ -210,23 +190,17 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
         "verbose": False,
     }, options)
 
+    A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
+
     def f(x):
         # x: (nbatch * ncols, na)
         # biases: (nbatch, ncols)
         x = x.view(nbatch, ncols, na).transpose(-2,-1) # (nbatch, na, ncols)
-        y = A(x, *params) # (nbatch, na, ncols)
-        if biases is not None:
-            xb = x
-            if M is not None:
-                xb = M(xb, *mparams) # (nbatch, na, ncols)
-            xb = xb * biases.unsqueeze(1)
-            y = y - xb # (nbatch, na, ncols)
+        y = A(x) # (nbatch, na, ncols)
         res = (y - B)
 
         # precondition the result
-        if A.is_precond_set():
-            res = A.precond(res, *params, biases=biases, M=M, mparams=mparams)
-
+        res = precond(res)
         res = res.transpose(-2,-1).contiguous().view(-1, na)
         return res
 
@@ -326,6 +300,35 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
     res = xk.view(nbatch, ncols, na).transpose(-2,-1)
     return res
 
+def _setup_matrices(A, params, B, biases, M, mparams, posdef):
+    # set up the preconditioning
+    At = A
+    if At.is_precond_set():
+        precond = lambda X: At.precond(X, *params, biases=biases,
+                                       M=M, mparams=mparams)
+    else:
+        precond = lambda X: X
+
+    # set up the biases
+    if biases is not None:
+        b = biases.unsqueeze(1)
+        if M is not None:
+            Aa = lambda X: At(X, *params) - M(X, *mparams) * b
+        else:
+            Aa = lambda X: At(X, *params) - X * b
+    else:
+        Aa = lambda X: At(X, *params)
+
+    # double the transformation to ensure posdefness
+    if not posdef:
+        precondt = precond
+        B = Aa(B)
+        A = lambda X: Aa(Aa(X))
+        precond = lambda X: precondt(precondt(X))
+    else:
+        A = Aa
+    return A, B, precond
+
 def _set_jinv0_diag(jinv0, x0):
     if type(jinv0) == torch.Tensor:
         jinv = jinv0
@@ -350,7 +353,7 @@ if __name__ == "__main__":
     dtype = torch.float64
     torch.manual_seed(123)
     A1 = (torch.rand(1,n,n).to(dtype) * 1e-2).requires_grad_()
-    diag = (torch.arange(n).to(dtype)+1.0).requires_grad_() # (na,)
+    diag = (torch.arange(n).to(dtype)+1.0).unsqueeze(0).requires_grad_() # (na,)
 
     @module(shape=(n,n))
     def A(X, A1, diag):
@@ -360,7 +363,10 @@ if __name__ == "__main__":
     @A.set_precond
     def precond(X, A1, diag, biases=None, M=None, mparams=[]):
         # X: (nbatch, na, ncols)
-        return X / diag.unsqueeze(-1)
+        # diag: (nbatch, na)
+        # biases: (nbatch, ncols)
+        dg = diag.unsqueeze(-1) - biases.unsqueeze(1)
+        return X / dg
 
     xtrue = torch.rand(1,n,1).to(dtype)
     A = A.to(dtype)
