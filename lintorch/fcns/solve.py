@@ -357,10 +357,10 @@ def fista(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
         # check convergence
         df = A(X) - B
         resid = _dot(df, df)
-        minresid = resid.min()
+        maxresid = resid.max()
         if verbose:
-            print("Iter %3d: minresid %.3e, 1/L: %.3e" % (i+1, minresid, 1./L))
-        if minresid < min_eps:
+            print("Iter %3d: minresid %.3e, 1/L: %.3e" % (i+1, maxresid, 1./L))
+        if maxresid < min_eps:
             break
     return X
 
