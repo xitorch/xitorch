@@ -59,10 +59,7 @@ class solve_torchfcn(torch.autograd.Function):
             "method": "conjgrad",
         }, bck_options)
 
-        # check symmetricity and must be a square matrix
-        if not A.is_symmetric:
-            msg = "The solve function cannot be used for non-symmetric transformation at the moment."
-            raise RuntimeError(msg)
+        # check the shape of the matrix
         if A.shape[0] != A.shape[1]:
             msg = "The solve function cannot be used for non-square transformation."
             raise RuntimeError(msg)
@@ -70,6 +67,8 @@ class solve_torchfcn(torch.autograd.Function):
         method = config["method"].lower()
         if method == "conjgrad":
             x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, **config)
+        elif method == "lbfgs":
+            x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
@@ -195,6 +194,135 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], **options):
         Rs_old = Rs_new
 
     return X
+
+def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
+    # B: (nbatch, na, ncols)
+    # biases: (nbatch, ncols)
+    nbatch, na, ncols = B.shape
+
+    config = set_default_option({
+        "max_niter": 20,
+        "min_eps": 1e-6,
+        "max_memory": 10,
+        "alpha0": 1.0,
+        "jinv0": 1.0,
+        "linesearch": False,
+        "verbose": False,
+    }, options)
+
+    def f(x):
+        # x: (nbatch * ncols, na)
+        # biases: (nbatch, ncols)
+        x = x.view(nbatch, ncols, na).transpose(-2,-1) # (nbatch, na, ncols)
+        y = A(x, *params) # (nbatch, na, ncols)
+        if biases is not None:
+            b = x
+            if M is not None:
+                b = M(b, *mparams) # (nbatch, na, ncols)
+            b = b * biases.unsqueeze(1)
+            y = y - b # (nbatch, na, ncols)
+        res = (y - B).transpose(-2,-1).contiguous().view(-1, na)
+        return res
+
+    # pull out the options for fast access
+    min_eps = config["min_eps"]
+    max_memory = config["max_memory"]
+    verbose = config["verbose"]
+    linesearch = config["linesearch"]
+    alpha = config["alpha0"]
+
+    # set up the initial jinv and the memories
+    b = B.transpose(-2,-1).view(nbatch*na, ncols)
+    x0 = torch.zeros_like(b).to(b.device)
+    H0 = _set_jinv0_diag(jinv0, b) # (nbatch*ncols, na)
+    sk_history = []
+    yk_history = []
+    rk_history = []
+
+    def _apply_Vk(rk, sk, yk, grad):
+        # sk: (nbatch, nfeat)
+        # yk: (nbatch, nfeat)
+        # rk: (nbatch, 1)
+        return grad - (sk * grad).sum(dim=-1, keepdim=True) * rk * yk
+
+    def _apply_VkT(rk, sk, yk, grad):
+        # sk: (nbatch, nfeat)
+        # yk: (nbatch, nfeat)
+        # rk: (nbatch, 1)
+        return grad - (yk * grad).sum(dim=-1, keepdim=True) * rk * sk
+
+    def _apply_Hk(H0, sk_hist, yk_hist, rk_hist, gk):
+        # H0: (nbatch, nfeat)
+        # sk: (nbatch, nfeat)
+        # yk: (nbatch, nfeat)
+        # rk: (nbatch, 1)
+        # gk: (nbatch, nfeat)
+        nhist = len(sk_hist)
+        if nhist == 0:
+            return H0 * gk
+
+        k = nhist - 1
+        rk = rk_hist[k]
+        sk = sk_hist[k]
+        yk = yk_hist[k]
+
+        # get the last term (rk * sk * sk.T)
+        rksksk = (sk * gk).sum(dim=-1, keepdim=True) * rk * sk
+
+        # calculate the V_(k-1)
+        grad = gk
+        grad = _apply_Vk(rk_hist[k], sk_hist[k], yk_hist[k], grad)
+        grad = _apply_Hk(H0, sk_hist[:k], yk_hist[:k], rk_hist[:k], grad)
+        grad = _apply_VkT(rk_hist[k], sk_hist[k], yk_hist[k], grad)
+        return grad + rksksk
+
+    def _line_search(xk, gk, dk, g):
+        if linesearch:
+            dx, dg, nit = line_search(dk, xk, gk, g)
+            return xk + dx, gk + dg
+        else:
+            return xk + alpha*dk, g(xk + alpha*dk)
+
+    # perform the main iteration
+    xk = x0
+    gk = f(xk)
+    for k in range(config["max_niter"]):
+        dk = -_apply_Hk(H0, sk_history, yk_history, rk_history, gk)
+        xknew, gknew = _line_search(xk, gk, dk, f)
+
+        # store the history
+        sk = xknew - xk # (nbatch, nfeat)
+        yk = gknew - gk
+        inv_rhok = 1.0 / (sk * yk).sum(dim=-1, keepdim=True) # (nbatch, 1)
+        sk_history.append(sk)
+        yk_history.append(yk)
+        rk_history.append(inv_rhok)
+        if len(sk_history) > max_memory:
+            sk_history = sk_history[-max_memory:]
+            yk_history = yk_history[-max_memory:]
+            rk_history = rk_history[-max_memory:]
+
+        # update for the next iteration
+        xk = xknew
+        # alphakold = alphak
+        gk = gknew
+
+        # check the stopping condition
+        if verbose:
+            print("Iter %3d: %.3e" % (k+1, gk.abs().max()))
+        if torch.allclose(gk, torch.zeros_like(gk), atol=min_feps):
+            break
+
+    # xk: (nbatch*ncols, na)
+    res = xk.view(nbatch, ncols, na).transpose(-2,-1)
+    return res
+
+def _set_jinv0_diag(jinv0, x0):
+    if type(jinv0) == torch.Tensor:
+        jinv = jinv0
+    else:
+        jinv = torch.zeros_like(x0).to(x0.device) + jinv0
+    return jinv
 
 def _safe_divide(A, B, eps=1e-10):
     C = B.clone()
