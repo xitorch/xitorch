@@ -378,6 +378,7 @@ def _powiter(A, Xpow, dim=1, n=5):
 def _setup_matrices(A, params, B, biases, M, mparams, posdef):
     # set up the preconditioning
     At = A
+    Atpose = A.transpose
     if At.is_precond_set():
         precond = lambda X: At.precond(X, *params, biases=biases,
                                        M=M, mparams=mparams)
@@ -389,16 +390,19 @@ def _setup_matrices(A, params, B, biases, M, mparams, posdef):
         b = biases.unsqueeze(1)
         if M is not None:
             Aa = lambda X: At(X, *params) - M(X, *mparams) * b
+            Aat = lambda X: Atpose(X, *params) - M.transpose(X, *mparams) * b
         else:
             Aa = lambda X: At(X, *params) - X * b
+            Aat = lambda X: Atpose(X, *params) - X * b
     else:
         Aa = lambda X: At(X, *params)
+        Aat = lambda X: Atpose(X, *params)
 
     # double the transformation to ensure posdefness
     if not posdef:
         precondt = precond
-        B = Aa(B)
-        A = lambda X: Aa(Aa(X))
+        B = Aat(B)
+        A = lambda X: Aat(Aa(X))
         precond = lambda X: precondt(precondt(X))
     else:
         A = Aa
