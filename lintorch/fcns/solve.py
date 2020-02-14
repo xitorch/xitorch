@@ -364,6 +364,8 @@ def fista(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
             break
     return X
 
+############################### helper functions ###############################
+
 def _powiter(A, Xpow, dim=1, n=5):
     # Xpow = torch.randn_like(Xpow).to(Xpow.device)
     Xpow = Xpow / Xpow.norm(dim=dim, keepdim=True)
