@@ -188,36 +188,37 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
         "min_eps": 1e-6,
         "max_memory": 10,
         "alpha0": 1.0,
-        "jinv0": 1.0,
+        "jinv0": None,
         "linesearch": False,
         "verbose": False,
     }, options)
 
     A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
+    A, B = _mix_precond(A, B, precond)
 
     def f(x):
         # x: (nbatch * ncols, na)
         # biases: (nbatch, ncols)
         x = x.view(nbatch, ncols, na).transpose(-2,-1) # (nbatch, na, ncols)
         y = A(x) # (nbatch, na, ncols)
-        res = (y - B)
-
-        # precondition the result
-        res = precond(res)
-        res = res.transpose(-2,-1).contiguous().view(-1, na)
+        res = (y - B).transpose(-2,-1).contiguous().view(-1, na)
         return res
 
     # pull out the options for fast access
     min_eps = config["min_eps"]
     max_memory = config["max_memory"]
-    verbose = True#config["verbose"]
+    verbose = config["verbose"]
     linesearch = config["linesearch"]
     alpha = config["alpha0"]
     jinv0 = config["jinv0"]
 
+    # power iteration to get the maximum step
+    if jinv0 is None:
+        jinv0 = 1. / _powiter(A, B, n=10)
+
     # set up the initial jinv and the memories
     b = B.transpose(-2,-1).view(nbatch*ncols, na)
-    x0 = torch.zeros_like(b).to(b.device)
+    x0 = b.clone()
     H0 = _set_jinv0_diag(jinv0, b) # (nbatch*ncols, na)
     sk_history = []
     yk_history = []
@@ -327,12 +328,7 @@ def fista(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
     L = 1.0
 
     # power iteration to find the largest eigenvalues
-    Xpow = B / B.norm(dim=1, keepdim=True) # (nbatch, na, ncols)
-    for i in range(10):
-        Axpow = A(Xpow)
-        Xpow = Axpow / Axpow.norm(dim=1, keepdim=True)
-    eval1 = _dot(Axpow, Xpow) # (nbatch, 1, ncols)
-    L = eval1
+    L = _powiter(A, B, n=10)
 
     def pL(X, L):
         dfx = (A(X) - B)
@@ -367,6 +363,15 @@ def fista(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options
         if minresid < min_eps:
             break
     return X
+
+def _powiter(A, Xpow, dim=1, n=5):
+    # Xpow = torch.randn_like(Xpow).to(Xpow.device)
+    Xpow = Xpow / Xpow.norm(dim=dim, keepdim=True)
+    for i in range(n):
+        Axpow = A(Xpow)
+        Xpow = Axpow / Axpow.norm(dim=dim, keepdim=True)
+    eval1 = _dot(Axpow, Xpow) # (nbatch, 1, ncols)
+    return eval1
 
 def _setup_matrices(A, params, B, biases, M, mparams, posdef):
     # set up the preconditioning
