@@ -216,23 +216,30 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
         x = x.view(nbatch, ncols, na).transpose(-2,-1) # (nbatch, na, ncols)
         y = A(x, *params) # (nbatch, na, ncols)
         if biases is not None:
-            b = x
+            xb = x
             if M is not None:
-                b = M(b, *mparams) # (nbatch, na, ncols)
-            b = b * biases.unsqueeze(1)
-            y = y - b # (nbatch, na, ncols)
-        res = (y - B).transpose(-2,-1).contiguous().view(-1, na)
+                xb = M(xb, *mparams) # (nbatch, na, ncols)
+            xb = xb * biases.unsqueeze(1)
+            y = y - xb # (nbatch, na, ncols)
+        res = (y - B)
+
+        # precondition the result
+        if A.is_precond_set():
+            res = A.precond(res, *params, biases=biases, M=M, mparams=mparams)
+
+        res = res.transpose(-2,-1).contiguous().view(-1, na)
         return res
 
     # pull out the options for fast access
     min_eps = config["min_eps"]
     max_memory = config["max_memory"]
-    verbose = config["verbose"]
+    verbose = True#config["verbose"]
     linesearch = config["linesearch"]
     alpha = config["alpha0"]
+    jinv0 = config["jinv0"]
 
     # set up the initial jinv and the memories
-    b = B.transpose(-2,-1).view(nbatch*na, ncols)
+    b = B.transpose(-2,-1).view(nbatch*ncols, na)
     x0 = torch.zeros_like(b).to(b.device)
     H0 = _set_jinv0_diag(jinv0, b) # (nbatch*ncols, na)
     sk_history = []
@@ -281,7 +288,8 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
             dx, dg, nit = line_search(dk, xk, gk, g)
             return xk + dx, gk + dg
         else:
-            return xk + alpha*dk, g(xk + alpha*dk)
+            xnew = xk + alpha*dk
+            return xnew, g(xnew)
 
     # perform the main iteration
     xk = x0
@@ -293,7 +301,8 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
         # store the history
         sk = xknew - xk # (nbatch, nfeat)
         yk = gknew - gk
-        inv_rhok = 1.0 / (sk * yk).sum(dim=-1, keepdim=True) # (nbatch, 1)
+        skyk = _dot(sk, yk, dim=-1) # (nbatch, 1)
+        inv_rhok = 1.0 / skyk # (nbatch, 1)
         sk_history.append(sk)
         yk_history.append(yk)
         rk_history.append(inv_rhok)
@@ -302,16 +311,16 @@ def lbfgs(A, params, B, biases=None, M=None, mparams=[], **options):
             yk_history = yk_history[-max_memory:]
             rk_history = rk_history[-max_memory:]
 
+        # check the stopping condition
+        if verbose:
+            print("Iter %3d: %.3e" % (k+1, gk.abs().max()))
+        if torch.allclose(gk, torch.zeros_like(gk), atol=min_eps):
+            break
+
         # update for the next iteration
         xk = xknew
         # alphakold = alphak
         gk = gknew
-
-        # check the stopping condition
-        if verbose:
-            print("Iter %3d: %.3e" % (k+1, gk.abs().max()))
-        if torch.allclose(gk, torch.zeros_like(gk), atol=min_feps):
-            break
 
     # xk: (nbatch*ncols, na)
     res = xk.view(nbatch, ncols, na).transpose(-2,-1)
@@ -329,8 +338,8 @@ def _safe_divide(A, B, eps=1e-10):
     C[C.abs() < eps] = eps
     return A / C
 
-def _dot(C, D):
-    return (C*D).sum(dim=1, keepdim=True) # (nbatch, 1, ncols)
+def _dot(C, D, dim=1):
+    return (C*D).sum(dim=dim, keepdim=True) # (nbatch, 1, ncols)
 
 if __name__ == "__main__":
     import time
@@ -355,11 +364,12 @@ if __name__ == "__main__":
 
     xtrue = torch.rand(1,n,1).to(dtype)
     A = A.to(dtype)
-    b = A(xtrue, A1, diag).detach().requires_grad_()
-    biases = (torch.ones((b.shape[0], b.shape[-1]))*1.2).to(dtype).requires_grad_()
+    biases = (torch.ones((xtrue.shape[0], xtrue.shape[-1]))*1.2).to(dtype).requires_grad_()
+    b = (A(xtrue, A1, diag) - biases.unsqueeze(1)).detach().requires_grad_()
     def getloss(A1, diag, b, biases):
         fwd_options = {
             "verbose": False,
+            "method": "lbfgs",
             "min_eps": 1e-9
         }
         bck_options = {
