@@ -139,10 +139,6 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
         "min_eps": 1e-6, # minimum residual to stop
     }, options)
 
-    # this function cannot work for non-symmetric matrix
-    if not A.is_symmetric:
-        raise RuntimeError("This function only works for real-symmetric matrix.")
-
     A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
 
     # assign a variable to some of the options
@@ -402,7 +398,18 @@ def _setup_matrices(A, params, B, biases, M, mparams, posdef):
     if not posdef:
         precondt = precond
         B = Aat(B)
-        A = lambda X: Aat(Aa(X))
+        if At.is_transpose_set():
+            A = lambda X: Aat(Aa(X))
+        else:
+            # efficiently evaluate A^T*A*x
+            def Afcn(X):
+                X = X.detach().requires_grad_()
+                with torch.enable_grad():
+                    Y = Aa(X)
+                res = torch.autograd.grad(Y, (X,), grad_outputs=(Y,))[0]
+                return res
+            A = Afcn
+
         precond = lambda X: precondt(precondt(X))
     else:
         A = Aa

@@ -127,7 +127,14 @@ class Module(torch.nn.Module):
         """
         if self.is_transpose_set():
             return self._fcn_transpose(x, *params)
-        raise UnimplementedError("The transpose function has not been defined.")
+
+        # the transpose is simply the backward propagation
+        with torch.enable_grad():
+            x1 = x.detach().requires_grad_()
+            y1 = self.forward(x1, *params)
+        res = torch.autograd.grad(y1, (x1,), grad_outputs=(x,),
+            create_graph=torch.is_grad_enabled())[0]
+        return res
 
     def precond(self, x, *params, biases=None, M=None, mparams=[]):
         """
