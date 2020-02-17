@@ -124,7 +124,12 @@ class lsymeig_torchfcn(torch.autograd.Function):
                 mloss = ctx.M(evecs, *mparams) # (nbatch, na, neig)
             gevalsM = -gevalsA * evals.unsqueeze(1)
             gevecsM = -gevecsA * evals.unsqueeze(1)
-            gaccumM = gevalsM + gevecsM
+
+            # the contribution from the orthogonal elements
+            Bortho = grad_evecs - B # (nbatch, na, neig)
+            gevecsM_ortho = -0.5 * (Bortho * evecs).sum(dim=1, keepdim=True) * evecs
+
+            gaccumM = gevalsM + gevecsM + gevecsM_ortho
             grad_mparams = torch.autograd.grad(
                 outputs=(mloss,),
                 inputs=mparams,
