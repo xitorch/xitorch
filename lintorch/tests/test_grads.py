@@ -41,6 +41,54 @@ def test_grad_lsymeig(dtype, device):
     compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1])
 
 @device_dtype_float_test(only64=True)
+def test_grad_lsymeig_with_M(dtype, device):
+    na = 4
+    dtype = torch.float64
+    torch.manual_seed(123)
+    A1 = (torch.rand((1,na,na))*0.1).to(dtype).requires_grad_(True)
+    diag = (torch.arange(na, dtype=dtype)+1.0).unsqueeze(0).requires_grad_(True)
+    M1 = (torch.rand((1,na,na))*0.1).to(dtype).requires_grad_(True)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).unsqueeze(0).requires_grad_(True)
+    Acls = get_diagonally_dominant_class(na)
+
+    def getloss(A1, diag, M1, mdiag, contrib):
+        A = Acls().to(dtype)
+        M = Acls().to(dtype)
+        neig = 4
+        options = {
+            "method": "davidson",
+            "verbose": False,
+            "nguess": neig,
+            "v_init": "randn",
+        }
+        bck_options = {
+            "verbose": True,
+            "min_eps": 1e-9,
+        }
+        with torch.enable_grad():
+            A1.requires_grad_()
+            diag.requires_grad_()
+            M1.requires_grad_()
+            mdiag.requires_grad_()
+            evals, evecs = lt.lsymeig(A,
+                neig=neig,
+                params=(A1, diag,),
+                M=M,
+                mparams=(M1, mdiag,),
+                fwd_options=options,
+                bck_options=bck_options)
+
+            lss = 0
+            if contrib == "eigvals":
+                lss = lss + (evals**1).abs().sum()
+            elif contrib == "eigvecs":
+                lss = lss + (evecs**1).abs().sum()
+        return lss
+
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvals"), [0, 1, 2, 3])
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvecs"), [0, 1, 2, 3])
+
+@device_dtype_float_test(only64=True)
 def test_grad_solve(dtype, device):
     # generate the matrix
     na = 4
