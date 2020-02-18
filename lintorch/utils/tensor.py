@@ -30,3 +30,14 @@ def to_fortran_order(V):
         return V
     else:
         raise RuntimeError("Only the last two dimensions can be made Fortran order.")
+
+def ortho(A, B, dim=-2, M=None, mparams=[], mright=True):
+    """
+    Orthogonalize each column in matrix A w.r.t. matrix B
+    """
+    if M is None:
+        return A - (A * B).sum(dim=dim, keepdim=True) * B
+    elif mright:
+        return A - (M(A, *mparams) * B).sum(dim=dim, keepdim=True) * B
+    else:
+        return A - M((A * B).sum(dim=dim, keepdim=True) * B, *mparams)
