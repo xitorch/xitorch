@@ -136,7 +136,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
     config = set_default_option({
         "max_niter": na,
         "verbose": False,
-        "min_eps": 1e-6, # minimum residual to stop
+        "min_eps": 1e-7, # minimum residual to stop
     }, options)
 
     A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
