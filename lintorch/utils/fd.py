@@ -1,7 +1,17 @@
 # This file contains calculation of finite differences for debugging purposes
 import torch
 
-def finite_differences(fcn, args, iarg, eps=1e-6):
+def finite_differences(fcn, args, iarg, eps=1e-6, step=1):
+    if step == 1:
+        return fd_basic(fcn, args, iarg, eps=eps)
+    elif step == 2:
+        fd1 = fd_basic(fcn, args, iarg, eps=eps)
+        fd2 = fd_basic(fcn, args, iarg, eps=eps*1.5)
+        return 1.8*fd1 - 0.8*fd2
+    else:
+        raise ValueError("Only step = 1 or 2 are supported.")
+
+def fd_basic(fcn, args, iarg, eps=1e-6):
     with torch.no_grad():
         nelmt = args[iarg].numel()
         shape = args[iarg].shape
