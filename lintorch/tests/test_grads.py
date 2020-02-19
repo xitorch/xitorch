@@ -132,16 +132,17 @@ def test_2grad_lsymeig(dtype, device):
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
 
-    def getloss(A1, diag, contrib):
+    def getloss(A1, diag, contrib, contrib2):
         A = Acls().to(dtype).to(device)
         neig = 4
         options = {
             "method": "davidson",
             "verbose": False,
+            "min_eps": 1e-10,
         }
         bck_options = {
             "verbose": False,
-            "min_eps": 1e-9,
+            "min_eps": 1e-10,
         }
         with torch.enable_grad():
             A1.requires_grad_()
@@ -161,14 +162,81 @@ def test_2grad_lsymeig(dtype, device):
                 create_graph=True)
 
         loss = 0
-        loss = loss + (grad_A1**2).abs().sum()
-        loss = loss + (grad_diag**2).abs().sum()
+        if contrib2 == "A1":
+            loss = loss + (grad_A1**2).abs().sum()
+        elif contrib2 == "diag":
+            loss = loss + (grad_diag**2).abs().sum()
         return loss
 
-    compare_grad_with_fd(getloss, (A1, diag, "eigvals"), [0, 1], eps=1e-3,
-        max_rtol=None, max_median_rtol=4e-3, fd_to64=True)
-    compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1], eps=1e-3,
-        max_rtol=None, max_median_rtol=3e-2, fd_to64=True)
+    compare_grad_with_fd(getloss, (A1, diag, "eigvals", "A1"), [0, 1])
+    compare_grad_with_fd(getloss, (A1, diag, "eigvals", "diag"), [0, 1])
+    # larger step size in eigvecs to avoid errors due to non-exactness in the iterative solutions
+    compare_grad_with_fd(getloss, (A1, diag, "eigvecs", "A1"), [0, 1], eps=1e-2, step=2)
+    compare_grad_with_fd(getloss, (A1, diag, "eigvecs", "diag"), [0, 1], eps=1e-2, step=2)
+
+@device_dtype_float_test(only64=True)
+def test_2grad_lsymeig_with_M(dtype, device):
+    # generate the matrix
+    na = 5
+    torch.manual_seed(123)
+    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+    M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
+    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
+    Acls = get_diagonally_dominant_class(na)
+
+    def getloss(A1, diag, M1, mdiag, contrib, contrib2):
+        A = Acls().to(dtype).to(device)
+        M = Acls().to(dtype).to(device)
+        neig = 4
+        options = {
+            "method": "davidson",
+            "verbose": False,
+            "min_eps": 1e-10,
+        }
+        bck_options = {
+            "verbose": False,
+            "min_eps": 1e-10,
+        }
+        with torch.enable_grad():
+            A1.requires_grad_()
+            diag.requires_grad_()
+            evals, evecs = lt.lsymeig(A,
+                neig=neig,
+                params=(A1, diag,),
+                M=M,
+                mparams=(M1, mdiag,),
+                fwd_options=options,
+                bck_options=bck_options)
+
+            lss = 0
+            if contrib == "eigvals":
+                lss = lss + evals.abs().sum()
+            elif contrib == "eigvecs":
+                lss = lss + evecs.abs().sum()
+            grad_A1, grad_diag, grad_M1, grad_mdiag = \
+                torch.autograd.grad(lss, (A1, diag, M1, mdiag), create_graph=True)
+
+        loss = 0
+        if contrib2 == "A1":
+            loss = loss + (grad_A1**2).abs().sum()
+        elif contrib2 == "diag":
+            loss = loss + (grad_diag**2).abs().sum()
+        elif contrib2 == "mdiag":
+            loss = loss + (grad_mdiag**2).abs().sum()
+        elif contrib2 == "M1":
+            loss = loss + (grad_M1**2).abs().sum()
+        return loss
+
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvals", "A1"), [0, 1])
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvals", "diag"), [0, 1])
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvals", "M1"), [0, 1])
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvals", "mdiag"), [0, 1])
+    # larger step size in eigvecs to avoid errors due to non-exactness in the iterative solutions
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvecs", "A1"), [0, 1], eps=1e-2, step=2)
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvecs", "diag"), [0, 1], eps=1e-2, step=2)
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvecs", "M1"), [0, 1], eps=1e-2, step=2)
+    compare_grad_with_fd(getloss, (A1, diag, M1, mdiag, "eigvecs", "mdiag"), [0, 1], eps=1e-2, step=2)
 
 @device_dtype_float_test(only64=True)
 def test_2grad_solve(dtype, device):
