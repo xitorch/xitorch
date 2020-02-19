@@ -134,7 +134,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
     # use conjugate gradient descent to solve the inverse equation
     nbatch, na, ncols = B.shape
     config = set_default_option({
-        "max_niter": na,
+        "max_niter": na+na//2,
         "verbose": False,
         "min_eps": 1e-7, # minimum residual to stop
     }, options)
