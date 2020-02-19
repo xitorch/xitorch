@@ -125,11 +125,10 @@ class lsymeig_torchfcn(torch.autograd.Function):
             gevalsM = -gevalsA * evals.unsqueeze(1)
             gevecsM = -gevecsA * evals.unsqueeze(1)
 
-            # the contribution from the orthogonal elements
-            Bortho = grad_evecs - B # (nbatch, na, neig)
-            gevecsM_ortho = -0.5 * (Bortho * evecs).sum(dim=1, keepdim=True) * evecs
+            # the contribution from the parallel elements
+            gevecsM_par = -0.5 * (grad_evecs * evecs).sum(dim=1, keepdim=True) * evecs
 
-            gaccumM = gevalsM + gevecsM + gevecsM_ortho
+            gaccumM = gevalsM + gevecsM + gevecsM_par
             grad_mparams = torch.autograd.grad(
                 outputs=(mloss,),
                 inputs=mparams,
@@ -428,10 +427,11 @@ if __name__ == "__main__":
             "verbose": False,
             "nguess": neig,
             "v_init": "randn",
+            "min_eps": 1e-10,
         }
         bck_options = {
-            "verbose": True,
-            "min_eps": 1e-9,
+            "verbose": False,
+            "min_eps": 1e-11,
         }
         with torch.enable_grad():
             A1.requires_grad_()
@@ -449,13 +449,16 @@ if __name__ == "__main__":
             lss = 0
             # lss = lss + (evals**1).abs().sum() # correct
             lss = lss + (evecs**1).abs().sum()
-            # grad_A1, grad_diag = torch.autograd.grad(lss, (A1, diag),
-            #     create_graph=True)
+            grad_A1, grad_diag, grad_M1, grad_mdiag = torch.autograd.grad(lss,
+                (A1, diag, M1, mdiag),
+                create_graph=True)
 
         loss = 0
-        loss = loss + lss
+        # loss = loss + lss
         # loss = loss + (grad_A1**2).abs().sum()
         # loss = loss + (grad_diag**2).abs().sum()
+        loss = loss + (grad_M1**2).abs().sum()
+        loss = loss + (grad_mdiag**2).abs().sum()
         return loss
 
     t0 = time.time()
@@ -470,10 +473,10 @@ if __name__ == "__main__":
     Mgrad = M1.grad.data
     mdgrad = mdiag.grad.data
 
-    Afd = finite_differences(getloss, (A1, diag, M1, mdiag), 0, eps=1e-6)
-    dfd = finite_differences(getloss, (A1, diag, M1, mdiag), 1, eps=1e-6)
-    Mfd = finite_differences(getloss, (A1, diag, M1, mdiag), 2, eps=1e-6)
-    mdfd = finite_differences(getloss, (A1, diag, M1, mdiag), 3, eps=1e-6)
+    Afd = finite_differences(getloss, (A1, diag, M1, mdiag), 0, eps=1e-3, step=1)
+    dfd = finite_differences(getloss, (A1, diag, M1, mdiag), 1, eps=1e-3, step=1)
+    Mfd = finite_differences(getloss, (A1, diag, M1, mdiag), 2, eps=1e-3, step=1)
+    mdfd = finite_differences(getloss, (A1, diag, M1, mdiag), 3, eps=1e-3, step=1)
     print("Finite differences done")
 
     print("A1:")
