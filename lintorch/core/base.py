@@ -233,6 +233,10 @@ class Module(torch.nn.Module):
         Warning: if your matrix is too big, then calling this function will
         drain your memory.
         """
+        if len(params) == 0:
+            try:
+                return self.__fullmatrix_
+            except AttributeError: pass
 
         nbatch = params[0].shape[0] if len(params) > 0 else 1
         na = self.shape[0]
@@ -245,6 +249,10 @@ class Module(torch.nn.Module):
         # doing this could improve numerical stability
         if self.is_symmetric:
             mat = (mat + mat.transpose(-2,-1)) * 0.5
+
+        # save the matrix if there is no params
+        if len(params) == 0:
+            self.__fullmatrix_ = mat
         return mat
 
 #################################### decor ####################################
