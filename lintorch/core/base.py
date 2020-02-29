@@ -241,7 +241,11 @@ class Module(torch.nn.Module):
         V = torch.eye(na).unsqueeze(0).expand(nbatch,-1,-1).to(dtype).to(device)
 
         # obtain the full matrix of A
-        return self.forward(V, *params)
+        mat = self.forward(V, *params)
+        # doing this could improve numerical stability
+        if self.is_symmetric:
+            mat = (mat + mat.transpose(-2,-1)) * 0.5
+        return mat
 
 #################################### decor ####################################
 def module(shape,
