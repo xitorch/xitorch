@@ -213,6 +213,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
     min_eig_est = mean_eig - 2*rms_eig # (nbatch,)
     min_eig_est = min_eig_est.unsqueeze(-1).repeat(1,neig) # (nbatch,neig)
 
+    best_resid = float("inf")
     for i in range(max_niter):
         VT = V.transpose(-2,-1) # (nbatch,nguess,na)
         # Can be optimized by saving AV from the previous iteration and only
@@ -245,6 +246,10 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             if verbose:
                 print("Iter %3d (guess size: %d): resid: %.3e, devals: %.3e" % \
                       (i+1, nguess, max_resid, max_deigval))
+            if max_resid < best_resid:
+                best_resid = max_resid
+                best_eigvals = eigvalT
+                best_eigvecs = eigvecA
             if max_resid < min_eps:
                 break
         if AV.shape[-1] == AV.shape[1]:
@@ -289,8 +294,8 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         AVnew = to_fortran_order(AVnew)
         AV = torch.cat((AV, AVnew), dim=-1)
 
-    eigvals = eigvalT # (nbatch, neig)
-    eigvecs = eigvecA # (nbatch, na, neig)
+    eigvals = best_eigvals # (nbatch, neig)
+    eigvecs = best_eigvecs # (nbatch, na, neig)
     return eigvals, eigvecs
 
 def exacteig(A, params, neig, M=None, mparams=[], **options):
