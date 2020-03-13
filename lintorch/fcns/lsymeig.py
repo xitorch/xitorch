@@ -327,14 +327,21 @@ def exacteig(A, params, neig, M=None, mparams=[], **options):
         return evals[:,:neig], evecs[:,:,:neig]
     else:
         Mmatrix = M.fullmatrix(*mparams)
-        MA,_ = torch.solve(Amatrix, Mmatrix)
-        evals, evecs = eig.apply(MA)
+
+        # M decomposition to make A symmetric
+        # it is done this way to make it numerically stable in avoiding
+        # complex eigenvalues for (near-)degenerate case
+        L = torch.cholesky(Mmatrix, upper=False)
+        Linv = torch.inverse(L)
+        LinvT = Linv.transpose(-2,-1)
+        A2 = torch.matmul(Linv, torch.matmul(Amatrix, LinvT))
+
+        # calculate the eigenvalues and eigenvectors
+        # (the eigvecs are normalized in M-space)
+        evals, evecs = torch.symeig(A2, eigenvectors=True)
         evals = evals[:,:neig]
         evecs = evecs[:,:,:neig]
-
-        # normalize in M-space
-        UMU = torch.sqrt((evecs * torch.matmul(Mmatrix, evecs)).sum(dim=-2, keepdim=True))
-        evecs = evecs / UMU
+        evecs = torch.matmul(LinvT, evecs)
         return evals, evecs
 
 
