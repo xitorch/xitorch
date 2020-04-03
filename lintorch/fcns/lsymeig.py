@@ -239,19 +239,20 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         resid = AVs - LVs
 
         # print information and check convergence
+        max_resid = resid.abs().max()
         if prev_eigvalT is not None:
             deigval = eigvalT - prev_eigvalT
             max_deigval = deigval.abs().max()
-            max_resid = resid.abs().max()
             if verbose:
                 print("Iter %3d (guess size: %d): resid: %.3e, devals: %.3e" % \
                       (i+1, nguess, max_resid, max_deigval))
-            if max_resid < best_resid:
-                best_resid = max_resid
-                best_eigvals = eigvalT
-                best_eigvecs = eigvecA
-            if max_resid < min_eps:
-                break
+
+        if max_resid < best_resid:
+            best_resid = max_resid
+            best_eigvals = eigvalT
+            best_eigvecs = eigvecA
+        if max_resid < min_eps:
+            break
         if AV.shape[-1] == AV.shape[1]:
             break
         prev_eigvalT = eigvalT
