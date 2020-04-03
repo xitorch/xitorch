@@ -1,5 +1,6 @@
 import time
 import torch
+from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
 from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, get_diagonally_dominant_class
 
@@ -12,7 +13,7 @@ def test_grad_lsymeig(dtype, device):
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
 
-    def getloss(A1, diag, contrib):
+    def getloss(A1, diag, return_evec=False):
         A = Acls().to(dtype).to(device)
         neig = 4
         options = {
@@ -30,15 +31,15 @@ def test_grad_lsymeig(dtype, device):
             params=(A1, diag,),
             fwd_options=options,
             bck_options=bck_options)
-        loss = 0
-        if contrib == "eigvals":
-            loss = loss + (evals**2).sum()
-        elif contrib == "eigvecs":
-            loss = loss + (evecs**4).sum()
-        return loss
+        if return_evec:
+            return evecs
+        else:
+            return evals
 
-    compare_grad_with_fd(getloss, (A1, diag, "eigvals"), [0, 1])
-    compare_grad_with_fd(getloss, (A1, diag, "eigvecs"), [0, 1])
+    gradcheck(getloss, (A1, diag, True))
+    gradcheck(getloss, (A1, diag, False))
+    gradgradcheck(getloss, (A1, diag, False))
+    gradgradcheck(getloss, (A1, diag, True), rtol=1e-4, atol=1e-4, eps=1e-3)
 
 @device_dtype_float_test(only64=True)
 def test_grad_lsymeig_with_M(dtype, device):
