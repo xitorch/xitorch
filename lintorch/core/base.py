@@ -49,12 +49,13 @@ class Module(torch.nn.Module):
             else:
                 self._is_transpose_set = self._check_fcn("transpose")
                 # if there is no transpose function defined by the user,
-                # use the default transpose
-                if not self._is_transpose_set:
-                    self._is_transpose_set = True
-                    self._fcn_transpose = self._default_transpose
 
             self._is_precond_set = self._check_fcn("precond")
+
+        # use the default transpose
+        if not self._is_transpose_set:
+            self._is_transpose_set = True
+            self._fcn_transpose = self._default_transpose
 
     def to(self, dtype_or_device):
         super(Module, self).to(dtype_or_device)
