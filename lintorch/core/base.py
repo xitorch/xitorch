@@ -48,6 +48,12 @@ class Module(torch.nn.Module):
                 self._fcn_transpose = self.forward
             else:
                 self._is_transpose_set = self._check_fcn("transpose")
+                # if there is no transpose function defined by the user,
+                # use the default transpose
+                if not self._is_transpose_set:
+                    self._is_transpose_set = True
+                    self._fcn_transpose = self._default_transpose
+
             self._is_precond_set = self._check_fcn("precond")
 
     def to(self, dtype_or_device):
@@ -107,7 +113,7 @@ class Module(torch.nn.Module):
         """
         if self.is_forward_set():
             return self._fcn_forward(x, *params)
-        raise UnimplementedError("The transpose function has not been defined.")
+        raise UnimplementedError("The forward function has not been defined.")
 
     def transpose(self, x, *params):
         """
@@ -127,7 +133,9 @@ class Module(torch.nn.Module):
         """
         if self.is_transpose_set():
             return self._fcn_transpose(x, *params)
+        raise UnimplementedError("The transpose function has not been defined")
 
+    def _default_transpose(self, x, *params):
         # the transpose is simply the backward propagation
         with torch.enable_grad():
             x1 = x.detach().requires_grad_()
