@@ -108,8 +108,8 @@ class solve_torchfcn(torch.autograd.Function):
             grad_biases = (v * Mx).sum(dim=1) # (nbatch, ncols)
 
         # calculate the grad of matrices parameters
-        params = [p.clone().detach().requires_grad_() for p in ctx.params]
         with torch.enable_grad():
+            params = [p.clone() for p in ctx.params]
             loss = -ctx.A(ctx.x, *params) # (nbatch, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
@@ -118,8 +118,8 @@ class solve_torchfcn(torch.autograd.Function):
         # calculate the gradient to the biases matrices
         grad_mparams = []
         if ctx.M is not None:
-            mparams = [p.clone().detach().requires_grad_() for p in ctx.mparams]
             with torch.enable_grad():
+                mparams = [p.clone() for p in ctx.mparams]
                 lmbdax = ctx.x * ctx.biases.unsqueeze(1)
                 mloss = ctx.M(lmbdax, *mparams)
 
