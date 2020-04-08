@@ -10,35 +10,32 @@ def test_equil(dtype, device):
         def __init__(self):
             super(DummyModule, self).__init__()
 
-        def forward(self, y, x, A):
-            # y: (nbatch, nr)
-            # x: (nbatch, nr)
-            nbatch = y.shape[0]
-            tanh = torch.nn.Tanh()
-            A = A.unsqueeze(0).expand(nbatch, -1, -1)
-            Ay = torch.bmm(A, y.unsqueeze(-1)).squeeze(-1)
-            Ayx = Ay + x
-            return tanh(0.1 * Ayx)
+        def forward(self, y, c):
+            # y: (nbatch, 1)
+            # c: (nbatch, nr)
+            nr = c.shape[1]
+            power = torch.arange(nr)
+            b = (y ** power * c).sum(dim=-1, keepdim=True) # (nbatch, 1)
+            return b
 
     torch.manual_seed(100)
     random.seed(100)
 
     dtype = torch.float64
-    nr = 3
+    nr = 4
     nbatch = 1
-    A  = torch.randn((nr, nr)).to(dtype).requires_grad_()
-    x  = torch.rand((nbatch, nr)).to(dtype).requires_grad_()
-    y0 = torch.rand((nbatch, nr)).to(dtype)
-    params = (x, A)
+    x  = torch.tensor([-1, 1, 4, 1]).unsqueeze(0).to(dtype).requires_grad_()
+    y0 = torch.rand((nbatch, 1)).to(dtype)
+    params = (x,)
 
     model = DummyModule()
     y = lt.equilibrium(model, y0, params)
     assert torch.allclose(y, model(y, *params))
 
-    def getloss(x, A, y0):
+    def getloss(x, y0):
         model = DummyModule()
-        y = lt.equilibrium(model, y0, (x, A))
+        y = lt.equilibrium(model, y0, (x,))
         return y
 
-    gradcheck(getloss, (x, A, y0))
-    # gradgradcheck(getloss, (x, A, y0), eps=1e-5)
+    gradcheck(getloss, (x, y0))
+    gradgradcheck(getloss, (x, y0))
