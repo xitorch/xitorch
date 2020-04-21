@@ -9,6 +9,8 @@ Its role is to enable listing of parameters that have roles in the function so
     gradient to the parameters.
 """
 
+__all__ = ["filler", "clsfiller", "is_with_filler"]
+
 def filler(**def_kwargs):
     ndef_kwargs = len(def_kwargs)
 
@@ -54,12 +56,12 @@ def clsfiller(cls):
         instance = cls(*args, **kwargs)
         methods = inspect.getmembers(instance, predicate=inspect.ismethod)
         for name, method in methods:
-            if is_method_with_filler(method):
+            if is_with_filler(method):
                 method.set_def_params(instance)
         return instance
     return wrapper_cls
 
-def is_method_with_filler(method):
+def is_with_filler(method):
     return hasattr(method, "is_with_filler")
 
 if __name__ == "__main__":
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     a = A(1)
     aa = A(2)
     print(a.b.def_params)
-    print(is_method_with_filler(a.b))
+    print(is_with_filler(a.b))
     print("Instance created")
     print(a.b(1))
     print(a.b(1, *aa.b.def_params))
