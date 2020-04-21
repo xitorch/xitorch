@@ -4,10 +4,11 @@ from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
+from lintorch.core.filler import is_with_filler
 
 __all__ = ["equilibrium", "rootfinder"]
 
-def rootfinder(fcn, y0, params, fwd_options={}, bck_options={}):
+def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
     """
     Solving the rootfinder equation of a given function,
 
@@ -16,9 +17,12 @@ def rootfinder(fcn, y0, params, fwd_options={}, bck_options={}):
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output
     """
-    return _RootFinder.apply(fcn, y0, fwd_options, bck_options, *params)
+    def_params = []
+    if is_with_filler(fcn):
+        def_params = fcn.def_params
+    return _RootFinder.apply(fcn, y0, fwd_options, bck_options, *params, *def_params)
 
-def equilibrium(fcn, y0, params, fwd_options={}, bck_options={}):
+def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
     """
     Solving nonlinear equation to solve the equation
 
@@ -29,7 +33,12 @@ def equilibrium(fcn, y0, params, fwd_options={}, bck_options={}):
     """
     def new_fcn(y, *params):
         return y - fcn(y, *params)
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *params)
+
+    def_params = []
+    if is_with_filler(fcn):
+        def_params = fcn.def_params
+
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *params, *def_params)
     # return _Equilibrium.apply(fcn, y0, fwd_options, bck_options, *params)
 
 class _RootFinder(torch.autograd.Function):

@@ -16,6 +16,19 @@ class PolynomialModule(torch.nn.Module):
         b = (y ** power * c).sum(dim=-1, keepdim=True) # (nbatch, 1)
         return b
 
+@lt.clsfiller
+class PolynomialModule2(torch.nn.Module):
+    def __init__(self, c):
+        super().__init__()
+        self.c = c
+
+    @lt.filler(self_c=lambda self:self.c)
+    def forward(self, y, self_c):
+        nr = self_c.shape[1]
+        power = torch.arange(nr)
+        b = (y ** power * self_c).sum(dim=-1, keepdim=True)
+        return b
+
 @device_dtype_float_test(only64=True)
 def test_rootfinder(dtype, device):
     torch.manual_seed(100)
@@ -35,11 +48,18 @@ def test_rootfinder(dtype, device):
 
     def getloss(x, y0):
         model = PolynomialModule()
-        y = lt.equilibrium(model, y0, (x,))
+        y = lt.rootfinder(model.forward, y0, (x,))
+        return y
+
+    def getloss2(x, y0):
+        model = PolynomialModule2(x)
+        y = lt.rootfinder(model.forward, y0)
         return y
 
     gradcheck(getloss, (x, y0))
+    gradcheck(getloss2, (x, y0))
     gradgradcheck(getloss, (x, y0))
+    gradgradcheck(getloss2, (x, y0))
 
 @device_dtype_float_test(only64=True)
 def test_equil(dtype, device):
@@ -62,8 +82,15 @@ def test_equil(dtype, device):
         y = lt.equilibrium(model, y0, (x,))
         return y
 
+    def getloss2(x, y0):
+        model = PolynomialModule2(x)
+        y = lt.equilibrium(model.forward, y0)
+        return y
+
     gradcheck(getloss, (x, y0))
+    gradcheck(getloss2, (x, y0))
     gradgradcheck(getloss, (x, y0))
+    gradgradcheck(getloss2, (x, y0))
 
 @device_dtype_float_test(only64=True)
 def test_optimize(dtype, device):
