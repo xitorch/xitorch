@@ -1,5 +1,6 @@
 from lintorch.core.base import *
 from lintorch.core.basic import *
+from lintorch.core.filler import *
 from lintorch.fcns.lsymeig import *
 from lintorch.fcns.solve import *
 from lintorch.nlfcns.rootfinder import *
