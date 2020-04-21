@@ -3,7 +3,7 @@ import numpy as np
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
-from lintorch.core.filler import is_with_filler
+from lintorch.nlfcns.util import wrap_fcn
 
 __all__ = ["optimize"]
 
@@ -20,10 +20,9 @@ def optimize(fcn, xparams, yparams=[], fwd_options={}, bck_options={}):
     parameters, `x`.
     The gradient is calculated with respect to `y`.
     """
-    def_yparams = []
-    if is_with_filler(fcn):
-        def_yparams = fcn.def_params
-    res = _Optimize.apply(fcn, xparams, fwd_options, bck_options, *yparams, *def_yparams)
+    wrapped_fcn, all_params = wrap_fcn(fcn, (*xparams, *yparams))
+    all_params = all_params[len(xparams):] # to exclude xparams
+    res = _Optimize.apply(wrapped_fcn, xparams, fwd_options, bck_options, *all_params)
     fcn_min = res[0]
     xmin = res[1:]
     return fcn_min, xmin
