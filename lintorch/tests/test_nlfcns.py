@@ -16,18 +16,22 @@ class PolynomialModule(torch.nn.Module):
         b = (y ** power * c).sum(dim=-1, keepdim=True) # (nbatch, 1)
         return b
 
-@lt.clsfiller
-class PolynomialModule2(torch.nn.Module):
+class PolynomialModule2(torch.nn.Module, lt.EditableModule):
     def __init__(self, c):
         super().__init__()
         self.c = c
 
-    @lt.filler(self_c=lambda self:self.c)
-    def forward(self, y, self_c):
-        nr = self_c.shape[1]
+    def forward(self, y):
+        nr = self.c.shape[1]
         power = torch.arange(nr)
-        b = (y ** power * self_c).sum(dim=-1, keepdim=True)
+        b = (y ** power * self.c).sum(dim=-1, keepdim=True)
         return b
+
+    def getparams(self):
+        return [self.c]
+
+    def setparams(self, c):
+        self.c = c
 
 @device_dtype_float_test(only64=True)
 def test_rootfinder(dtype, device):

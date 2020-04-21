@@ -1,10 +1,11 @@
+import inspect
 import torch
 import lintorch as lt
 from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
-from lintorch.core.filler import is_with_filler
+from lintorch.nlfcns.util import wrap_fcn
 
 __all__ = ["equilibrium", "rootfinder"]
 
@@ -17,10 +18,9 @@ def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output
     """
-    def_params = []
-    if is_with_filler(fcn):
-        def_params = fcn.def_params
-    return _RootFinder.apply(fcn, y0, fwd_options, bck_options, *params, *def_params)
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
+    all_params = all_params[1:] # to exclude y0
+    return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
 def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
     """
@@ -31,15 +31,12 @@ def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
     where `fcn` is a function that can be non-linear and produce output of shape
     of `y`.
     """
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
+    all_params = all_params[1:] # to exclude y0
     def new_fcn(y, *params):
-        return y - fcn(y, *params)
+        return y - wrapped_fcn(y, *params)
 
-    def_params = []
-    if is_with_filler(fcn):
-        def_params = fcn.def_params
-
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *params, *def_params)
-    # return _Equilibrium.apply(fcn, y0, fwd_options, bck_options, *params)
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)#
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
