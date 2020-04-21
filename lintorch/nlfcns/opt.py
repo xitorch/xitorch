@@ -3,10 +3,11 @@ import numpy as np
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
+from lintorch.core.filler import is_with_filler
 
 __all__ = ["optimize"]
 
-def optimize(fcn, xparams, yparams, fwd_options={}, bck_options={}):
+def optimize(fcn, xparams, yparams=[], fwd_options={}, bck_options={}):
     """
     Find the set of parameters that minimize the output of the function `fcn`,
 
@@ -19,7 +20,10 @@ def optimize(fcn, xparams, yparams, fwd_options={}, bck_options={}):
     parameters, `x`.
     The gradient is calculated with respect to `y`.
     """
-    res = _Optimize.apply(fcn, xparams, fwd_options, bck_options, *yparams)
+    def_yparams = []
+    if is_with_filler(fcn):
+        def_yparams = fcn.def_params
+    res = _Optimize.apply(fcn, xparams, fwd_options, bck_options, *yparams, *def_yparams)
     fcn_min = res[0]
     xmin = res[1:]
     return fcn_min, xmin
