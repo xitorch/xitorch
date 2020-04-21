@@ -27,10 +27,10 @@ class PolynomialModule2(torch.nn.Module, lt.EditableModule):
         b = (y ** power * self.c).sum(dim=-1, keepdim=True)
         return b
 
-    def getparams(self):
+    def getparams(self, methodname):
         return [self.c]
 
-    def setparams(self, c):
+    def setparams(self, methodname, c):
         self.c = c
 
 @device_dtype_float_test(only64=True)
@@ -52,12 +52,12 @@ def test_rootfinder(dtype, device):
 
     def getloss(x, y0):
         model = PolynomialModule()
-        y = lt.rootfinder(model.forward, y0, (x,))
+        y = lt.rootfinder(model, y0, (x,))
         return y
 
     def getloss2(x, y0):
         model = PolynomialModule2(x)
-        y = lt.rootfinder(model.forward, y0)
+        y = lt.rootfinder(model, y0)
         return y
 
     gradcheck(getloss, (x, y0))
@@ -88,7 +88,7 @@ def test_equil(dtype, device):
 
     def getloss2(x, y0):
         model = PolynomialModule2(x)
-        y = lt.equilibrium(model.forward, y0)
+        y = lt.equilibrium(model, y0)
         return y
 
     gradcheck(getloss, (x, y0))
