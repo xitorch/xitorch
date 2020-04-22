@@ -39,15 +39,17 @@ def list_operating_params(method, *args, **kwargs):
     obj = method.__self__
 
     # get all the tensors recursively
-    all_tensors, all_names = _get_tensors(obj, prefix="self")
+    max_depth = 3
+    all_tensors, all_names = _get_tensors(obj, prefix="self", max_depth=max_depth)
 
     # copy the tensors and require them to be differentiable
-    copy_tensors = [tensor.clone().detach().requires_grad_() for tensor in all_tensors]
-    _set_tensors(obj, copy_tensors)
+    copy_tensors0 = [tensor.clone().detach().requires_grad_() for tensor in all_tensors]
+    copy_tensors = copy.copy(copy_tensors0)
+    _set_tensors(obj, copy_tensors, max_depth=max_depth)
 
     # run the method and see which one has the gradients
     output = method(*args, **kwargs).sum()
-    grad_tensors = torch.autograd.grad(output, copy_tensors, allow_unused=True)
+    grad_tensors = torch.autograd.grad(output, copy_tensors0, allow_unused=True)
 
     res = []
     for i, grad in enumerate(grad_tensors):
@@ -57,9 +59,9 @@ def list_operating_params(method, *args, **kwargs):
 
     # print the results
     res_str = ", ".join(res)
-    print("%s: [%s]" % (method.__name__, res_str))
+    print("'%s': [%s]," % (method.__name__, res_str))
 
-def _get_tensors(obj, prefix):
+def _get_tensors(obj, prefix, max_depth=4):
     # get the tensors recursively towards torch.nn.Module
     res = []
     names = []
@@ -70,18 +72,25 @@ def _get_tensors(obj, prefix):
         if isinstance(elmt, torch.Tensor) and elmt.dtype in float_type:
             res.append(elmt)
             names.append(name)
-        elif isinstance(elmt, torch.nn.Module):
-            new_res, new_names = _get_tensors(elmt, prefix=name)
+        elif hasattr(elmt, "__dict__"):
+            new_res = []
+            new_names = []
+            if isinstance(elmt, torch.nn.Module):
+                new_res, new_names = _get_tensors(elmt, prefix=name, max_depth=max_depth)
+            elif max_depth > 0:
+                new_res, new_names = _get_tensors(elmt, prefix=name, max_depth=max_depth-1)
             res = res + new_res
             names = names + new_names
     return res, names
 
-def _set_tensors(obj, params):
-    all_params = copy.copy(params)
+def _set_tensors(obj, all_params, max_depth=4):
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
     for key in obj.__dict__:
         elmt = obj.__dict__[key]
         if isinstance(elmt, torch.Tensor) and elmt.dtype in float_type:
             obj.__dict__[key] = all_params.pop(0)
-        elif isinstance(elmt, torch.nn.Module):
-            _set_tensors(elmt, all_params)
+        elif hasattr(elmt, "__dict__"):
+            if isinstance(elmt, torch.nn.Module):
+                _set_tensors(elmt, all_params, max_depth=max_depth)
+            elif max_depth > 0:
+                _set_tensors(elmt, all_params, max_depth=max_depth-1)
