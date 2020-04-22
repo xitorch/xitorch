@@ -2,10 +2,11 @@ import inspect
 from abc import abstractmethod, abstractproperty
 import torch
 from lintorch.utils.exceptions import UnimplementedError
+from lintorch.core.editable_module import EditableModule, getmethodparams, setmethodparams
 
 __all__ = ["Module", "module", "module_like"]
 
-class Module(torch.nn.Module):
+class Module(torch.nn.Module, EditableModule):
     def __init__(self, shape,
                is_symmetric=True,
                is_real=True,
@@ -263,6 +264,24 @@ class Module(torch.nn.Module):
         if len(params) == 0:
             self.__fullmatrix_ = mat
         return mat
+
+    ##################### editable module part #####################
+    def getparams(self, methodname):
+        if (methodname == "forward" or methodname == "__call__") and self.is_forward_set():
+            return getmethodparams(self._fcn_forward)
+        elif methodname == "transpose" and self.is_transpose_set():
+            return getmethodparams(self._fcn_transpose)
+        else:
+            raise RuntimeError("The method %s is not defined for getparams" % methodname)
+
+    def setparams(self, methodname, *params):
+        if (methodname == "forward" or methodname == "__call__") and self.is_forward_set():
+            setmethodparams(self._fcn_forward, *params)
+        elif methodname == "transpose" and self.is_transpose_set():
+            setmethodparams(self._fcn_transpose, *params)
+        else:
+            raise RuntimeError("The method %s is not defined for setparams" % methodname)
+
 
 #################################### decor ####################################
 def module(shape,

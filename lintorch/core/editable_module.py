@@ -1,3 +1,4 @@
+import inspect
 from abc import abstractmethod
 from contextlib import contextmanager
 import copy
@@ -29,6 +30,24 @@ class EditableModule(object):
             yield self
         finally:
             self.setparams(methodname, *_orig_params_)
+
+def getmethodparams(method):
+    if not inspect.ismethod(method):
+        return []
+    obj = method.__self__
+    methodname = method.__name__
+    if not isinstance(obj, EditableModule):
+        return []
+    return obj.getparams(methodname)
+
+def setmethodparams(method, *params):
+    if not inspect.ismethod(method):
+        return
+    obj = method.__self__
+    methodname = method.__name__
+    if not isinstance(obj, EditableModule):
+        return
+    obj.setparams(methodname, *params)
 
 ############################ debugging functions ############################
 
