@@ -267,6 +267,7 @@ class Module(torch.nn.Module, EditableModule):
 
     ##################### editable module part #####################
     def getparams(self, methodname):
+        # TODO: check if it is inherited or not
         if (methodname == "forward" or methodname == "__call__") and self.is_forward_set():
             return getmethodparams(self._fcn_forward)
         elif methodname == "transpose" and self.is_transpose_set():
