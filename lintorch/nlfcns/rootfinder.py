@@ -92,7 +92,7 @@ class _RootFinder(torch.autograd.Function):
 
         # get the grad for the params
         with torch.enable_grad():
-            params_copy = [p.clone() for p in params]
+            params_copy = [p.clone().detach().requires_grad_() for p in params]
             yfcn = ctx.fcn(yout, *params_copy)
         grad_params = torch.autograd.grad(yfcn, params_copy, grad_outputs=gyfcn,
             create_graph=torch.is_grad_enabled())
