@@ -11,7 +11,6 @@ def test_decor(dtype, device):
         return x * diag
 
     # check the properties
-    assert isinstance(A, torch.nn.Module)
     assert A.is_symmetric
     assert A.is_real
     assert A.shape == (na, na)
@@ -52,7 +51,6 @@ def test_class(dtype, device):
     # check the properties
     A = Acls()
     A = A.to(dtype).to(device)
-    assert isinstance(A, torch.nn.Module)
     assert A.is_symmetric
     assert A.is_real
     assert A.shape == (na, na)
