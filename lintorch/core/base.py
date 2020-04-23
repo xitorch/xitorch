@@ -6,7 +6,7 @@ from lintorch.core.editable_module import EditableModule, getmethodparams, setme
 
 __all__ = ["Module", "module", "module_like"]
 
-class Module(torch.nn.Module, EditableModule):
+class Module(EditableModule):
     def __init__(self, shape,
                is_symmetric=True,
                is_real=True,
@@ -59,7 +59,7 @@ class Module(torch.nn.Module, EditableModule):
             self._fcn_transpose = self._default_transpose
 
     def to(self, dtype_or_device):
-        super(Module, self).to(dtype_or_device)
+        # super(Module, self).to(dtype_or_device)
         if isinstance(dtype_or_device, torch.dtype):
             self._dtype = dtype_or_device
         elif isinstance(dtype_or_device, torch.device):

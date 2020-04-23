@@ -352,13 +352,12 @@ def exacteig(A, params, neig, M=None, mparams=[], **options):
 
 
 def _get_dtype_device(params, A):
-    A_params = list(A.parameters())
-    if len(A_params) == 0:
-        p = params[0]
+    if len(params) == 0:
+        dtype, device = A.dtype, A.device
     else:
-        p = A_params[0]
-    dtype = p.dtype
-    device = p.device
+        p = params[0]
+        dtype = p.dtype
+        device = p.device
     return dtype, device
 
 def _check_and_get_shape(A):
