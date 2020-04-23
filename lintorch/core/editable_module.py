@@ -25,7 +25,6 @@ class EditableModule(object):
     def getuniqueparams(self, methodname):
         allparams = self.getparams(methodname)
         idxs = self._get_unique_params_idxs(methodname, allparams)
-        print(idxs)
         return [allparams[i] for i in idxs]
 
     def setuniqueparams(self, methodname, *uniqueparams):
