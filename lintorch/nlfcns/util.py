@@ -22,7 +22,7 @@ def wrap_fcn(fcn, params):
             return res
 
         # get all the parameters
-        obj_params = obj.getparams(method_name)
+        obj_params = obj.getuniqueparams(method_name)
         all_params = [*params, *obj_params]
     else:
         wrapped_fcn = fcn

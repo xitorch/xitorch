@@ -22,14 +22,68 @@ class EditableModule(object):
         """
         pass
 
+    def getuniqueparams(self, methodname):
+        allparams = self.getparams(methodname)
+        idxs = self._get_unique_params_idxs(methodname, allparams)
+        print(idxs)
+        return [allparams[i] for i in idxs]
+
+    def setuniqueparams(self, methodname, *uniqueparams):
+        nparams = self._number_of_params[methodname]
+        allparams = [None for _ in range(nparams)]
+        maps = self._unique_params_maps[methodname]
+
+        for j in range(len(uniqueparams)):
+            jmap = maps[j]
+            p = uniqueparams[j]
+            for i in jmap:
+                allparams[i] = p
+
+        self.setparams(methodname, *allparams)
+
+    def _get_unique_params_idxs(self, methodname, allparams=None):
+        if not hasattr(self, "_unique_params_idxs"):
+            self._unique_params_idxs = {}
+            self._unique_params_maps = {}
+            self._number_of_params = {}
+
+        if methodname in self._unique_params_idxs:
+            return self._unique_params_idxs[methodname]
+        if allparams is None:
+            allparams = self.getparams(methodname)
+
+        # get the unique ids
+        ids = []
+        idxs = []
+        idx_map = []
+        for i in range(len(allparams)):
+            id_param = id(allparams[i])
+
+            # search the id if it has been added to the list
+            try:
+                jfound = ids.index(id_param)
+                idx_map[jfound].append(i)
+                continue
+            except ValueError:
+                pass
+
+            ids.append(id_param)
+            idxs.append(i)
+            idx_map.append([i])
+
+        self._number_of_params[methodname] = len(allparams)
+        self._unique_params_idxs[methodname] = idxs
+        self._unique_params_maps[methodname] = idx_map
+        return idxs
+
     @contextmanager
     def useparams(self, methodname, *params):
         try:
-            _orig_params_ = self.getparams(methodname)
-            self.setparams(methodname, *params)
+            _orig_params_ = self.getuniqueparams(methodname)
+            self.setuniqueparams(methodname, *params)
             yield self
         finally:
-            self.setparams(methodname, *_orig_params_)
+            self.setuniqueparams(methodname, *_orig_params_)
 
 def getmethodparams(method):
     if not inspect.ismethod(method):
