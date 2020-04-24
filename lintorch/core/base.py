@@ -272,6 +272,8 @@ class Module(EditableModule):
             return getmethodparams(self._fcn_forward)
         elif methodname == "transpose" and self.is_transpose_set():
             return getmethodparams(self._fcn_transpose)
+        elif methodname == "fullmatrix":
+            return [self.__fullmatrix_]
         else:
             raise RuntimeError("The method %s is not defined for getparams" % methodname)
 
@@ -280,6 +282,8 @@ class Module(EditableModule):
             setmethodparams(self._fcn_forward, *params)
         elif methodname == "transpose" and self.is_transpose_set():
             setmethodparams(self._fcn_transpose, *params)
+        elif methodname == "fullmatrix":
+            self.__fullmatrix_, = params
         else:
             raise RuntimeError("The method %s is not defined for setparams" % methodname)
 
