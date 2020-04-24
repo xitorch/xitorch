@@ -124,14 +124,17 @@ def list_operating_params(method, *args, **kwargs):
     grad_tensors = torch.autograd.grad(output, copy_tensors0, allow_unused=True)
 
     res = []
+    params = []
     for i, grad in enumerate(grad_tensors):
         if grad is None:
             continue
         res.append(all_names[i])
+        params.append(all_tensors[i])
 
     # print the results
     res_str = ", ".join(res)
     print("'%s': [%s]," % (method.__name__, res_str))
+    return res, params
 
 def find_param_address(param, method_or_obj, max_depth=3, return_all=True):
     if inspect.ismethod(method_or_obj):
