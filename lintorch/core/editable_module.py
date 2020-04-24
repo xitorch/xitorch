@@ -133,17 +133,21 @@ def list_operating_params(method, *args, **kwargs):
     res_str = ", ".join(res)
     print("'%s': [%s]," % (method.__name__, res_str))
 
-def find_param_address(param, method_or_obj, max_depth=3):
+def find_param_address(param, method_or_obj, max_depth=3, return_all=True):
     if inspect.ismethod(method_or_obj):
         obj = method_or_obj.__self__
     else:
         obj = method_or_obj
     all_tensors, all_names = _get_tensors(obj, prefix="self", max_depth=max_depth)
+    names = []
     for i,tensor in enumerate(all_tensors):
         if tensor.shape != param.shape: continue
         if not torch.allclose(param, tensor): continue
-        return all_names[i]
-    return None
+        names.append(all_names[i])
+    if return_all:
+        return names
+    else:
+        return names[0] if len(names) > 0 else None
 
 def _get_tensors(obj, prefix, max_depth=4):
     # get the tensors recursively towards torch.nn.Module
