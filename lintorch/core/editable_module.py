@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import copy
 import torch
 
-__all__ = ["EditableModule", "list_operating_params"]
+__all__ = ["EditableModule", "list_operating_params", "find_param_address"]
 
 class EditableModule(object):
     @abstractmethod
