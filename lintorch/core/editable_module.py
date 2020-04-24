@@ -4,7 +4,8 @@ from contextlib import contextmanager
 import copy
 import torch
 
-__all__ = ["EditableModule", "list_operating_params", "find_param_address"]
+__all__ = ["EditableModule",
+    "list_operating_params", "find_param_address", "find_missing_parameters"]
 
 class EditableModule(object):
     @abstractmethod
@@ -123,18 +124,19 @@ def list_operating_params(method, *args, **kwargs):
     output = method(*args, **kwargs).sum()
     grad_tensors = torch.autograd.grad(output, copy_tensors0, allow_unused=True)
 
-    res = []
+    # return the original tensor
+    all_tensors_copy = copy.copy(all_tensors)
+    _set_tensors(obj, all_tensors_copy, max_depth=max_depth)
+
+    names = []
     params = []
     for i, grad in enumerate(grad_tensors):
         if grad is None:
             continue
-        res.append(all_names[i])
+        names.append(all_names[i])
         params.append(all_tensors[i])
 
-    # print the results
-    res_str = ", ".join(res)
-    print("'%s': [%s]," % (method.__name__, res_str))
-    return res, params
+    return names, params
 
 def find_param_address(param, method_or_obj, max_depth=3, return_all=True):
     if inspect.ismethod(method_or_obj):
@@ -151,6 +153,27 @@ def find_param_address(param, method_or_obj, max_depth=3, return_all=True):
         return names
     else:
         return names[0] if len(names) > 0 else None
+
+def find_missing_parameters(method, *args, **kwargs):
+    """
+    List the parameters missed by the "getparams" function.
+    """
+    names, params0 = list_operating_params(method, *args, **kwargs)
+    obj = method.__self__
+    methodname = method.__name__
+    params = obj.getuniqueparams(methodname)
+
+    idparams = [id(p) for p in params]
+    idparams0 = [id(p) for p in params0]
+
+    missing_names = []
+    missing_params = []
+    for i in range(len(idparams0)):
+        if idparams0[i] not in idparams:
+            missing_names.append(names[i])
+            missing_params.append(params0[i])
+
+    return missing_names, missing_params
 
 def _get_tensors(obj, prefix, max_depth=4):
     # get the tensors recursively towards torch.nn.Module
