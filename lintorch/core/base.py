@@ -282,14 +282,15 @@ class Module(EditableModule):
 
     def setparams(self, methodname, *params):
         if (methodname == "forward" or methodname == "__call__") and self.is_forward_set():
-            setmethodparams(self._fcn_forward, *params)
+            return setmethodparams(self._fcn_forward, *params)
         elif methodname == "transpose" and self.is_transpose_set():
-            setmethodparams(self._fcn_transpose, *params)
+            return setmethodparams(self._fcn_transpose, *params)
         elif methodname == "fullmatrix":
             try:
-                self.__fullmatrix_, = params
+                self.__fullmatrix_, = params[:1]
+                return 1
             except AttributeError:
-                self.setparams("forward", *params)
+                return self.setparams("forward", *params)
         else:
             raise RuntimeError("The method %s is not defined for setparams" % methodname)
 

@@ -30,8 +30,9 @@ class PolynomialModule2(torch.nn.Module, lt.EditableModule):
     def getparams(self, methodname):
         return [self.c]
 
-    def setparams(self, methodname, c):
-        self.c = c
+    def setparams(self, methodname, *params):
+        self.c, = params[:1]
+        return 1
 
 @device_dtype_float_test(only64=True)
 def test_rootfinder(dtype, device):

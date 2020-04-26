@@ -20,6 +20,8 @@ class EditableModule(object):
         """
         Set the input parameters to the object's parameters to make a copy of
         the operations.
+        *params is an excessive list of the parameters to be set and the
+        method will return the number of parameters it sets.
         """
         pass
 
@@ -39,7 +41,7 @@ class EditableModule(object):
             for i in jmap:
                 allparams[i] = p
 
-        self.setparams(methodname, *allparams)
+        return self.setparams(methodname, *allparams)
 
     def _get_unique_params_idxs(self, methodname, allparams=None):
         if not hasattr(self, "_unique_params_idxs"):
@@ -100,8 +102,8 @@ def setmethodparams(method, *params):
     obj = method.__self__
     methodname = method.__name__
     if not isinstance(obj, EditableModule):
-        return
-    obj.setparams(methodname, *params)
+        return 0
+    return obj.setparams(methodname, *params)
 
 ############################ debugging functions ############################
 
