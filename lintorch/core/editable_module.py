@@ -111,6 +111,9 @@ def list_operating_params(method, *args, **kwargs):
     """
     obj = method.__self__
 
+    # invoke first in case the method add a new variable to the object
+    output = method(*args, **kwargs).sum()
+
     # get all the tensors recursively
     max_depth = 3
     all_tensors, all_names = _get_tensors(obj, prefix="self", max_depth=max_depth)
