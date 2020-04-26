@@ -195,9 +195,19 @@ def _get_tensors(obj, prefix, max_depth=4):
                 new_res, new_names = _get_tensors(elmt, prefix=name, max_depth=max_depth-1)
             res = res + new_res
             names = names + new_names
+        elif hasattr(elmt, "__iter__"):
+            for i,elm in enumerate(elmt):
+                if not hasattr(elm, "__dict__"): continue
+                new_res = []
+                new_names = []
+                if max_depth > 0:
+                    new_res, new_names = _get_tensors(elm, prefix="%s[%d]"%(name,i), max_depth=max_depth-1)
+                res = res + new_res
+                names = names + new_names
     return res, names
 
 def _set_tensors(obj, all_params, max_depth=4):
+    # TODO: set tensors based on the name!
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
     for key in obj.__dict__:
         elmt = obj.__dict__[key]
@@ -208,3 +218,8 @@ def _set_tensors(obj, all_params, max_depth=4):
                 _set_tensors(elmt, all_params, max_depth=max_depth)
             elif max_depth > 0:
                 _set_tensors(elmt, all_params, max_depth=max_depth-1)
+        elif hasattr(elmt, "__iter__"):
+            for i,elm in enumerate(elmt):
+                if not hasattr(elm, "__dict__"): continue
+                if max_depth > 0:
+                    _set_tensors(elm, all_params, max_depth=max_depth-1)
