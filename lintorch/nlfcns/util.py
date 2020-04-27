@@ -7,7 +7,6 @@ def wrap_fcn(fcn, params):
     Wrap function to include the object's parameters as well
     """
 
-    nparams = len(params)
 
     # if the fcn is an object that has __call__ attribute, then assign it to fcn
     # to make fcn a method
@@ -20,6 +19,7 @@ def wrap_fcn(fcn, params):
     # unroller object to make sure the parameters of the wrapped functions are
     # all tensors
     unroller = ParamsUnroller(params)
+    nparams = unroller.num_all_tensors
 
     # if it is a method from an object, unroll the parameters and add
     # the object's parameters as well
@@ -62,6 +62,7 @@ class ParamsUnroller(object):
         # format: 0 for tensor, 1 for list of tensors
         self.formats = [self._get_format(p) for p in params]
         self.lengths = [1 if f==0 else len(p) for p,f in zip(params, self.formats)]
+        self._num_all_tensors = sum(self.lengths)
         self.params = params
         self.nparams = len(params)
         self._all_tensors = (sum(self.formats) == 0)
@@ -69,6 +70,10 @@ class ParamsUnroller(object):
     @property
     def all_tensors(self):
         return self._all_tensors
+
+    @property
+    def num_all_tensors(self):
+        return self._num_all_tensors
 
     def unroll(self, params):
         if self._all_tensors: return params
@@ -84,6 +89,7 @@ class ParamsUnroller(object):
         if self._all_tensors: return uparams
         res = []
         idx = 0
+        print(len(uparams), self.lengths, self.params)
         for i in range(self.nparams):
             length = self.lengths[i]
             format = self.formats[i]
