@@ -89,7 +89,6 @@ class ParamsUnroller(object):
         if self._all_tensors: return uparams
         res = []
         idx = 0
-        print(len(uparams), self.lengths, self.params)
         for i in range(self.nparams):
             length = self.lengths[i]
             format = self.formats[i]
