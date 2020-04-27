@@ -13,11 +13,11 @@ def test_grad_lsymeig(dtype, device):
     diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
 
-    def getloss(A1, diag, return_evec=False):
+    def getloss(A1, diag, method="davidson"):
         A = Acls().to(dtype).to(device)
         neig = 4
         options = {
-            # "method": "davidson",
+            "method": method,
             # "verbose": False,
             # "nguess": neig,
             # "v_init": "randn",
@@ -31,15 +31,12 @@ def test_grad_lsymeig(dtype, device):
             params=(A1, diag,),
             fwd_options=options,
             bck_options=bck_options)
-        if return_evec:
-            return evecs
-        else:
-            return evals
+        return evals, evecs
 
-    gradcheck(getloss, (A1, diag, True))
-    gradcheck(getloss, (A1, diag, False))
-    gradgradcheck(getloss, (A1, diag, False))
-    gradgradcheck(getloss, (A1, diag, True), rtol=1e-4, atol=1e-4, eps=1e-3)
+    gradcheck(getloss, (A1, diag, "davidson"))
+    gradcheck(getloss, (A1, diag, "exacteig"))
+    gradgradcheck(getloss, (A1, diag, "exacteig"))
+    gradgradcheck(getloss, (A1, diag, "davidson"), rtol=1e-4, atol=1e-4, eps=1e-3)
 
 @device_dtype_float_test(only64=True)
 def test_grad_lsymeig_with_M(dtype, device):
@@ -52,15 +49,12 @@ def test_grad_lsymeig_with_M(dtype, device):
     mdiag = (torch.arange(na, dtype=dtype)+1.0).unsqueeze(0).requires_grad_(True)
     Acls = get_diagonally_dominant_class(na)
 
-    def getloss(A1, diag, M1, mdiag, return_evec):
+    def getloss(A1, diag, M1, mdiag, method="davidson"):
         A = Acls().to(dtype)
         M = Acls().to(dtype)
         neig = 4
         options = {
-            "method": "davidson",
-            "verbose": False,
-            "nguess": neig,
-            "v_init": "randn",
+            "method": method,
         }
         bck_options = {
             "verbose": True,
@@ -78,15 +72,12 @@ def test_grad_lsymeig_with_M(dtype, device):
                 mparams=(M1, mdiag,),
                 fwd_options=options,
                 bck_options=bck_options)
-        if return_evec:
-            return evecs
-        else:
-            return evals
+        return evals, evecs
 
-    gradcheck(getloss, (A1, diag, M1, mdiag, False))
-    gradcheck(getloss, (A1, diag, M1, mdiag, True))
-    gradgradcheck(getloss, (A1, diag, M1, mdiag, False))
-    gradgradcheck(getloss, (A1, diag, M1, mdiag, True))
+    gradcheck(getloss, (A1, diag, M1, mdiag, "davidson"))
+    gradcheck(getloss, (A1, diag, M1, mdiag, "exacteig"))
+    gradgradcheck(getloss, (A1, diag, M1, mdiag, "davidson"))
+    gradgradcheck(getloss, (A1, diag, M1, mdiag, "exacteig"))
 
 @device_dtype_float_test(only64=True)
 def test_grad_solve(dtype, device):
