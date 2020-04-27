@@ -9,6 +9,8 @@ def wrap_fcn(fcn, params):
 
     nparams = len(params)
 
+    # if the fcn is an object that has __call__ attribute, then assign it to fcn
+    # to make fcn a method
     if not inspect.ismethod(fcn) and not inspect.isfunction(fcn):
         if hasattr(fcn, "__call__"):
             fcn = fcn.__call__
@@ -28,7 +30,7 @@ def wrap_fcn(fcn, params):
             params = unroller.roll(all_params[:nparams])
             obj_params = all_params[nparams:]
             with obj.useparams(method_name, *obj_params) as model:
-                res = getattr(model, method_name)(*params)
+                res = fcn(*params)
             return res
 
         # get all the parameters
