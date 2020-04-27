@@ -17,9 +17,9 @@ class PolynomialModule(torch.nn.Module):
         return b
 
 class PolynomialModule2(torch.nn.Module, lt.EditableModule):
-    def __init__(self, c):
+    def __init__(self, c1, c2):
         super().__init__()
-        self.c = c
+        self.c = c1 + c2
 
     def forward(self, y):
         nr = self.c.shape[1]
@@ -57,7 +57,7 @@ def test_rootfinder(dtype, device):
         return y
 
     def getloss2(x, y0):
-        model = PolynomialModule2(x)
+        model = PolynomialModule2(x, 0.5*x)
         y = lt.rootfinder(model, y0)
         return y
 
@@ -88,7 +88,7 @@ def test_equil(dtype, device):
         return y
 
     def getloss2(x, y0):
-        model = PolynomialModule2(x)
+        model = PolynomialModule2(x, 0.5*x)
         y = lt.equilibrium(model, y0)
         return y
 
