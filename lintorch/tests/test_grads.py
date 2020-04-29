@@ -2,7 +2,8 @@ import time
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
-from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, get_diagonally_dominant_class
+from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, \
+    get_diagonally_dominant_class, get_lower_mat_class
 
 @device_dtype_float_test(only64=True)
 def test_grad_lsymeig(dtype, device):
@@ -85,32 +86,30 @@ def test_grad_solve(dtype, device):
     na = 4
     ncols = 2
     torch.manual_seed(124)
-    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
-    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
-    Acls = get_diagonally_dominant_class(na)
-    M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device).requires_grad_(True)
-    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0).requires_grad_(True)
-    Mcls = get_diagonally_dominant_class(na)
+    A1 = (torch.rand((1,na,na))+1).to(dtype).to(device).requires_grad_(True)
+    Acls = get_lower_mat_class(na)
+    M1 = (torch.rand((1,na,na))+1).to(dtype).to(device).requires_grad_(True)
+    Mcls = get_lower_mat_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
     A = Acls().to(dtype).to(device)
     M = Mcls().to(dtype).to(device)
-    biases = torch.rand(1,ncols).to(dtype).to(device)
-    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag)).detach().requires_grad_()
+    biases = torch.rand(1,ncols).to(dtype).to(device) * 0.1
+    b = (A(xtrue, A1) - biases.unsqueeze(1) * M(xtrue, M1)).detach().requires_grad_()
 
-    def getloss(A1, diag, b, biases, M1, mdiag):
+    def getloss(A1, b, biases, M1):
         fwd_options = {
-            "min_eps": 1e-12
+            "min_eps": 1e-12,
         }
         bck_options = {
             "verbose": False,
-            "min_eps": 1e-12
+            "min_eps": 1e-12,
         }
-        xinv = lt.solve(A, (A1, diag), b,
+        xinv = lt.solve(A, (A1,), b,
             biases = biases,
             M = M,
-            mparams = (M1, mdiag),
+            mparams = (M1,),
             fwd_options = fwd_options)
         return xinv
 
-    gradcheck(getloss, (A1, diag, b, biases, M1, mdiag))
-    gradgradcheck(getloss, (A1, diag, b, biases, M1, mdiag), atol=1e-3)
+    gradcheck(getloss, (A1, b, biases, M1))
+    gradgradcheck(getloss, (A1, b, biases, M1), atol=7e-4)

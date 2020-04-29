@@ -93,8 +93,10 @@ class solve_torchfcn(torch.autograd.Function):
         # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
         # (nbatch, nr, ncols)
-        v = solve(ctx.A, ctx.params, grad_x,
-            biases=ctx.biases, M=ctx.M, mparams=ctx.mparams,
+        AT = ctx.A.T
+        MT = ctx.M.T if ctx.M is not None else None
+        v = solve(AT, ctx.params, grad_x,
+            biases=ctx.biases, M=MT, mparams=ctx.mparams,
             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         grad_B = v
 
