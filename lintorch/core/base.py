@@ -256,7 +256,13 @@ class Module(EditableModule):
         V = torch.eye(na).unsqueeze(0).expand(nbatch,-1,-1).to(dtype).to(device)
 
         # obtain the full matrix of A
-        mat = self.forward(V, *params)
+        try:
+            mat = self.forward(V, *params)
+        except:
+            mat = torch.empty((nbatch, na, na))
+            for i in range(na):
+                mat[:,:,i:i+1] = self.forward(V[:,:,i:i+1], *params)
+
         # doing this could improve numerical stability
         if self.is_symmetric:
             mat = (mat + mat.transpose(-2,-1)) * 0.5
