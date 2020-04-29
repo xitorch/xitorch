@@ -4,34 +4,30 @@ from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
 from lintorch.tests.utils import device_dtype_float_test
 
-class PolynomialModule(torch.nn.Module):
-    def __init__(self):
-        super(PolynomialModule, self).__init__()
+class DummyModule(lt.EditableModule):
+    def __init__(self, A, addx=True):
+        super(DummyModule, self).__init__()
+        self.A = A # (nr, nr)
+        self.addx = addx
+        self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, y, c):
-        # y: (nbatch, 1)
-        # c: (nbatch, nr)
-        nr = c.shape[1]
-        power = torch.arange(nr)
-        b = (y ** power * c).sum(dim=-1, keepdim=True) # (nbatch, 1)
-        return b
-
-class PolynomialModule2(torch.nn.Module, lt.EditableModule):
-    def __init__(self, c1, c2):
-        super().__init__()
-        self.c = c1 + c2
-
-    def forward(self, y):
-        nr = self.c.shape[1]
-        power = torch.arange(nr)
-        b = (y ** power * self.c).sum(dim=-1, keepdim=True)
-        return b
+    def forward(self, x, bias):
+        # x: (nbatch, nr)
+        # bias: (nbatch, nr)
+        nbatch, nr = x.shape
+        x = x.unsqueeze(-1)
+        A = self.A.unsqueeze(0).expand(nbatch, -1, -1)
+        y = torch.bmm(A, x) # (nbatch, nr, ncols)
+        yr = self.sigmoid(2*y) + bias.unsqueeze(-1)
+        if self.addx:
+            yr = yr + x
+        return yr.squeeze(-1)
 
     def getparams(self, methodname):
-        return [self.c]
+        return [self.A]
 
     def setparams(self, methodname, *params):
-        self.c, = params[:1]
+        self.A, = params[:1]
         return 1
 
 @device_dtype_float_test(only64=True)
@@ -42,29 +38,23 @@ def test_rootfinder(dtype, device):
 
     nr = 4
     nbatch = 1
-    x  = torch.tensor([-1, 1, 4, 1]).unsqueeze(0).to(dtype).requires_grad_()
-    y0 = torch.rand((nbatch, 1)).to(dtype)
-    params = (x,)
+    A = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+    bias = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    params = (bias,)
 
-    model = PolynomialModule()
-    y = lt.rootfinder(model, y0, params)
-    f = model(y, *params)
+    model = DummyModule(A, addx=True)
+    y = lt.rootfinder(model.forward, y0, params)
+    f = model.forward(y, *params)
     assert torch.allclose(f*0, f)
 
-    def getloss(x, y0):
-        model = PolynomialModule()
-        y = lt.rootfinder(model, y0, (x,))
+    def getloss(A, y0, bias):
+        model = DummyModule(A, addx=True)
+        y = lt.rootfinder(model.forward, y0, (bias,))
         return y
 
-    def getloss2(x, y0):
-        model = PolynomialModule2(x, 0.5*x)
-        y = lt.rootfinder(model, y0)
-        return y
-
-    gradcheck(getloss, (x, y0))
-    gradcheck(getloss2, (x, y0))
-    gradgradcheck(getloss, (x, y0))
-    gradgradcheck(getloss2, (x, y0))
+    gradcheck(getloss, (A, y0, bias))
+    # gradgradcheck(getloss, (A, y0, bias))
 
 @device_dtype_float_test(only64=True)
 def test_equil(dtype, device):
@@ -74,28 +64,23 @@ def test_equil(dtype, device):
 
     nr = 4
     nbatch = 1
-    x  = torch.tensor([-1, 1, 4, 1]).unsqueeze(0).to(dtype).requires_grad_()
-    y0 = torch.rand((nbatch, 1)).to(dtype)
-    params = (x,)
+    A = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+    bias = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    params = (bias,)
 
-    model = PolynomialModule()
-    y = lt.equilibrium(model, y0, params)
-    assert torch.allclose(y, model(y, *params))
+    model = DummyModule(A, addx=False)
+    y = lt.equilibrium(model.forward, y0, params)
+    f = model.forward(y, *params)
+    assert torch.allclose(y, f)
 
-    def getloss(x, y0):
-        model = PolynomialModule()
-        y = lt.equilibrium(model, y0, (x,))
+    def getloss(A, y0, bias):
+        model = DummyModule(A, addx=False)
+        y = lt.equilibrium(model.forward, y0, (bias,))
         return y
 
-    def getloss2(x, y0):
-        model = PolynomialModule2(x, 0.5*x)
-        y = lt.equilibrium(model, y0)
-        return y
-
-    gradcheck(getloss, (x, y0))
-    gradcheck(getloss2, (x, y0))
-    gradgradcheck(getloss, (x, y0))
-    gradgradcheck(getloss2, (x, y0))
+    gradcheck(getloss, (A, y0, bias))
+    # gradgradcheck(getloss, (A, y0, bias))
 
 @device_dtype_float_test(only64=True)
 def test_optimize(dtype, device):
