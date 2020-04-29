@@ -314,6 +314,9 @@ class TransposeModule(Module):
     def to(self, dtype_or_device):
         self.model.to(dtype_or_device)
 
+    def __call__(self, x, *params):
+        return self.forward(x, *params)
+
     def forward(self, x, *params):
         return self.model.transpose(x, *params)
 
