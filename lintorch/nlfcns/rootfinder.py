@@ -126,3 +126,18 @@ class _DfDy(LintorchModule):
         res = -dfdy
         res = res.unsqueeze(-1)
         return res
+
+    def transpose(self, gy, yfcn, *params):
+        gy = gy.squeeze(-1)
+        yfcn.requires_grad_()
+        v = torch.ones_like(gy).to(gy.device).requires_grad_()
+        with torch.enable_grad():
+            yout = self.fcn(yfcn, *params)
+            dfdy, = torch.autograd.grad(yout, (yfcn,), grad_outputs=v,
+                create_graph=True)
+        dfdyt, = torch.autograd.grad(dfdy, v, grad_outputs=gy,
+            create_graph=torch.is_grad_enabled())
+
+        res = -dfdyt
+        res = res.unsqueeze(-1)
+        return res
