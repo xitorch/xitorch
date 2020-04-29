@@ -85,3 +85,19 @@ def get_diagonally_dominant_class(na):
             yprec = y / dd
             return yprec
     return Acls
+
+def get_lower_mat_class(na):
+    class Acls(lt.Module):
+        def __init__(self):
+            super(Acls, self).__init__(shape=(na,na), is_symmetric=False)
+
+        def forward(self, x, A1):
+            Amatrix = torch.tril(A1)
+            y = torch.bmm(Amatrix, x)
+            return y
+
+        def transpose(self, x, A1):
+            Amatrix = torch.tril(A1).transpose(-2,-1)
+            y = torch.bmm(Amatrix, x)
+            return y
+    return Acls
