@@ -24,6 +24,7 @@ class Module(EditableModule):
         self._is_forward_set = False
         self._is_transpose_set = False
         self._is_precond_set = False
+        self._transposed_module = None
 
         if dtype is None:
             dtype = torch.float32
@@ -265,6 +266,12 @@ class Module(EditableModule):
             self.__fullmatrix_ = mat
         return mat
 
+    @property
+    def T(self):
+        if self._transposed_module is None:
+            self._transposed_module = TransposeModule(self)
+        return self._transposed_module
+
     ##################### editable module part #####################
     def getparams(self, methodname):
         # TODO: check if it is inherited or not
@@ -294,6 +301,62 @@ class Module(EditableModule):
         else:
             raise RuntimeError("The method %s is not defined for setparams" % methodname)
 
+class TransposeModule(Module):
+    def __init__(self, model):
+        super(TransposeModule, self).__init__(
+            shape=model.shape,
+            is_symmetric=model.is_symmetric,
+            is_real=model.is_real,
+            dtype=model.dtype,
+            device=model.device)
+        self.model = model
+
+    def to(self, dtype_or_device):
+        self.model.to(dtype_or_device)
+
+    def forward(self, x, *params):
+        return self.model.transpose(x, *params)
+
+    def transpose(self, x, *params):
+        return self.model.forward(x, *params)
+
+    def precond(self, x, *params, biases=None, M=None, mparams=[]):
+        return self.model.precond(x, *params, biases=biases, M=M, mparams=mparams)
+
+    ##################### checkers #####################
+    def is_forward_set(self):
+        return self.model.is_transpose_set()
+
+    def is_transpose_set(self):
+        return self.model.is_forward_set()
+
+    def is_precond_set(self):
+        return self.model.is_precond_set()
+
+    ##################### setters #####################
+    def set_forward(self, fcn):
+        return self.model.set_transpose(fcn)
+
+    def set_transpose(self, fcn):
+        return self.model.set_forward(fcn)
+
+    def set_precond(self, fcn):
+        return self.model.set_precond(fcn)
+
+    ##################### implemented functions #####################
+    def fullmatrix(self, *params):
+        return self.model.fullmatrix(*params).transpose(-2,-1)
+
+    @property
+    def T(self):
+        return self.model
+
+    ##################### editable module part #####################
+    def getparams(self, methodname):
+        return self.model.getparams(methodname)
+
+    def setparams(self, methodname, *params):
+        return self.model.setparams(methodname, *params)
 
 #################################### decor ####################################
 def module(shape,
