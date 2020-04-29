@@ -103,21 +103,21 @@ def test_solve(dtype, device):
     na = 10
     ncols = 2
     torch.manual_seed(124)
-    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
+    A1 = (torch.rand((1,na,na))+1).to(dtype).to(device)
     Acls = get_lower_mat_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
     A = Acls().to(dtype).to(device)
-    biases = torch.rand(1,ncols).to(dtype).to(device)
+    biases = (torch.rand(1,ncols)*0.1).to(dtype).to(device)
     b = (A(xtrue, A1) - biases.unsqueeze(1) * xtrue)
 
     fwd_options = {
-        "min_eps": 1e-12,
+        "min_eps": 1e-9,
     }
     x = lt.solve(A, (A1,), b,
         biases = biases,
         fwd_options = fwd_options)
 
-    assert torch.allclose(x, xtrue, atol=1e-5, rtol=5e-4)
+    assert torch.allclose(x, xtrue, atol=1e-5, rtol=1e-4)
 
 @device_dtype_float_test()
 def test_solve_with_M(dtype, device):
@@ -125,28 +125,26 @@ def test_solve_with_M(dtype, device):
     na = 10
     ncols = 2
     torch.manual_seed(124)
-    A1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
-    diag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
-    Acls = get_diagonally_dominant_class(na)
-    M1 = (torch.rand((1,na,na))*0.1).to(dtype).to(device)
-    mdiag = (torch.arange(na, dtype=dtype)+1.0).to(device).unsqueeze(0)
-    Mcls = get_diagonally_dominant_class(na)
+    A1 = (torch.rand((1,na,na))+1).to(dtype).to(device)
+    Acls = get_lower_mat_class(na)
+    M1 = (torch.rand((1,na,na))+1).to(dtype).to(device)
+    Mcls = get_lower_mat_class(na)
     xtrue = torch.rand(1,na,ncols).to(dtype).to(device)
     A = Acls().to(dtype).to(device)
     M = Mcls().to(dtype).to(device)
-    biases = torch.rand(1,ncols).to(dtype).to(device)
-    b = (A(xtrue, A1, diag) - biases.unsqueeze(1) * M(xtrue, M1, mdiag))
+    biases = torch.rand(1,ncols).to(dtype).to(device) * 0.1
+    b = (A(xtrue, A1) - biases.unsqueeze(1) * M(xtrue, M1))
 
     fwd_options = {
         "min_eps": 1e-9,
     }
-    x = lt.solve(A, (A1, diag), b,
+    x = lt.solve(A, (A1,), b,
         biases = biases,
         M = M,
-        mparams = (M1, mdiag),
+        mparams = (M1,),
         fwd_options = fwd_options)
 
-    assert torch.allclose(x, xtrue, atol=1e-5, rtol=1e-6)
+    assert torch.allclose(x, xtrue, atol=1e-5, rtol=1e-4)
 
 @device_dtype_float_test(only64=True)
 def test_converge_solve(dtype, device):
