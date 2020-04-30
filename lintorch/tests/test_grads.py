@@ -102,14 +102,16 @@ def test_grad_solve(dtype, device):
         }
         bck_options = {
             "verbose": False,
+            "max_niter": 150,
             "min_eps": 1e-12,
         }
         xinv = lt.solve(A, (A1,), b,
             biases = biases,
             M = M,
             mparams = (M1,),
-            fwd_options = fwd_options)
+            fwd_options = fwd_options,
+            bck_options = bck_options)
         return xinv
 
     gradcheck(getloss, (A1, b, biases, M1))
-    gradgradcheck(getloss, (A1, b, biases, M1), atol=7e-4)
+    gradgradcheck(getloss, (A1, b, biases, M1), atol=3e-6)
