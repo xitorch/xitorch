@@ -11,14 +11,15 @@ class DummyModule(lt.EditableModule):
         self.addx = addx
         self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, x, bias):
+    def forward(self, x, diag):
         # x: (nbatch, nr)
-        # bias: (nbatch, nr)
+        # diag: (nbatch, nr)
         nbatch, nr = x.shape
         x = x.unsqueeze(-1)
-        A = self.A.unsqueeze(0).expand(nbatch, -1, -1)
+        A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
+        A = A + torch.diag_embed(diag) # (nbatch, nr, nr)
         y = torch.bmm(A, x) # (nbatch, nr, ncols)
-        yr = self.sigmoid(2*y) + bias.unsqueeze(-1)
+        yr = self.sigmoid(2*y)
         if self.addx:
             yr = yr + x
         return yr.squeeze(-1)
@@ -39,22 +40,22 @@ def test_rootfinder(dtype, device):
     nr = 4
     nbatch = 1
     A = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
-    bias = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+    diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    params = (bias,)
+    params = (diag,)
 
     model = DummyModule(A, addx=True)
     y = lt.rootfinder(model.forward, y0, params)
     f = model.forward(y, *params)
     assert torch.allclose(f*0, f)
 
-    def getloss(A, y0, bias):
+    def getloss(A, y0, diag):
         model = DummyModule(A, addx=True)
-        y = lt.rootfinder(model.forward, y0, (bias,))
+        y = lt.rootfinder(model.forward, y0, (diag,))
         return y
 
-    gradcheck(getloss, (A, y0, bias))
-    # gradgradcheck(getloss, (A, y0, bias))
+    gradcheck(getloss, (A, y0, diag))
+    # gradgradcheck(getloss, (A, y0, diag))
 
 @device_dtype_float_test(only64=True)
 def test_equil(dtype, device):
@@ -65,22 +66,22 @@ def test_equil(dtype, device):
     nr = 4
     nbatch = 1
     A = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
-    bias = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+    diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    params = (bias,)
+    params = (diag,)
 
     model = DummyModule(A, addx=False)
     y = lt.equilibrium(model.forward, y0, params)
     f = model.forward(y, *params)
     assert torch.allclose(y, f)
 
-    def getloss(A, y0, bias):
+    def getloss(A, y0, diag):
         model = DummyModule(A, addx=False)
-        y = lt.equilibrium(model.forward, y0, (bias,))
+        y = lt.equilibrium(model.forward, y0, (diag,))
         return y
 
-    gradcheck(getloss, (A, y0, bias))
-    # gradgradcheck(getloss, (A, y0, bias))
+    gradcheck(getloss, (A, y0, diag))
+    gradgradcheck(getloss, (A, y0, diag))
 
 @device_dtype_float_test(only64=True)
 def test_optimize(dtype, device):
