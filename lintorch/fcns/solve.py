@@ -156,6 +156,8 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
     R = B - A(X)
     P = precond(R) # (nbatch, na, ncols)
     Rs_old = _dot(R, P) # (nbatch, 1, ncols)
+    best_loss = 9e99
+    best_res = X
     for i in range(config["max_niter"]):
         Ap = A(P) # (nbatch, na, ncols)
         alpha = _safe_divide(Rs_old, _dot(P, Ap)) # (nbatch, na, ncols)
@@ -166,6 +168,9 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
 
         # check convergence
         eps_max = Rs_new.abs().max()
+        if eps_max < best_loss:
+            best_loss = eps_max
+            best_res = X
         if verbose and (i+1)%1 == 0:
             print("Iter %d: %.3e" % (i+1, eps_max))
         if eps_max < min_eps:
@@ -174,7 +179,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
         P = prR + _safe_divide(Rs_new, Rs_old) * P
         Rs_old = Rs_new
 
-    return X
+    return best_res
 
 def lbfgs(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
     # B: (nbatch, na, ncols)
