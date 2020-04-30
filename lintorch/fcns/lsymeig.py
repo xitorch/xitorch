@@ -88,12 +88,12 @@ class lsymeig_torchfcn(torch.autograd.Function):
         M = ctx.M
 
         # the loss function where the gradient will be retrieved
-        params = [p.clone().detach().requires_grad_() for p in ctx.params]
         # warnings: if not all params have the connection to the output of A,
         # it could cause an infinite loop because pytorch will keep looking
         # for the *params node and propagate further backward via the `evecs`
         # path. So make sure all the *params are all connected in the graph.
         with torch.enable_grad():
+            params = [p.clone().requires_grad_() for p in ctx.params]
             loss = ctx.A(evecs, *params) # (nbatch, na, neig)
 
         # calculate the contributions from the eigenvalues
@@ -119,8 +119,8 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         grad_mparams = []
         if ctx.M is not None and len(ctx.mparams) > 0:
-            mparams = [p.clone().detach().requires_grad_() for p in ctx.mparams]
             with torch.enable_grad():
+                mparams = [p.clone().requires_grad_() for p in ctx.mparams]
                 mloss = ctx.M(evecs, *mparams) # (nbatch, na, neig)
             gevalsM = -gevalsA * evals.unsqueeze(1)
             gevecsM = -gevecsA * evals.unsqueeze(1)

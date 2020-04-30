@@ -111,7 +111,7 @@ class solve_torchfcn(torch.autograd.Function):
 
         # calculate the grad of matrices parameters
         with torch.enable_grad():
-            params = [p.clone().detach().requires_grad_() for p in ctx.params]
+            params = [p.clone().requires_grad_() for p in ctx.params]
             loss = -ctx.A(ctx.x, *params) # (nbatch, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
