@@ -142,3 +142,9 @@ class _DfDy(LintorchModule):
         res = -dfdyt
         res = res.unsqueeze(-1)
         return res
+
+    def getparams(self, methodname):
+        return []
+
+    def setparams(self, methodname, *params):
+        return 0
