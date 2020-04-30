@@ -138,7 +138,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
     config = set_default_option({
         "max_niter": 2*na,
         "verbose": False,
-        "min_eps": 1e-12, # minimum residual to stop
+        "min_eps": 1e-9, # minimum residual to stop
     }, options)
 
     A, B, precond = _setup_matrices(A, params, B, biases, M, mparams, posdef)
@@ -156,7 +156,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
     R = B - A(X)
     P = precond(R) # (nbatch, na, ncols)
     Rs_old = _dot(R, P) # (nbatch, 1, ncols)
-    best_loss = 9e99
+    best_loss = None
     best_res = X
     for i in range(config["max_niter"]):
         Ap = A(P) # (nbatch, na, ncols)
@@ -168,7 +168,7 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
 
         # check convergence
         eps_max = Rs_new.abs().max()
-        if eps_max < best_loss:
+        if best_loss is None or eps_max < best_loss:
             best_loss = eps_max
             best_res = X
         if verbose and (i+1)%1 == 0:

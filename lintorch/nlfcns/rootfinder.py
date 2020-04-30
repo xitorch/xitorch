@@ -51,7 +51,6 @@ class _RootFinder(torch.autograd.Function):
     def forward(ctx, fcn, y0, options, bck_options, *params):
         # set default options
         config = set_default_option({
-            "max_niter": 50,
             "min_eps": 1e-9,
             "verbose": False,
             "linesearch": True,
@@ -59,9 +58,6 @@ class _RootFinder(torch.autograd.Function):
             "method": "lbfgs",
         }, options)
         ctx.bck_options = set_default_option({
-            "max_niter": 50,
-            "min_eps": 1e-9,
-            "verbose": False,
         }, bck_options)
 
         def loss(y):
