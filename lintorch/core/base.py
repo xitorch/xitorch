@@ -259,7 +259,7 @@ class Module(EditableModule):
         try:
             mat = self.forward(V, *params)
         except:
-            mat = torch.empty((nbatch, na, na))
+            mat = torch.empty((nbatch, na, na)).to(dtype).to(device)
             for i in range(na):
                 mat[:,:,i:i+1] = self.forward(V[:,:,i:i+1], *params)
 
