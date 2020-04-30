@@ -16,7 +16,11 @@ def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
         0 = fcn(y, *params)
 
     where `fcn` is a function that can be non-linear and produce output of shape
-    `y`. The output of this block is `y` that produces the 0 as the output
+    `y`. The output of this block is `y` that produces the 0 as the output.
+
+    WARNING: If a parameter is not on the graph of df/dy, then the second-order
+        gradient calculation could yield an infinite loop.
+        For example: fcn(y,a) = y^2+a, where df/dy = 2*y
     """
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -30,6 +34,10 @@ def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
 
     where `fcn` is a function that can be non-linear and produce output of shape
     of `y`.
+
+    WARNING: If a parameter is not on the graph of df/dy, then the second-order
+        gradient calculation could yield an infinite loop.
+        For example: fcn(y,a) = y^2+a, where df/dy = 2*y
     """
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
