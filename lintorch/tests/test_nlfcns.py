@@ -83,29 +83,29 @@ def test_equil(dtype, device):
     gradcheck(getloss, (A, y0, diag))
     gradgradcheck(getloss, (A, y0, diag))
 
-@device_dtype_float_test(only64=True)
-def test_optimize(dtype, device):
-    torch.manual_seed(100)
-    random.seed(100)
-    dtype = torch.float64
-
-    nr = 3
-    nbatch = 1
-    x  = torch.tensor([-1, 1, 4]).unsqueeze(0).to(dtype).requires_grad_()
-    y0 = torch.rand((nbatch, 1)).to(dtype)
-    params = (y0, x)
-
-    model = PolynomialModule()
-    zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
-    z = model(yopt, x)
-    zmin = x[:,0]-x[:,1]**2/(4*x[:,2])
-    assert torch.allclose(zmin, z)
-    assert torch.allclose(zmin, zopt)
-
-    def getloss(x, y0):
-        model = PolynomialModule()
-        zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
-        return zopt#, yopt
-
-    gradcheck(getloss, (x, y0))
-    gradgradcheck(getloss, (x, y0))
+# @device_dtype_float_test(only64=True)
+# def test_optimize(dtype, device):
+#     torch.manual_seed(100)
+#     random.seed(100)
+#     dtype = torch.float64
+#
+#     nr = 3
+#     nbatch = 1
+#     x  = torch.tensor([-1, 1, 4]).unsqueeze(0).to(dtype).requires_grad_()
+#     y0 = torch.rand((nbatch, 1)).to(dtype)
+#     params = (y0, x)
+#
+#     model = PolynomialModule()
+#     zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
+#     z = model(yopt, x)
+#     zmin = x[:,0]-x[:,1]**2/(4*x[:,2])
+#     assert torch.allclose(zmin, z)
+#     assert torch.allclose(zmin, zopt)
+#
+#     def getloss(x, y0):
+#         model = PolynomialModule()
+#         zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
+#         return zopt#, yopt
+#
+#     gradcheck(getloss, (x, y0))
+#     gradgradcheck(getloss, (x, y0))

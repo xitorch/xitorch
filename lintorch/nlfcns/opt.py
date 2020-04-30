@@ -20,6 +20,7 @@ def optimize(fcn, xparams, yparams=[], fwd_options={}, bck_options={}):
     parameters, `x`.
     The gradient is calculated with respect to `y`.
     """
+    raise RuntimeError("This function is not ready. Please do not use it.")
     wrapped_fcn, all_params = wrap_fcn(fcn, (*xparams, *yparams))
     all_params = all_params[len(xparams):] # to exclude xparams
     res = _Optimize.apply(wrapped_fcn, xparams, fwd_options, bck_options, *all_params)
