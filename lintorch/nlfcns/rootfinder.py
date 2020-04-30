@@ -86,7 +86,7 @@ class _RootFinder(torch.autograd.Function):
         params = ctx.params
         nr = yout.shape[-1]
         # dL/df
-        _apply_DfDy = _DfDy(nr, ctx.fcn)
+        _apply_DfDy = _DfDy(nr, ctx.fcn, dtype=yout.dtype, device=yout.device)
         gyfcn = solve(_apply_DfDy, [yout, *params], grad_yout.unsqueeze(-1),
             fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
 
@@ -100,8 +100,9 @@ class _RootFinder(torch.autograd.Function):
         return (None, None, None, None, *grad_params)
 
 class _DfDy(LintorchModule):
-    def __init__(self, nr, fcn):
-        super(_DfDy, self).__init__(shape=(nr,nr), is_symmetric=False)
+    def __init__(self, nr, fcn, dtype=None, device=None):
+        super(_DfDy, self).__init__(shape=(nr,nr), is_symmetric=False,
+            dtype=dtype, device=device)
         self.fcn = fcn
         self.yinp = None
         self.yfcn = None
