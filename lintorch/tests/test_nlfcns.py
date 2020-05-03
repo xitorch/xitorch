@@ -55,7 +55,7 @@ def test_rootfinder(dtype, device):
         return y
 
     gradcheck(getloss, (A, y0, diag))
-    # gradgradcheck(getloss, (A, y0, diag))
+    gradgradcheck(getloss, (A, y0, diag))
 
 @device_dtype_float_test(only64=True)
 def test_equil(dtype, device):
