@@ -3,6 +3,7 @@ import inspect
 from abc import abstractmethod
 from contextlib import contextmanager
 import copy
+import traceback as tb
 import torch
 
 __all__ = ["EditableModule",
@@ -86,7 +87,7 @@ class EditableModule(object):
             self.setuniqueparams(methodname, *params)
             yield self
         except Exception as exc:
-            print(exc)
+            tb.print_exc()
         finally:
             self.setuniqueparams(methodname, *_orig_params_)
 
