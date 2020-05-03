@@ -128,8 +128,12 @@ class _DfDy(LintorchModule):
             dfdy, = torch.autograd.grad(self.yfcn, (self.yinp,), gy,
                 retain_graph=True, create_graph=torch.is_grad_enabled())
 
+        # line just to have a dummy graph, in case there is a parameter that
+        # is disconnected in calculating df/dy
+        dummy_graph = sum([(p.sum()*0) for p in params])
+
         res = -dfdy
-        res = res.unsqueeze(-1)
+        res = res.unsqueeze(-1) + dummy_graph
         return res
 
     def transpose(self, gy, yfcn, *params):
@@ -143,8 +147,12 @@ class _DfDy(LintorchModule):
         dfdyt, = torch.autograd.grad(dfdy, v, grad_outputs=gy,
             create_graph=torch.is_grad_enabled())
 
+        # line just to have a dummy graph, in case there is a parameter that
+        # is disconnected in calculating df/dy
+        dummy_graph = sum([(p.sum()*0) for p in params])
+
         res = -dfdyt
-        res = res.unsqueeze(-1)
+        res = res.unsqueeze(-1) + dummy_graph
         return res
 
     def getparams(self, methodname):
