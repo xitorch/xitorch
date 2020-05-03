@@ -17,10 +17,6 @@ def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
 
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
-
-    WARNING: If a parameter is not on the graph of df/dy, then the second-order
-        gradient calculation could yield an infinite loop.
-        For example: fcn(y,a) = y^2+a, where df/dy = 2*y
     """
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -34,10 +30,6 @@ def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
 
     where `fcn` is a function that can be non-linear and produce output of shape
     of `y`.
-
-    WARNING: If a parameter is not on the graph of df/dy, then the second-order
-        gradient calculation could yield an infinite loop.
-        For example: fcn(y,a) = y^2+a, where df/dy = 2*y
     """
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -128,12 +120,11 @@ class _DfDy(LintorchModule):
             dfdy, = torch.autograd.grad(self.yfcn, (self.yinp,), gy,
                 retain_graph=True, create_graph=torch.is_grad_enabled())
 
-        # line just to have a dummy graph, in case there is a parameter that
-        # is disconnected in calculating df/dy
-        dummy_graph = sum([(p.sum()*0) for p in params])
+        # connect the params to dfdy, in case there is one or more missing
+        if torch.is_grad_enabled():
+            dfdy = connect_graph(dfdy, params)
 
-        res = -dfdy
-        res = res.unsqueeze(-1) + dummy_graph
+        res = -dfdy.unsqueeze(-1)
         return res
 
     def transpose(self, gy, yfcn, *params):
@@ -147,12 +138,11 @@ class _DfDy(LintorchModule):
         dfdyt, = torch.autograd.grad(dfdy, v, grad_outputs=gy,
             create_graph=torch.is_grad_enabled())
 
-        # line just to have a dummy graph, in case there is a parameter that
-        # is disconnected in calculating df/dy
-        dummy_graph = sum([(p.sum()*0) for p in params])
+        # connect the params to dfdy, in case there is one or more missing
+        if torch.is_grad_enabled():
+            dfdyt = connect_graph(dfdyt, params)
 
-        res = -dfdyt
-        res = res.unsqueeze(-1) + dummy_graph
+        res = -dfdyt.unsqueeze(-1)
         return res
 
     def getparams(self, methodname):
@@ -160,3 +150,8 @@ class _DfDy(LintorchModule):
 
     def setparams(self, methodname, *params):
         return 0
+
+def connect_graph(out, params):
+    # just to have a dummy graph, in case there is a parameter that
+    # is disconnected in calculating df/dy
+    return out + sum([p.view(-1)[0]*0 for p in params])
