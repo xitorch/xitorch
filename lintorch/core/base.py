@@ -1,6 +1,7 @@
 import inspect
 from abc import abstractmethod, abstractproperty
 import torch
+from scipy.sparse.linalg import LinearOperator
 from lintorch.utils.exceptions import UnimplementedError
 from lintorch.core.editable_module import EditableModule, getmethodparams, setmethodparams
 
@@ -277,6 +278,21 @@ class Module(EditableModule):
         if self._transposed_module is None:
             self._transposed_module = TransposeModule(self)
         return self._transposed_module
+
+    def scipy_linalg_op(self, *params):
+        return LinearOperator(
+            shape=self.shape,
+            matvec=lambda v: self.forward(
+                torch.tensor(v, dtype=self.dtype, device=self.device).unsqueeze(0).unsqueeze(-1),
+                *params).squeeze(0).detach().numpy(),
+            rmatvec=lambda v: self.transpose(
+                torch.tensor(v, dtype=self.dtype, device=self.device).unsqueeze(0).unsqueeze(-1),
+                *params).squeeze(0).detach().numpy(),
+            matmat=lambda v: self.forward(
+                torch.tensor(v, dtype=self.dtype, device=self.device).unsqueeze(0),
+                *params).squeeze(0).detach().numpy(),
+        )
+
 
     ##################### editable module part #####################
     def getparams(self, methodname):
