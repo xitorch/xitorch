@@ -1,4 +1,5 @@
 import torch
+import warnings
 import numpy as np
 from lintorch.utils.misc import set_default_option
 from scipy.sparse.linalg import gmres, minres
@@ -148,7 +149,10 @@ def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **op
     nbatch, na, ncols = B.shape
     config = set_default_option({
         "min_eps": 1e-9,
+        "max_niter": None,
     }, options)
+    min_eps = config["min_eps"]
+    max_niter = config["max_niter"]
 
     B = B.transpose(-1,-2) # (nbatch, ncols, na)
 
@@ -158,7 +162,12 @@ def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **op
     res_np = np.empty(B.shape, dtype=np.float64)
     for i in range(nbatch):
         for j in range(ncols):
-            x, info = gmres(op, B_np[i,j,:], tol=config["min_eps"], atol=1e-12)
+            x, info = gmres(op, B_np[i,j,:], tol=min_eps, atol=1e-12, maxiter=max_niter)
+            if info > 0:
+                msg = "The GMRES iteration does not converge to the desired value "\
+                      "(%.3e) even after %d iterations" % \
+                      (config["min_eps"], info)
+                warnings.warn(msg)
             res_np[i,j,:] = x
 
     res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
