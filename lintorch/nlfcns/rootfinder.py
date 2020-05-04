@@ -50,6 +50,7 @@ class _RootFinder(torch.autograd.Function):
             "method": "lbfgs",
         }, options)
         ctx.bck_options = set_default_option({
+            "method": "gmres"
         }, bck_options)
 
         def loss(y):

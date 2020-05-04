@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from lintorch.utils.misc import set_default_option
+from scipy.sparse.linalg import gmres, minres
 
 __all__ = ["solve"]
 
@@ -70,6 +71,10 @@ class solve_torchfcn(torch.autograd.Function):
         method = config["method"].lower()
         if method == "conjgrad":
             x = conjgrad(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
+        elif method == "gmres":
+            x = wrap_gmres(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
+        elif method == "minres":
+            x = wrap_minres(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "lbfgs":
             x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "fista":
@@ -131,6 +136,68 @@ class solve_torchfcn(torch.autograd.Function):
 
         return (None, grad_B, grad_biases, None, None, None, None, None,
                 *grad_params, *grad_mparams)
+
+def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
+    # check the parameters
+    msg = "GMRES can only do AX=B"
+    assert A.shape[0] == A.shape[1], "GMRES can only work for square operator for now"
+    assert biases is None, msg
+    assert M is None, msg
+
+    # set the default config options
+    nbatch, na, ncols = B.shape
+    config = set_default_option({
+        "min_eps": 1e-9,
+    }, options)
+
+    B = B.transpose(-1,-2) # (nbatch, ncols, na)
+
+    # convert the numpy/scipy
+    op = A.scipy_linalg_op(*params)
+    B_np = B.detach().numpy()
+    res_np = np.empty(B.shape, dtype=np.float64)
+    for i in range(nbatch):
+        for j in range(ncols):
+            x, info = gmres(op, B_np[i,j,:], tol=config["min_eps"], atol=1e-12)
+            res_np[i,j,:] = x
+
+    res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
+    res = res.transpose(-1,-2) # (nbatch, na, ncols)
+    return res
+
+def wrap_minres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
+    # NOTE: untested
+
+    # check the parameters
+    msg = "MINRES can only do AX=B or (A-bias*I)X=B"
+    assert A.shape[0] == A.shape[1], "MINRES can only work for square operator for now"
+    assert M is None, msg
+
+    # set the default config options
+    nbatch, na, ncols = B.shape
+    config = set_default_option({
+        "min_eps": 1e-5,
+    }, options)
+
+    B = B.transpose(-1,-2) # (nbatch, ncols, na)
+
+    # convert the numpy/scipy
+    op = A.scipy_linalg_op(*params)
+    B_np = B.detach().numpy()
+    res_np = np.empty(B.shape, dtype=np.float64)
+    for i in range(nbatch):
+        for j in range(ncols):
+            if biases is not None:
+                shift = biases[i,j]
+            else:
+                shift = 0.0
+            x, info = minres(op, B_np[i,j,:], shift=shift, tol=config["min_eps"])
+            res_np[i,j,:] = x
+
+    res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
+    res = res.transpose(-1,-2) # (nbatch, na, ncols)
+    return res
+
 
 def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
     # use conjugate gradient descent to solve the inverse equation
