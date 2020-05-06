@@ -1,5 +1,6 @@
 import inspect
 import torch
+import scipy.optimize
 import lintorch as lt
 from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
@@ -69,6 +70,25 @@ class _RootFinder(torch.autograd.Function):
             y = diis(loss, y0, **config)
         elif method == "gradrca":
             y = gradrca(loss, y0, **config)
+        elif method.startswith("np_"):
+            nbatch = y0.shape[0]
+
+            def loss_np(y):
+                yt = torch.tensor(y, dtype=y0.dtype, device=y0.device).view(nbatch,-1)
+                yfcn = fcn(yt, *params)
+                return yfcn.reshape(-1).cpu().detach().numpy()
+
+            y0_np = y0.squeeze(0).cpu().detach().numpy()
+            if method == "np_broyden":
+                y_np = scipy.optimize.broyden1(loss_np, y0_np,
+                    verbose=config["verbose"],
+                    maxiter=config["max_niter"],
+                    alpha=-config["jinv0"],
+                    f_tol=1e-2)
+            else:
+                raise RuntimeError("Unknown method: %s" % config["method"])
+
+            y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device).unsqueeze(0)
         else:
             raise RuntimeError("Unknown method: %s" % config["method"])
 
