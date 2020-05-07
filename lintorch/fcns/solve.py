@@ -255,6 +255,11 @@ def conjgrad(A, params, B, biases=None, M=None, mparams=[], posdef=False, **opti
         P = prR + _safe_divide(Rs_new, Rs_old) * P
         Rs_old = Rs_new
 
+    if best_loss >= min_eps:
+        msg = "The conjgrad failed to reach the convergence (only %.3e after "\
+              "%d iterations)" % (best_loss, config["max_niter"])
+        warnings.warn(msg)
+
     return best_res
 
 def lbfgs(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
