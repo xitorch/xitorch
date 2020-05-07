@@ -149,7 +149,7 @@ def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **op
     nbatch, na, ncols = B.shape
     config = set_default_option({
         "min_eps": 1e-9,
-        "max_niter": None,
+        "max_niter": 2*na,
     }, options)
     min_eps = config["min_eps"]
     max_niter = config["max_niter"]
@@ -165,7 +165,7 @@ def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **op
             x, info = gmres(op, B_np[i,j,:], tol=min_eps, atol=1e-12, maxiter=max_niter)
             if info > 0:
                 msg = "The GMRES iteration does not converge to the desired value "\
-                      "(%.3e) even after %d iterations" % \
+                      "(%.3e) after %d iterations" % \
                       (config["min_eps"], info)
                 warnings.warn(msg)
             res_np[i,j,:] = x
