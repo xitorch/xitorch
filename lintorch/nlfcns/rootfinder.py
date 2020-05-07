@@ -79,12 +79,27 @@ class _RootFinder(torch.autograd.Function):
                 return yfcn.reshape(-1).cpu().detach().numpy()
 
             y0_np = y0.squeeze(0).cpu().detach().numpy()
-            if method == "np_broyden":
+            if method == "np_broyden1":
+                opt = set_default_option({
+                    "verbose": False,
+                    "max_niter": None,
+                    "min_eps": None,
+                    "linesearch": "armijo",
+                }, config)
                 y_np = scipy.optimize.broyden1(loss_np, y0_np,
-                    verbose=config["verbose"],
-                    maxiter=config["max_niter"],
+                    verbose=opt["verbose"],
+                    maxiter=opt["max_niter"],
                     alpha=-config["jinv0"],
-                    f_tol=1e-2)
+                    f_tol=opt["min_eps"],
+                    line_search=opt["linesearch"])
+            elif method == "np_fsolve":
+                opt = set_default_option({
+                    "max_niter": 0,
+                }, config)
+                y_np, info, ier, msg = scipy.optimize.fsolve(loss_np, y0_np,
+                    maxfev=opt["max_niter"])
+                if ier != 1:
+                    warnings.warn(msg)
             else:
                 raise RuntimeError("Unknown method: %s" % config["method"])
 
