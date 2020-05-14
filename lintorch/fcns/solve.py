@@ -2,7 +2,7 @@ import torch
 import warnings
 import numpy as np
 from lintorch.utils.misc import set_default_option
-from scipy.sparse.linalg import gmres, minres
+from scipy.sparse.linalg import gmres, minres, lsqr
 
 __all__ = ["solve"]
 
@@ -76,6 +76,8 @@ class solve_torchfcn(torch.autograd.Function):
             x = wrap_gmres(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "minres":
             x = wrap_minres(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
+        elif method == "lsqr":
+            x = wrap_lsqr(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "lbfgs":
             x = lbfgs(A, params, B, biases=biases, M=M, mparams=mparams, posdef=posdef, **config)
         elif method == "fista":
@@ -202,6 +204,44 @@ def wrap_minres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **o
                 shift = 0.0
             x, info = minres(op, B_np[i,j,:], shift=shift, tol=config["min_eps"])
             res_np[i,j,:] = x
+
+    res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
+    res = res.transpose(-1,-2) # (nbatch, na, ncols)
+    return res
+
+def wrap_lsqr(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
+    # NOTE: untested
+
+    # check the parameters
+    msg = "LSQR can only do AX=B"
+    assert biases is None, msg
+    assert M is None, msg
+
+    # set the default config options
+    nbatch, na, ncols = B.shape
+    config = set_default_option({
+        "min_eps": 1e-5,
+    }, options)
+
+    B = B.transpose(-1,-2) # (nbatch, ncols, na)
+    conlim = 1e12 if A.shape[0] == A.shape[1] else 1e8
+
+    # convert the numpy/scipy
+    op = A.scipy_linalg_op(*params)
+    B_np = B.detach().numpy()
+    res_np = np.empty(B.shape, dtype=np.float64)
+    for i in range(nbatch):
+        for j in range(ncols):
+            x, istop, itn, normr = lsqr(op, B_np[i,j,:],
+                atol=config["min_eps"], btol=config["min_eps"],
+                conlim=conlim, iter_lim=config["max_niter"],
+                show=config["verbose"])[:4]
+            res_np[i,j,:] = x
+            if istop == 7:
+                msg = "The LSQR iteration does not converge to the desired value "\
+                      "(%.3e) after %d iterations. Final |r|=%.3e" % \
+                      (config["min_eps"], itn, normr)
+                warnings.warn(msg)
 
     res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
     res = res.transpose(-1,-2) # (nbatch, na, ncols)
