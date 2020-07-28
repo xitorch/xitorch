@@ -43,7 +43,10 @@ def solve(A, params, B, biases=None, M=None, mparams=[],
     na = len(params)
     if biases is None:
         M = None
-    return solve_torchfcn.apply(A, B, biases, M, posdef, fwd_options, bck_options, na, *params, *mparams)
+    if "method" in fwd_options and fwd_options["method"].lower() == "exactsolve":
+        return exactsolve(A, params, B, biases, M, mparams, **fwd_options)
+    else:
+        return solve_torchfcn.apply(A, B, biases, M, posdef, fwd_options, bck_options, na, *params, *mparams)
 
 class solve_torchfcn(torch.autograd.Function):
     @staticmethod
@@ -139,6 +142,23 @@ class solve_torchfcn(torch.autograd.Function):
 
         return (None, grad_B, grad_biases, None, None, None, None, None,
                 *grad_params, *grad_mparams)
+
+def exactsolve(A, params, B, biases=None, M=None, mparams=[], **options):
+    # B: (nbatch, na, ncols)
+    # solve (A-biases*M)x = B
+    nbatch, na, ncols = B.shape
+
+    Bright = B.transpose(-2, -1).unsqueeze(-1) # (nbatch, ncols, na, 1)
+    Amatrix = A.fullmatrix(*params) # (na, na)
+    if biases is not None: # biases: (nbatch, ncols)
+        if M is None:
+            Mmatrix = torch.eye(Amatrix.shape[-1], dtype=Amatrix.dtype, device=Amatrix.device) # (na, na)
+        else:
+            Mmatrix = M.fullmatrix(*mparams)
+        Amatrix = Amatrix - torch.einsum("bc,ad->bcad", biases, Mmatrix) # (nbatch, ncols, na, na)
+    x, _ = torch.solve(Bright, Amatrix) # (nbatch, ncols, na, 1)
+    x = x.squeeze(-1).transpose(-2,-1) # (nbatch, na, ncols)
+    return x
 
 def wrap_gmres(A, params, B, biases=None, M=None, mparams=[], posdef=False, **options):
     # check the parameters
