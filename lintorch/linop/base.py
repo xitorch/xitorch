@@ -1,5 +1,6 @@
 import inspect
 import warnings
+import traceback
 import torch
 from abc import abstractmethod, abstractproperty
 from lintorch.core.editable_module import EditableModule
@@ -377,8 +378,11 @@ def checklinop(linop):
         try:
             y = fcn(x)
         except:
-            raise RuntimeError("An error is raised from .%s with input shape: %s (linear operator shape: %s)" % \
-                (methodname, tuple(xshape), tuple(linop.shape)))
+            s = traceback.format_exc()
+            msg = "An error is raised from .%s with input shape: %s (linear operator shape: %s)\n" % \
+                (methodname, tuple(xshape), tuple(linop.shape))
+            msg += "--- full traceback ---\n%s" % s
+            raise RuntimeError(msg)
         msg = "The output shape of .%s is not correct. Input: %s, expected output: %s, output: %s" % \
             (methodname, tuple(x.shape), tuple(yshape), tuple(y.shape))
         assert list(y.shape) == list(yshape), msg
