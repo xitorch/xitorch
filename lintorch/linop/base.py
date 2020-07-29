@@ -388,17 +388,18 @@ def checklinop(linop):
         assert list(y.shape) == list(yshape), msg
 
         # linearity test
-        y2 = fcn(1.25*x)
+        x2 = 1.25*x
+        y2 = fcn(x2)
         assert torch.allclose(y2, 1.25*y), "Linearity check fails"
         y0 = fcn(0*x)
         assert torch.allclose(y0, y*0), "Linearity check (with 0) fails"
 
         # batched test
-        xnew = x.expand(2,*x.shape)
+        xnew = torch.cat((x.unsqueeze(0), x2.unsqueeze(0)), dim=0)
         ynew = fcn(xnew) # (2, ..., q)
         msg = "Batched test fails (expanding batches changes the results)"
         assert torch.allclose(ynew[0], y), msg
-        assert torch.allclose(ynew[1], y), msg
+        assert torch.allclose(ynew[1], y2), msg
 
     # generate shapes
     mv_xshapes = [
