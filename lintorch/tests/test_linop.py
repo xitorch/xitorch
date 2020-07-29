@@ -88,6 +88,12 @@ def test_linop1_mm():
     assert torch.allclose(ymv, torch.matmul(mat, xv))
     assert torch.allclose(ymm, torch.matmul(mat, x))
 
+def test_linop1_fullmatrix():
+    mat = torch.rand((2,4,2,3), dtype=torch.float64)
+    linop = LinOp1(mat)
+    linop_mat = linop.fullmatrix()
+    assert torch.allclose(linop_mat, mat)
+
 def test_linop1_adj_err():
     # see if an error is raised if .H.mv() is called without .rmv() implementation
     mat = torch.rand((2,4,2,3))
