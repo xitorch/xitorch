@@ -373,7 +373,7 @@ def checklinop(linop):
     batchshape = shape[:-2]
 
     def runtest(methodname, xshape, yshape):
-        x = torch.zeros(xshape, dtype=linop.dtype, device=linop.device)
+        x = torch.rand(xshape, dtype=linop.dtype, device=linop.device)
         fcn = getattr(linop, methodname)
         try:
             y = fcn(x)
@@ -386,6 +386,19 @@ def checklinop(linop):
         msg = "The output shape of .%s is not correct. Input: %s, expected output: %s, output: %s" % \
             (methodname, tuple(x.shape), tuple(yshape), tuple(y.shape))
         assert list(y.shape) == list(yshape), msg
+
+        # linearity test
+        y2 = fcn(1.25*x)
+        assert torch.allclose(y2, 1.25*y), "Linearity check fails"
+        y0 = fcn(0*x)
+        assert torch.allclose(y0, y*0), "Linearity check (with 0) fails"
+
+        # batched test
+        xnew = x.expand(2,*x.shape)
+        ynew = fcn(xnew) # (2, ..., q)
+        msg = "Batched test fails (expanding batches changes the results)"
+        assert torch.allclose(ynew[0], y), msg
+        assert torch.allclose(ynew[1], y), msg
 
     # generate shapes
     mv_xshapes = [
