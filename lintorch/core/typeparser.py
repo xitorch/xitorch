@@ -10,6 +10,7 @@ class TypeParser(ast.NodeVisitor):
     def __init__(self):
         self.typed_classes = []
         # to be able to get the actual type, we need to import what the file imports
+        # TODO: how about the type is defined in the file (???)
         self.imported_modules = {}
         self.imported_obj = {}
         self.deftypes = ["int", "float", "str", "bool"] # default types in Python
