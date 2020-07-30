@@ -5,6 +5,8 @@ import torch
 from abc import abstractmethod, abstractproperty
 from lintorch.core.editable_module import EditableModule
 
+__all__ = ["LinearOperator", "MatrixLinOp"]
+
 class LinearOperator(EditableModule):
     """
     LinearOperator is a class designed to behave as a linear operator without
@@ -288,6 +290,33 @@ class LinearOperator(EditableModule):
     def is_fullmatrix_implemented(self):
         return self._is_fullmatrix_implemented
 
+    ############ debug functions ##############
+    def check(self, warn=True):
+        """
+        Perform checks to make sure the linear operator behaves as a proper
+        linear operator.
+
+        Arguments
+        ---------
+        * warn: bool
+            If True, then raises a warning to the user that the check might slow
+            down the program. This is to remind the user to turn off the check
+            when not in a debugging mode.
+
+        Exceptions
+        ----------
+        * RuntimeError
+            Raised if an error is raised when performing linear operations of the
+            object (e.g. calling .mv(), .mm(), etc)
+        * AssertionError
+            Raised if the linear operations do not behave as proper linear operations.
+            (e.g. not scaling linearly)
+        """
+        if warn:
+            msg = "The linear operator check is performed. This might slow down your program."
+            warnings.warn(msg, stacklevel=2)
+        checklinop(self)
+
     ############ private functions #################
     def __check_if_implemented(self, methodname):
         this_method = getattr(self, methodname).__func__
@@ -461,4 +490,4 @@ def checklinop(linop):
 if __name__ == "__main__":
     mat = torch.tensor([[1.2, 3.4], [2.1, 5.6]])
     matlinop = MatrixLinOp(mat)
-    checklinop(matlinop)
+    matlinop.check()
