@@ -33,6 +33,7 @@ class LinearOperator(EditableModule):
         self._is_mm_implemented = self.__check_if_implemented("_mm")
         self._is_rmv_implemented = self.__check_if_implemented("_rmv")
         self._is_rmm_implemented = self.__check_if_implemented("_rmm")
+        self._is_fullmatrix_implemented = self.__check_if_implemented("_fullmatrix")
         if not self._is_mv_implemented:
             raise RuntimeError("LinearOperator must have at least ._mv() method implemented")
         if self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
@@ -55,6 +56,10 @@ class LinearOperator(EditableModule):
 
     # @abstractmethod
     def _rmm(self, x):
+        pass
+
+    # @abstractmethod
+    def _fullmatrix(self):
         pass
 
     @abstractmethod
@@ -181,9 +186,12 @@ class LinearOperator(EditableModule):
 
     def fullmatrix(self):
         if self._matrix is None:
-            nq = self._shape[-1]
-            V = torch.eye(nq, dtype=self.dtype, device=self.device) # (nq,nq)
-            self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
+            if self._is_fullmatrix_implemented:
+                self._matrix = self._fullmatrix()
+            else:
+                nq = self._shape[-1]
+                V = torch.eye(nq, dtype=self._dtype, device=self._device) # (nq,nq)
+                self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
         return self._matrix
 
     def getparams(self, methodname):
@@ -276,6 +284,10 @@ class LinearOperator(EditableModule):
     def is_rmm_implemented(self):
         return self._is_rmm_implemented
 
+    @property
+    def is_fullmatrix_implemented(self):
+        return self._is_fullmatrix_implemented
+
     ############ private functions #################
     def __check_if_implemented(self, methodname):
         this_method = getattr(self, methodname).__func__
@@ -337,6 +349,9 @@ class MatrixLinOp(LinearOperator):
 
     def _rmm(self, x):
         return torch.matmul(self.mat.transpose(-2,-1), x)
+
+    def _fullmatrix(self):
+        return self.mat
 
     def _getparams(self, methodname):
         if methodname in ["_mv", "_mm", "_rmv", "_rmm"]:
