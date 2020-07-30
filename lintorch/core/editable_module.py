@@ -136,8 +136,7 @@ def list_operating_params(method, *args, **kwargs):
     output = method(*args, **kwargs).sum()
 
     # get all the tensors recursively
-    max_depth = 3
-    all_tensors, all_names = _get_tensors(obj, prefix="self", max_depth=max_depth)
+    all_tensors, all_names = _get_tensors(obj)
 
     # copy the tensors and require them to be differentiable
     copy_tensors0 = [tensor.clone().detach().requires_grad_() for tensor in all_tensors]
@@ -162,12 +161,12 @@ def list_operating_params(method, *args, **kwargs):
 
     return names, params
 
-def find_param_address(param, method_or_obj, max_depth=3, return_all=True):
+def find_param_address(param, method_or_obj, return_all=True):
     if inspect.ismethod(method_or_obj):
         obj = method_or_obj.__self__
     else:
         obj = method_or_obj
-    all_tensors, all_names = _get_tensors(obj, prefix="self", max_depth=max_depth)
+    all_tensors, all_names = _get_tensors(obj)
     names = []
     for i,tensor in enumerate(all_tensors):
         if tensor.shape != param.shape: continue
@@ -199,51 +198,94 @@ def find_missing_parameters(method, *args, **kwargs):
 
     return missing_names, missing_params
 
-def _get_tensors(obj, prefix, max_depth=4):
+def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
+    """
+    Traverse an object to get/set variables that are accessible through the object.
+    """
+    if exception_ids is None:
+        # None is set as default arg to avoid expanding list for multiple
+        # invokes of _get_tensors without exception_ids argument
+        exception_ids = []
+
+    if hasattr(obj, "__dict__"):
+        generator = obj.__dict__.items()
+        name_format = "{prefix}.{key}"
+        obj_dict = obj.__dict__
+    elif hasattr(obj, "__iter__"):
+        generator = enumerate(obj)
+        name_format = "{prefix}[{key}]"
+        obj_dict = obj
+    else:
+        raise RuntimeError("The object must be iterable or keyable")
+
+    for key,elmt in generator:
+        if id(elmt) in exception_ids:
+            continue
+        else:
+            exception_ids.append(id(elmt))
+
+        name = name_format.format(prefix=prefix, key=key)
+        if crit(elmt):
+            action(elmt, name, objdict, key)
+        elif hasattr(elmt, "__dict__") or hasattr(elmt, "__iter__"):
+            if max_depth > 0:
+                _traverse_obj(elmt, action=action, prefix=name, max_depth=max_depth-1, exception_ids=exception_ids)
+            else:
+                raise RecursionError("Maximum number of recursion reached")
+
+def _get_tensors(obj, prefix="self", max_depth=20):
+    """
+    Collect all tensors in an object recursively and return the tensors as well
+    as their "names" (names meaning the address, e.g. "self.a[0].elmt").
+
+    Arguments
+    ---------
+    * obj: an instance
+        The object user wants to traverse down
+    * prefix: str
+        Prefix of the name of the collected tensors. Default: "self"
+    * max_depth: int
+        Maximum recursive depth to avoid infinitely running program.
+        If the maximum depth is reached, then raise a RecursionError.
+
+    Returns
+    -------
+    * res: list of torch.Tensor
+        List of tensors collected recursively in the object.
+    * name: list of str
+        List of names of the collected tensors.
+    """
+
     # get the tensors recursively towards torch.nn.Module
     res = []
     names = []
+    def action(elmt, name, objdict, key):
+        res.append(elmt)
+        names.append(name)
+
+    # traverse down the object to collect the tensors
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
-    for key in obj.__dict__:
-        elmt = obj.__dict__[key]
-        name = "%s.%s"%(prefix, key)
-        if isinstance(elmt, torch.Tensor) and elmt.dtype in float_type:
-            res.append(elmt)
-            names.append(name)
-        elif hasattr(elmt, "__dict__"):
-            new_res = []
-            new_names = []
-            if isinstance(elmt, torch.nn.Module):
-                new_res, new_names = _get_tensors(elmt, prefix=name, max_depth=max_depth)
-            elif max_depth > 0:
-                new_res, new_names = _get_tensors(elmt, prefix=name, max_depth=max_depth-1)
-            res = res + new_res
-            names = names + new_names
-        elif hasattr(elmt, "__iter__"):
-            for i,elm in enumerate(elmt):
-                if not hasattr(elm, "__dict__"): continue
-                new_res = []
-                new_names = []
-                if max_depth > 0:
-                    new_res, new_names = _get_tensors(elm, prefix="%s[%d]"%(name,i), max_depth=max_depth-1)
-                res = res + new_res
-                names = names + new_names
+    crit = lambda elmt: isintance(elmt, torch.Tensor) and elmt.dtype in float_type
+    _traverse_obj(obj, action=action, crit=crit, prefix=prefix, max_depth=max_depth)
     return res, names
 
-def _set_tensors(obj, all_params, max_depth=4):
-    # TODO: set tensors based on the name!
+def _set_tensors(obj, all_params, max_depth=20):
+    """
+    Set the tensors in an object to new tensor object listed in `all_params`.
+
+    Arguments
+    ---------
+    * obj: an instance
+        The object user wants to traverse down
+    * all_params: list of torch.Tensor
+        List of tensors to be put in the object.
+    * max_depth: int
+        Maximum recursive depth to avoid infinitely running program.
+        If the maximum depth is reached, then raise a RecursionError.
+    """
+    def action(elmt, name, objdict, key):
+        objdict[key] = all_params.pop(0)
+    # traverse down the object to collect the tensors
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
-    for key in obj.__dict__:
-        elmt = obj.__dict__[key]
-        if isinstance(elmt, torch.Tensor) and elmt.dtype in float_type:
-            obj.__dict__[key] = all_params.pop(0)
-        elif hasattr(elmt, "__dict__"):
-            if isinstance(elmt, torch.nn.Module):
-                _set_tensors(elmt, all_params, max_depth=max_depth)
-            elif max_depth > 0:
-                _set_tensors(elmt, all_params, max_depth=max_depth-1)
-        elif hasattr(elmt, "__iter__"):
-            for i,elm in enumerate(elmt):
-                if not hasattr(elm, "__dict__"): continue
-                if max_depth > 0:
-                    _set_tensors(elm, all_params, max_depth=max_depth-1)
+    crit = lambda elmt: isintance(elmt, torch.Tensor) and elmt.dtype in float_type
+    _traverse_obj(obj, action=action, crit=crit, prefix="self", max_depth=max_depth)
