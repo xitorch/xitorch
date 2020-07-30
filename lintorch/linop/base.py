@@ -1,8 +1,10 @@
 import inspect
+from typing import Iterable, List
 import warnings
 import traceback
 import torch
 from abc import abstractmethod, abstractproperty
+import lintorch.core
 from lintorch.core.editable_module import EditableModule
 
 __all__ = ["LinearOperator", "MatrixLinOp"]
@@ -14,10 +16,10 @@ class LinearOperator(EditableModule):
     This LinearOperator can operate a batch of linear operator and it has shape
     of (B1,B2,...,Bb,p,q) where B* is the (optional) batch dimensions.
     """
-    def __init__(self, shape,
-            is_hermitian=False,
-            dtype=torch.float32,
-            device=torch.device('cpu')):
+    def __init__(self, shape:Iterable[int],
+            is_hermitian:bool = False,
+            dtype:torch.dtype = torch.float32,
+            device:torch.device = torch.device('cpu')) -> None:
 
         super(LinearOperator, self).__init__()
         if len(shape) < 2:
@@ -45,35 +47,35 @@ class LinearOperator(EditableModule):
         self._matrix = None
 
     @abstractmethod
-    def _mv(self, x):
+    def _mv(self, x:torch.Tensor) -> torch.Tensor:
         pass
 
     # @abstractmethod
-    def _rmv(self, x):
+    def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         pass
 
     # @abstractmethod # (optional)
-    def _mm(self, x):
+    def _mm(self, x:torch.Tensor) -> torch.Tensor:
         pass
 
     # @abstractmethod
-    def _rmm(self, x):
+    def _rmm(self, x:torch.Tensor) -> torch.Tensor:
         pass
 
     # @abstractmethod
-    def _fullmatrix(self):
+    def _fullmatrix(self) -> torch.Tensor:
         pass
 
     @abstractmethod
-    def _getparams(self, methodname):
+    def _getparams(self, methodname:str) -> Iterable[torch.Tensor]:
         pass
 
     @abstractmethod
-    def _setparams(self, methodname, *params):
+    def _setparams(self, methodname:str, *params) -> int:
         pass
 
     ############# implemented functions ################
-    def mv(self, x):
+    def mv(self, x:torch.Tensor) -> torch.Tensor:
         """
         Apply the matrix-vector operation to vector x with shape (...,q).
         The batch dimensions of x need not be the same as the batch dimensions
@@ -91,7 +93,7 @@ class LinearOperator(EditableModule):
         """
         return self._mv(x)
 
-    def mm(self, x):
+    def mm(self, x:torch.Tensor) -> torch.Tensor:
         """
         Apply the matrix-matrix operation to matrix x with shape (...,q,r).
         The batch dimensions of x need not be the same as the batch dimensions
@@ -124,7 +126,7 @@ class LinearOperator(EditableModule):
             y = ynew.unsqueeze(-1).transpose(0,-1).squeeze(0) # (...,p,r)
             return y
 
-    def rmv(self, x):
+    def rmv(self, x:torch.Tensor) -> torch.Tensor:
         """
         Apply the matrix-vector adjoint operation to vector x with shape (...,p),
         i.e. A^H x.
@@ -147,7 +149,7 @@ class LinearOperator(EditableModule):
             raise RuntimeError("The ._rmv() must be implemented to call .rmv() method")
         return self._rmv(x)
 
-    def rmm(self, x):
+    def rmm(self, x:torch.Tensor) -> torch.Tensor:
         """
         Apply the matrix-matrix adjoint operation to matrix x with shape (...,p,r),
         i.e. A^H X.
@@ -186,7 +188,7 @@ class LinearOperator(EditableModule):
             y = ynew.unsqueeze(-1).transpose(0,-1).squeeze(0) # (...,q,r)
             return y
 
-    def fullmatrix(self):
+    def fullmatrix(self) -> torch.Tensor:
         if self._matrix is None:
             if self._is_fullmatrix_implemented:
                 self._matrix = self._fullmatrix()
@@ -196,7 +198,7 @@ class LinearOperator(EditableModule):
                 self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
         return self._matrix
 
-    def getparams(self, methodname):
+    def getparams(self, methodname:str) -> List[torch.Tensor]:
         if methodname == "mv":
             return self._getparams("_mv")
         elif methodname == "mm":
@@ -221,7 +223,7 @@ class LinearOperator(EditableModule):
         else:
             raise RuntimeError("getparams for method %s is not implemented" % methodname)
 
-    def setparams(self, methodname, *params):
+    def setparams(self, methodname:str, *params) -> int:
         if methodname == "mv":
             return self._setparams("_mv", *params)
         elif methodname == "mm":
@@ -254,44 +256,44 @@ class LinearOperator(EditableModule):
 
     ############# properties ################
     @property
-    def dtype(self):
+    def dtype(self) -> torch.dtype:
         return self._dtype
 
     @property
-    def device(self):
+    def device(self) -> torch.device:
         return self._device
 
     @property
-    def shape(self):
+    def shape(self) -> Iterable[int]:
         return self._shape
 
     @property
-    def is_hermitian(self):
+    def is_hermitian(self) -> bool:
         return self._is_hermitian
 
     # implementation
     @property
-    def is_mv_implemented(self):
+    def is_mv_implemented(self) -> bool:
         return self._is_mv_implemented
 
     @property
-    def is_mm_implemented(self):
+    def is_mm_implemented(self) -> bool:
         return self._is_mm_implemented
 
     @property
-    def is_rmv_implemented(self):
+    def is_rmv_implemented(self) -> bool:
         return self._is_rmv_implemented
 
     @property
-    def is_rmm_implemented(self):
+    def is_rmm_implemented(self) -> bool:
         return self._is_rmm_implemented
 
     @property
-    def is_fullmatrix_implemented(self):
+    def is_fullmatrix_implemented(self) -> bool:
         return self._is_fullmatrix_implemented
 
     ############ debug functions ##############
-    def check(self, warn=True):
+    def check(self, warn:bool=True) -> None:
         """
         Perform checks to make sure the linear operator behaves as a proper
         linear operator.
@@ -318,13 +320,13 @@ class LinearOperator(EditableModule):
         checklinop(self)
 
     ############ private functions #################
-    def __check_if_implemented(self, methodname):
+    def __check_if_implemented(self, methodname:str) -> bool:
         this_method = getattr(self, methodname).__func__
         base_method = getattr(LinearOperator, methodname)
         return this_method is not base_method
 
 class AdjointLinearOperator(LinearOperator):
-    def __init__(self, obj):
+    def __init__(self, obj:LinearOperator):
         super(AdjointLinearOperator, self).__init__(
             shape = (*obj.shape[:-2], obj.shape[-1], obj.shape[-2]),
             is_hermitian = obj.is_hermitian,
@@ -333,15 +335,15 @@ class AdjointLinearOperator(LinearOperator):
         )
         self.obj = obj
 
-    def _mv(self, x):
+    def _mv(self, x:torch.Tensor) -> torch.Tensor:
         if not self.obj.is_rmv_implemented:
             raise RuntimeError("The ._rmv of must be implemented to call .H.mv()")
         return self.obj._rmv(x)
 
-    def _rmv(self, x):
+    def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.obj._mv(x)
 
-    def _getparams(self, methodname):
+    def _getparams(self, methodname:str) -> List[torch.Tensor]:
         if methodname == "_mv":
             return self.obj._getparams("_rmv")
         elif methodname == "_rmv":
@@ -349,7 +351,7 @@ class AdjointLinearOperator(LinearOperator):
         else:
             raise RuntimeError("_getparams for method %s is not implemented" % methodname)
 
-    def _setparams(self, methodname, *params):
+    def _setparams(self, methodname:str, *params) -> int:
         if methodname == "_mv":
             return self.obj._setparams("_rmv", *params)
         elif methodname == "_rmv":
@@ -358,7 +360,7 @@ class AdjointLinearOperator(LinearOperator):
             raise RuntimeError("_setparams for method %s is not implemented" % methodname)
 
 class MatrixLinOp(LinearOperator):
-    def __init__(self, mat):
+    def __init__(self, mat:torch.Tensor) -> None:
         super(MatrixLinOp, self).__init__(
             shape = mat.shape,
             is_hermitian = False,
@@ -367,35 +369,35 @@ class MatrixLinOp(LinearOperator):
         )
         self.mat = mat
 
-    def _mv(self, x):
+    def _mv(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
 
-    def _mm(self, x):
+    def _mm(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat, x)
 
-    def _rmv(self, x):
+    def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat.transpose(-2,-1), x.unsqueeze(-1)).squeeze(-1)
 
-    def _rmm(self, x):
+    def _rmm(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat.transpose(-2,-1), x)
 
-    def _fullmatrix(self):
+    def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparams(self, methodname):
+    def _getparams(self, methodname:str) -> List[torch.Tensor]:
         if methodname in ["_mv", "_mm", "_rmv", "_rmm"]:
             return [self.mat]
         else:
             raise RuntimeError("_getparams for method %s is not defined" % methodname)
 
-    def _setparams(self, methodname, *params):
+    def _setparams(self, methodname:str, *params) -> int:
         if methodname in ["_mv", "_mm", "_rmv", "_rmm"]:
             self.mat, = params[:1]
             return 1
         else:
             raise RuntimeError("_setparams for method %s is not defined" % methodname)
 
-def checklinop(linop):
+def checklinop(linop:LinearOperator) -> None:
     """
     Check if the implemented mv and mm can receive the possible shapes and returns
     the correct shape. If an error is found, then this function raise AssertionError.
