@@ -61,7 +61,22 @@ class EditableModule(object):
         idxs = []
         idx_map = []
         for i in range(len(allparams)):
-            id_param = id(allparams[i])
+            param = allparams[i]
+
+            # if the param is not a tensor, raise an error and indicating where
+            # the parameter is.
+            if not isinstance(param, torch.Tensor):
+                msg = "Non-tensor param is detected at position #%d (type: %s).\n" % (i, type(param))
+                msg += "The position of the parameter #%d can be detected using setparams as below:\n" % i
+                msg += "--------\n"
+                try:
+                    self.setparams(methodname, *allparams[:i])
+                except:
+                    s = tb.format_exc()
+                    msg += s
+                raise RuntimeError(msg)
+
+            id_param = id(param)
 
             # search the id if it has been added to the list
             try:
