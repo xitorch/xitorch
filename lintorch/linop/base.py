@@ -45,11 +45,11 @@ class LinearOperator(EditableModule):
         self._matrix = None
 
     @abstractmethod
-    def _mv(self, x, *params):
+    def _mv(self, x):
         pass
 
     # @abstractmethod
-    def _rmv(self, x, *params):
+    def _rmv(self, x):
         pass
 
     # @abstractmethod # (optional)
