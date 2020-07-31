@@ -1,4 +1,5 @@
 import inspect
+from typing import Callable, Iterable, Mapping, Any
 import torch
 import numpy as np
 import scipy.optimize
@@ -12,11 +13,15 @@ from lintorch.nlfcns.util import wrap_fcn
 
 __all__ = ["equilibrium2", "rootfinder2"]
 
-def rootfinder2(fcn, y0, params=[], fwd_options={}, bck_options={}):
+def rootfinder2(
+        fcn:Callable[[torch.Tensor],torch.Tensor],
+        y0:torch.Tensor,
+        fwd_options:Mapping[str,Any]={},
+        bck_options:Mapping[str,Any]={}):
     """
     Solving the rootfinder equation of a given function,
 
-        0 = fcn(y, *params)
+        0 = fcn(y)
 
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
@@ -27,8 +32,6 @@ def rootfinder2(fcn, y0, params=[], fwd_options={}, bck_options={}):
         The function
     * y0: torch.tensor with shape (*ny)
         Initial guess of the solution
-    * params: list
-        A list of additional parameters for the function fcn
     * fwd_options: dict
         Options for the rootfinder method
     * bck_options: dict
@@ -38,16 +41,28 @@ def rootfinder2(fcn, y0, params=[], fwd_options={}, bck_options={}):
     -------
     * yout: torch.tensor with shape (*ny)
         The solution which satisfies 0 = fcn(yout, *params)
+
+    Note
+    ----
+    * To obtain the correct gradient and higher order gradients, the fcn must be:
+        - a torch.nn.Module with fcn.parameters() list the tensors that determine
+            the output of the fcn.
+        - a method in lt.EditableModule object with no out-of-scope parameters.
+        - a function with no out-of-scope parameters.
     """
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0,))
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
-def equilibrium2(fcn, y0, params=[], fwd_options={}, bck_options={}):
+def equilibrium2(
+        fcn:Callable[[torch.Tensor],torch.Tensor],
+        y0:torch.Tensor,
+        fwd_options:Mapping[str,Any]={},
+        bck_options:Mapping[str,Any]={}):
     """
     Solving the equilibrium equation of a given function,
 
-        y = fcn(y, *params)
+        y = fcn(y)
 
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
@@ -58,8 +73,6 @@ def equilibrium2(fcn, y0, params=[], fwd_options={}, bck_options={}):
         The function
     * y0: torch.tensor with shape (*ny)
         Initial guess of the solution
-    * params: list
-        A list of additional parameters for the function fcn
     * fwd_options: dict
         Options for the rootfinder method
     * bck_options: dict
@@ -69,8 +82,16 @@ def equilibrium2(fcn, y0, params=[], fwd_options={}, bck_options={}):
     -------
     * yout: torch.tensor with shape (*ny)
         The solution which satisfies yout = fcn(yout, *params)
+
+    Note
+    ----
+    * To obtain the correct gradient and higher order gradients, the fcn must be:
+        - a torch.nn.Module with fcn.parameters() list the tensors that determine
+            the output of the fcn.
+        - a method in lt.EditableModule object with no out-of-scope parameters.
+        - a function with no out-of-scope parameters.
     """
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0,))
     all_params = all_params[1:] # to exclude y0
     def new_fcn(y, *params):
         return y - wrapped_fcn(y, *params)
@@ -79,7 +100,10 @@ def equilibrium2(fcn, y0, params=[], fwd_options={}, bck_options={}):
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, fcn, y0, options, bck_options, *params):
+    def forward(ctx, fcn:Callable[[torch.Tensor],torch.Tensor],
+            y0:torch.Tensor,
+            options:Mapping[str,Any],
+            bck_options:Mapping[str,Any], *params) -> torch.Tensor:
         # set default options
         config = set_default_option({
             "min_eps": 1e-9,
@@ -151,7 +175,7 @@ class _RootFinder(torch.autograd.Function):
         return y
 
     @staticmethod
-    def backward(ctx, grad_yout):
+    def backward(ctx, grad_yout:torch.Tensor):
         yout = ctx.yout # (*ny)
         params = ctx.params
         # dL/df
@@ -170,7 +194,10 @@ class _RootFinder(torch.autograd.Function):
         return (None, None, None, None, *grad_params)
 
 class _DfDy(LinearOperator):
-    def __init__(self, fcn, yfcn, params):
+    def __init__(self, fcn:Callable[...,torch.Tensor],
+            yfcn:torch.Tensor,
+            params:Iterable[torch.Tensor]) -> None:
+
         nr = torch.numel(yfcn)
         super(_DfDy, self).__init__(
             shape=(nr,nr),
@@ -181,7 +208,7 @@ class _DfDy(LinearOperator):
         self.params = params
         self.yfcnshape = yfcn.shape
 
-    def _mv(self, gy):
+    def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nr)
         # self.yfcn: (*ny)
         with torch.enable_grad():
@@ -203,7 +230,7 @@ class _DfDy(LinearOperator):
         res = -dfdy.reshape(*gy.shape[:-1], self.shape[-1]) # (..., nr)
         return res
 
-    def _fullmatrix(self):
+    def _fullmatrix(self) -> torch.Tensor:
         with torch.enable_grad():
             fcn_wrap = lambda y: self.fcn(y, *self.params)
             jac = torch.autograd.functional.jacobian(fcn_wrap, self.yfcn,
@@ -225,7 +252,7 @@ class _DfDy(LinearOperator):
         else:
             raise RuntimeError("_setparams has no method %s defined" % methodname)
 
-def connect_graph(out, params):
+def connect_graph(out:torch.Tensor, params):
     # just to have a dummy graph, in case there is a parameter that
     # is disconnected in calculating df/dy
     return out + sum([p.reshape(-1)[0]*0 for p in params])

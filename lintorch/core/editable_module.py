@@ -5,20 +5,21 @@ from contextlib import contextmanager
 import copy
 import traceback as tb
 import torch
+from typing import Sequence, Union, Mapping, List, Dict
 
 __all__ = ["EditableModule",
     "list_operating_params", "find_param_address", "find_missing_parameters"]
 
 class EditableModule(object):
     @abstractmethod
-    def getparams(self, methodname):
+    def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
         """
         Returns a list of tensor parameters used in the object's operations
         """
         pass
 
     @abstractmethod
-    def setparams(self, methodname, *params):
+    def setparams(self, methodname:str, *params) -> int:
         """
         Set the input parameters to the object's parameters to make a copy of
         the operations.
@@ -27,12 +28,12 @@ class EditableModule(object):
         """
         pass
 
-    def getuniqueparams(self, methodname):
+    def getuniqueparams(self, methodname:str) -> Sequence[torch.Tensor]:
         allparams = self.getparams(methodname)
         idxs = self._get_unique_params_idxs(methodname, allparams)
         return [allparams[i] for i in idxs]
 
-    def setuniqueparams(self, methodname, *uniqueparams):
+    def setuniqueparams(self, methodname:str, *uniqueparams) -> int:
         nparams = self._number_of_params[methodname]
         allparams = [None for _ in range(nparams)]
         maps = self._unique_params_maps[methodname]
@@ -45,9 +46,11 @@ class EditableModule(object):
 
         return self.setparams(methodname, *allparams)
 
-    def _get_unique_params_idxs(self, methodname, allparams=None):
+    def _get_unique_params_idxs(self, methodname:str,
+            allparams:Union[Sequence[torch.Tensor],None]=None) -> Sequence[int]:
+
         if not hasattr(self, "_unique_params_idxs"):
-            self._unique_params_idxs = {}
+            self._unique_params_idxs = {} # type: Dict[str,List[int]]
             self._unique_params_maps = {}
             self._number_of_params = {}
 
@@ -57,9 +60,9 @@ class EditableModule(object):
             allparams = self.getparams(methodname)
 
         # get the unique ids
-        ids = []
+        ids = [] # type: List[int]
         idxs = []
-        idx_map = []
+        idx_map = [] # type: List[List[int]]
         for i in range(len(allparams)):
             param = allparams[i]
 
@@ -96,7 +99,7 @@ class EditableModule(object):
         return idxs
 
     @contextmanager
-    def useparams(self, methodname, *params):
+    def useparams(self, methodname:str, *params):
         try:
             _orig_params_ = self.getuniqueparams(methodname)
             self.setuniqueparams(methodname, *params)
@@ -265,7 +268,7 @@ def _get_tensors(obj, prefix="self", max_depth=20):
 
     # traverse down the object to collect the tensors
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
-    crit = lambda elmt: isintance(elmt, torch.Tensor) and elmt.dtype in float_type
+    crit = lambda elmt: isinstance(elmt, torch.Tensor) and elmt.dtype in float_type
     _traverse_obj(obj, action=action, crit=crit, prefix=prefix, max_depth=max_depth)
     return res, names
 
@@ -287,5 +290,5 @@ def _set_tensors(obj, all_params, max_depth=20):
         objdict[key] = all_params.pop(0)
     # traverse down the object to collect the tensors
     float_type = [torch.float32, torch.float, torch.float64, torch.float16]
-    crit = lambda elmt: isintance(elmt, torch.Tensor) and elmt.dtype in float_type
+    crit = lambda elmt: isinstance(elmt, torch.Tensor) and elmt.dtype in float_type
     _traverse_obj(obj, action=action, crit=crit, prefix="self", max_depth=max_depth)

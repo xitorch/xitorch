@@ -1,10 +1,14 @@
 import torch
 import warnings
+from typing import Union, Any, Mapping
 from lintorch.linop.base import LinearOperator
 from lintorch.utils.bcast import normalize_bcast_dims
 from lintorch.utils.debug import assert_runtime
 
-def solve(A, B, E=None, M=None, fwd_options={}, bck_options={}):
+def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
+          M:Union[LinearOperator,None]=None,
+          fwd_options:Mapping[str,Any]={},
+          bck_options:Mapping[str,Any]={}):
     """
     Performing iterative method to solve the equation AX=B or
     AX-MXE=B, where E is a diagonal matrix.
@@ -45,7 +49,9 @@ def solve(A, B, E=None, M=None, fwd_options={}, bck_options={}):
     else:
         raise RuntimeError("Method other than exactsolve has not been implemented")
 
-def exactsolve(A, B, E, M):
+def exactsolve(A:LinearOperator, B:torch.Tensor,
+               E:Union[torch.Tensor,None],
+               M:Union[LinearOperator,None]):
     # A: (*BA, na, na)
     # B: (*BB, na, ncols)
     # E: (*BE, ncols)
@@ -68,7 +74,7 @@ def exactsolve(A, B, E, M):
         x = torch.matmul(LinvT, X2) # (*BABEM, na, ncols)
     return x
 
-def _solve_ABE(A, B, E):
+def _solve_ABE(A:torch.Tensor, B:torch.Tensor, E:torch.Tensor):
     # A: (*BA, na, na) matrix
     # B: (*BB, na, ncols) matrix
     # E: (*BE, ncols) matrix

@@ -11,26 +11,30 @@ class DummyModule(lt.EditableModule):
         self.addx = addx
         self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, x, diag, bias):
+    def set_diag_bias(self, diag, bias):
+        self.diag = diag
+        self.bias = bias
+
+    def forward(self, x):
         # x: (nbatch, nr)
         # diag: (nbatch, nr)
         # bias: (nbatch, nr)
         nbatch, nr = x.shape
         x = x.unsqueeze(-1)
         A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
-        A = A + torch.diag_embed(diag) # (nbatch, nr, nr)
+        A = A + torch.diag_embed(self.diag) # (nbatch, nr, nr)
         y = torch.bmm(A, x).squeeze(-1) # (nbatch, nr)
-        yr = self.sigmoid(2*y) + 2*bias
+        yr = self.sigmoid(2*y) + 2*self.bias
         if self.addx:
             yr = yr + x.squeeze(-1)
         return yr
 
     def getparams(self, methodname):
-        return [self.A]
+        return [self.A, self.diag, self.bias]
 
     def setparams(self, methodname, *params):
-        self.A, = params[:1]
-        return 1
+        self.A, self.diag, self.bias = params[:3]
+        return 3
 
 @device_dtype_float_test(only64=True)
 def test_rootfinder(dtype, device):
@@ -44,16 +48,17 @@ def test_rootfinder(dtype, device):
     diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
     bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    params = (diag, bias)
 
     model = DummyModule(A, addx=True)
-    y = lt.rootfinder(model.forward, y0, params)
-    f = model.forward(y, *params)
+    model.set_diag_bias(diag, bias)
+    y = lt.rootfinder2(model.forward, y0)
+    f = model.forward(y)
     assert torch.allclose(f*0, f)
 
     def getloss(A, y0, diag, bias):
         model = DummyModule(A, addx=True)
-        y = lt.rootfinder(model.forward, y0, (diag, bias))
+        model.set_diag_bias(diag, bias)
+        y = lt.rootfinder2(model.forward, y0)
         return y
 
     gradcheck(getloss, (A, y0, diag, bias))
@@ -71,16 +76,17 @@ def test_equil(dtype, device):
     diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
     bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    params = (diag, bias)
 
     model = DummyModule(A, addx=False)
-    y = lt.equilibrium(model.forward, y0, params)
-    f = model.forward(y, *params)
+    model.set_diag_bias(diag, bias)
+    y = lt.equilibrium2(model.forward, y0)
+    f = model.forward(y)
     assert torch.allclose(y, f)
 
     def getloss(A, y0, diag, bias):
         model = DummyModule(A, addx=False)
-        y = lt.equilibrium(model.forward, y0, (diag, bias))
+        model.set_diag_bias(diag, bias)
+        y = lt.equilibrium2(model.forward, y0)
         return y
 
     gradcheck(getloss, (A, y0, diag, bias))

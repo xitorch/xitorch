@@ -1,8 +1,11 @@
 import torch
+from typing import Union, Mapping, Any
 from lintorch.linop.base import LinearOperator
 from lintorch.utils.debug import assert_runtime
 
-def lsymeig(A, neig=None, M=None, fwd_options={}, bck_options={}):
+def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
+        M:Union[LinearOperator,None]=None,
+        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a linear operator.
     If M is specified, it solve the eigendecomposition Ax = eMx.
@@ -16,9 +19,9 @@ def lsymeig(A, neig=None, M=None, fwd_options={}, bck_options={}):
         retrieved
     * M: lintorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
         The transformation on the right hand side. If None, then M=I.
-    * fwd_options:
+    * fwd_options: dict with str as key
         Eigendecomposition iterative algorithm options.
-    * bck_options:
+    * bck_options: dict with str as key
         Conjugate gradient options to calculate the gradient in
         backpropagation calculation.
 
@@ -39,7 +42,7 @@ def lsymeig(A, neig=None, M=None, fwd_options={}, bck_options={}):
     else:
         raise RuntimeError("Method other than exacteig has not been implemented")
 
-def exacteig(A, neig, M):
+def exacteig(A:LinearOperator, neig:Union[int,None], M:Union[LinearOperator,None]):
     Amatrix = A.fullmatrix() # (*BA, q, q)
     if neig is None:
         neig = A.shape[-1]
