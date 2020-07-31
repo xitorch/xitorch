@@ -3,7 +3,7 @@ import numpy as np
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
-from lintorch.nlfcns.util import wrap_fcn
+from lintorch.nlfcns.utils.wrapper import wrap_fcn
 
 __all__ = ["optimize"]
 
