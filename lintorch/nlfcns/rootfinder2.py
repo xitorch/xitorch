@@ -40,7 +40,7 @@ def rootfinder2(
     Returns
     -------
     * yout: torch.tensor with shape (*ny)
-        The solution which satisfies 0 = fcn(yout, *params)
+        The solution which satisfies 0 = fcn(yout)
 
     Note
     ----
@@ -81,7 +81,7 @@ def equilibrium2(
     Returns
     -------
     * yout: torch.tensor with shape (*ny)
-        The solution which satisfies yout = fcn(yout, *params)
+        The solution which satisfies yout = fcn(yout)
 
     Note
     ----
