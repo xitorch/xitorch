@@ -103,18 +103,21 @@ def test_nested_module_simple():
 
 def assert_mod_dict(mod, dct2_orig):
     recurse_modes = [True, False]
+    nnparam_only_modes = [True, False]
     for recurse in recurse_modes:
-        dct2 = select_dct(dct2_orig, recurse)
-        dct1 = dict(mod.named_parameters(recurse=recurse))
-        assert len(dct1) == len(dct2)
-        for k,v1 in dct1.items():
-            v2 = dct2[k]
-            assert v1 is v2
+        for nnparam_only in nnparam_only_modes:
+            dct2 = select_dct(dct2_orig, recurse, nnparam_only)
+            dct1 = dict(mod.named_parameters(recurse=recurse, nnparam_only=nnparam_only))
+            assert len(dct1) == len(dct2)
+            for k,v1 in dct1.items():
+                v2 = dct2[k]
+                assert v1 is v2
 
 def select_dct(dct, recurse=True, nnparam_only=False):
     res = {}
     for key, val in dct.items():
         cond1 = recurse or "." not in key
-        if cond1:
+        cond2 = not nnparam_only or isinstance(val, torch.nn.Parameter)
+        if cond1 and cond2:
             res[key] = val
     return res
