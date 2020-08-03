@@ -15,7 +15,7 @@ setup(
         "numpy>=1.8.2",
         "scipy>=1.1.0",
         "matplotlib>=1.5.3",
-        "torch>=1.3",
+        "torch>=1.5",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
