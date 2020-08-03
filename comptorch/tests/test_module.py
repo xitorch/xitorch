@@ -4,7 +4,10 @@ from comptorch.core.module import Module
 class NNModule(torch.nn.Module):
     def __init__(self, a):
         super(NNModule, self).__init__()
-        self.a = torch.nn.Parameter(a)
+        if isinstance(a, torch.nn.Parameter):
+            self.a = a
+        else:
+            self.a = torch.nn.Parameter(a)
 
 class PlainModule(Module):
     def __init__(self, a, b):
@@ -18,11 +21,11 @@ class ModuleWithList(Module):
         self.ab = self.register([a, b])
 
 class NestedModule(Module):
-    def __init__(self, amod, at, a):
+    def __init__(self, mod, a, b):
         super(NestedModule, self).__init__()
-        self.mod = amod
-        self.modt = at
+        self.mod = mod
         self.a = self.register(a)
+        self.b = b
 
 def test_plain_module():
     # plain module apply self.register to a and plain assignment for b
@@ -35,27 +38,68 @@ def test_plain_module():
     named_params_dict1 = {
         "a": a
     }
-    assert_tensor_dict(dict(mod1.named_fullparams()), named_params_dict1, assert_obj=True)
+    assert_tensor_dict(dict(mod1.named_parameters()), named_params_dict1, assert_obj=True)
 
     mod2 = PlainModule(aparam, b)
     named_params_dict2 = {
         "a": aparam
     }
-    assert_tensor_dict(dict(mod2.named_fullparams()), named_params_dict2, assert_obj=True)
+    assert_tensor_dict(dict(mod2.named_parameters()), named_params_dict2, assert_obj=True)
 
     mod3 = PlainModule(a, bparam)
     named_params_dict3 = {
         "a": a,
         "b": bparam # b should be registered as well because it is a parameter
     }
-    assert_tensor_dict(dict(mod3.named_fullparams()), named_params_dict3, assert_obj=True)
+    assert_tensor_dict(dict(mod3.named_parameters()), named_params_dict3, assert_obj=True)
 
     mod4 = PlainModule(aparam, bparam)
     named_params_dict4 = {
         "a": aparam,
         "b": bparam
     }
-    assert_tensor_dict(dict(mod4.named_fullparams()), named_params_dict4, assert_obj=True)
+    assert_tensor_dict(dict(mod4.named_parameters()), named_params_dict4, assert_obj=True)
+
+def test_nested_module_simple():
+    # nested module apply self.register to a and plain assignment for b
+    a = torch.tensor([1.])
+    b = torch.tensor([2.])
+    aparam = torch.nn.Parameter(a)
+    bparam = torch.nn.Parameter(b)
+    nnmod = NNModule(aparam)
+    plmod1 = PlainModule(a, b)
+    plmod2 = PlainModule(a, bparam)
+
+    mod1 = NestedModule(nnmod, a, b)
+    named_params_dict1 = {
+        "mod.a": aparam,
+        "a": a,
+    }
+    assert_tensor_dict(dict(mod1.named_parameters()), named_params_dict1, assert_obj=True)
+
+    mod2 = NestedModule(plmod1, a, b)
+    named_params_dict2 = {
+        "mod.a": a,
+        "a": a
+    }
+    assert_tensor_dict(dict(mod2.named_parameters()), named_params_dict2, assert_obj=True)
+
+    mod3 = NestedModule(plmod2, a, b)
+    named_params_dict3 = {
+        "mod.a": a,
+        "mod.b": bparam,
+        "a": a
+    }
+    assert_tensor_dict(dict(mod3.named_parameters()), named_params_dict3, assert_obj=True)
+
+    mod4 = NestedModule(mod3, a, b)
+    named_params_dict4 = {
+        "mod.mod.a": a,
+        "mod.mod.b": bparam,
+        "mod.a": a,
+        "a": a
+    }
+    assert_tensor_dict(dict(mod4.named_parameters()), named_params_dict4, assert_obj=True)
 
 def assert_tensor_dict(dct1, dct2, assert_obj=True):
     assert len(dct1) == len(dct2)

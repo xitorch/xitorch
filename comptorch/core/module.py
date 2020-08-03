@@ -7,29 +7,43 @@ class Module(torch.nn.Module):
         super(Module, self).__init__()
 
     def register(self, x):
-        if isinstance(x, torch.Tensor): # torch.nn.Parameter is a subtype of torch.Tensor
+        if isinstance(x, torch.Tensor) and not isinstance(x, torch.nn.Parameter):
             return CParameter(x)
+        elif isinstance(x, torch.nn.Parameter) or \
+             isinstance(x, torch.nn.Module) or \
+             isinstance(x, Module):
+            return x
         elif hasattr(x, "__iter__"): # iterable (e.g. list, dict)
             # check is performed in the CParameterList and CParameterDict
             if hasattr(x, "keys"): # mapping
                 return CParameterDict(x)
             else:
                 return CParameterList(x)
-        elif isinstance(x, torch.nn.Module) or \
-             isinstance(x, Module):
-            return x
         else:
             raise RuntimeError("Type %s cannot be registered" % type(x))
 
-    def fullparams(self, recurse=True):
-        for name, val in self.named_fullparams(recurse=True):
+    def parameters(self, recurse=True, nnparam_only=False):
+        for name, val in self.named_parameters(recurse=recurse, nnparam_only=nnparam_only):
             yield val
 
-    def named_fullparams(self, recurse=True):
-        for name,val in self._cparameters.items():
+    def named_parameters(self, recurse=True, nnparam_only=False):
+        if not nnparam_only:
+            for name,val in self._cparameters.items():
+                yield name,val
+
+        for name,val in super().named_parameters(recurse=False):
             yield name,val
-        for name,val in super().named_parameters(recurse=recurse):
-            yield name,val
+        if recurse:
+            for name,module in self.named_children():
+                kwargs = {"recurse": recurse}
+                if isinstance(module, Module):
+                    kwargs["nnparam_only"] = nnparam_only
+
+                for varname,value in module.named_parameters(**kwargs):
+                    fullname = "%s.%s" % (name,varname)
+                    yield fullname, value
+        # for name,val in super().named_parameters(recurse=recurse):
+        #     yield name,val
 
     ################## __*attr__ functions ##################
     def __setattr__(self, name, value):
@@ -73,6 +87,8 @@ class CParameter(object):
     # CParameter is needed to differentiate the values that are going to be
     # registered from the ordinary values
     def __init__(self, x):
+        if isinstance(x, torch.nn.Parameter):
+            raise TypeError("CParameter input cannot be a torch.nn.Parameter")
         self._val = x
 
     @property
