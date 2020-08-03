@@ -178,6 +178,8 @@ class _RootFinder(torch.autograd.Function):
         params = ctx.params
         # dL/df
         _apply_DfDy = _DfDy(fcn=ctx.fcn, yfcn=yout, params=params)
+        # print(list(_apply_DfDy.named_parameters()))
+        # raise RuntimeError
         # _apply_DfDy.check()
         gyfcn = solve(A=_apply_DfDy, B=grad_yout.unsqueeze(-1),
             fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
@@ -202,8 +204,8 @@ class _DfDy(LinearOperator):
             dtype=yfcn.dtype,
             device=yfcn.device)
         self.fcn = fcn
-        self.yfcn = yfcn.requires_grad_() # (*ny), prod(*ny) == nr
-        self.params = params
+        self.yfcn = self.register(yfcn.requires_grad_()) # (*ny), prod(*ny) == nr
+        self.params = self.register(params)
         self.yfcnshape = yfcn.shape
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:

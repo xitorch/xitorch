@@ -64,7 +64,7 @@ def test_rootfinder():
     nr = 4
     nbatch = 1
 
-    for clss in [DummyModule, DummyNNModule]:
+    for clss in [DummyModule, DummyNNModule][:1]:
         A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
         diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
         bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
@@ -99,10 +99,14 @@ def test_equil():
     nr = 4
     nbatch = 1
 
-    for clss in [DummyModule, DummyNNModule]:
-        A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
-        diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
-        bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
+    for clss in [DummyModule, DummyNNModule][:1]:
+        A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+        diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+        bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
+        if clss is DummyNNModule:
+            A = torch.nn.Parameter(A)
+            diag = torch.nn.Parameter(diag)
+            bias = torch.nn.Parameter(bias)
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
         model = DummyModule(A, addx=False)

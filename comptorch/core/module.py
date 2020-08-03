@@ -13,7 +13,12 @@ class Module(_BaseCModule):
 
     def register(self, x):
         if isinstance(x, torch.Tensor):
-            return RegisteringTensor(x)
+            return CParameter(x)
+        elif hasattr(x, "__iter__") and isinstance(x[0], torch.Tensor):
+            if isinstance(x[0], torch.nn.Parameter):
+                return torch.nn.ParameterList(x)
+            else:
+                return CParameterList(x)
         elif isinstance(x, torch.nn.Parameter) or \
              isinstance(x, torch.nn.Module) or \
              isinstance(x, _BaseCModule):
@@ -64,7 +69,7 @@ class Module(_BaseCModule):
         # adding new parameters
         else:
             # TODO: add type
-            if isinstance(value, RegisteringTensor):
+            if isinstance(value, CParameter):
                 self._cparameters[name] = value.tensor
 
             elif isinstance(value, _BaseCModule):
@@ -95,18 +100,29 @@ class Module(_BaseCModule):
 
         super(Module, self).__delattr__(name)
 
-class RegisteringClass:
-    # RegisteringClass is needed to differentiate the values that are going to be
+class CParameter(object):
+    # CParameter is needed to differentiate the values that are going to be
     # registered from the ordinary values
-    pass
-
-class RegisteringTensor(RegisteringClass):
     def __init__(self, x):
         self._val = x
 
     @property
     def tensor(self):
         return self._val
+
+class CParameterList(Module):
+    def __init__(self, xlist):
+        super(CParameterList, self).__init__()
+        self._cparamlen = len(xlist)
+        for i,x in enumerate(xlist):
+            self._cparameters["%d"%i] = x
+
+    def __getitem__(self, key):
+        if key < 0:
+            key = key + self._cparamlen
+        if key >= self._cparamlen:
+            raise IndexError("Cannot access index %d from list with %d elements" % (key, self._cparamlen))
+        return self._cparameters["%d"%key]
 
 if __name__ == "__main__":
     class NNModule(torch.nn.Module):
@@ -117,8 +133,7 @@ if __name__ == "__main__":
     class NewModule(Module):
         def __init__(self, a, b):
             super(NewModule, self).__init__()
-            self.a = self.register(a)
-            self.b = torch.nn.Parameter(b)
+            self.ab = self.register([a, b])
 
     class Module2(Module):
         def __init__(self, amod, at, a):
