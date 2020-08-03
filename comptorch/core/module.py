@@ -13,9 +13,12 @@ class Module(_BaseCModule):
     def register(self, x):
         if isinstance(x, torch.Tensor):
             return CParameter(x)
-        elif hasattr(x, "__iter__"):
-            # check is performed in the CParameterList
-            return CParameterList(x)
+        elif hasattr(x, "__iter__"): # iterable (e.g. list, dict)
+            # check is performed in the CParameterList and CParameterDict
+            if hasattr(x, "keys"): # mapping
+                return CParameterDict(x)
+            else:
+                return CParameterList(x)
         elif isinstance(x, torch.nn.Parameter) or \
              isinstance(x, torch.nn.Module) or \
              isinstance(x, _BaseCModule):
@@ -106,6 +109,36 @@ class CParameterList(Module):
 
     def __len__(self):
         return self._cparamlen
+
+class CParameterDict(Module):
+    def __init__(self, xdict):
+        super(CParameterDict, self).__init__()
+        self._cparamlen = len(xdict)
+        self._ckeys = xdict.keys()
+        for k,x in xdict.items():
+            if not isinstance(x, torch.Tensor):
+                raise TypeError("The %d-th element is not a tensor" % i)
+            setattr(self, str(k), self.register(x))
+
+    def __getitem__(self, key):
+        if key not in self._ckeys:
+            raise KeyError("No %s key in the object" % key)
+        return getattr(self, key)
+
+    def __len__(self):
+        return self._cparamlen
+
+    def keys(self):
+        for k in self._ckeys:
+            yield k
+
+    def items(self):
+        for k in self._ckeys:
+            yield k, self[k]
+
+    def values(self):
+        for k in self._ckeys:
+            yield self[k]
 
 if __name__ == "__main__":
     class NNModule(torch.nn.Module):
