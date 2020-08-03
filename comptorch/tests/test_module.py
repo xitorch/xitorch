@@ -38,27 +38,27 @@ def test_plain_module():
     named_params_dict1 = {
         "a": a
     }
-    assert_tensor_dict(dict(mod1.named_parameters()), named_params_dict1, assert_obj=True)
+    assert_mod_dict(mod1, named_params_dict1)
 
     mod2 = PlainModule(aparam, b)
     named_params_dict2 = {
         "a": aparam
     }
-    assert_tensor_dict(dict(mod2.named_parameters()), named_params_dict2, assert_obj=True)
+    assert_mod_dict(mod2, named_params_dict2)
 
     mod3 = PlainModule(a, bparam)
     named_params_dict3 = {
         "a": a,
         "b": bparam # b should be registered as well because it is a parameter
     }
-    assert_tensor_dict(dict(mod3.named_parameters()), named_params_dict3, assert_obj=True)
+    assert_mod_dict(mod3, named_params_dict3)
 
     mod4 = PlainModule(aparam, bparam)
     named_params_dict4 = {
         "a": aparam,
         "b": bparam
     }
-    assert_tensor_dict(dict(mod4.named_parameters()), named_params_dict4, assert_obj=True)
+    assert_mod_dict(mod4, named_params_dict4)
 
 def test_nested_module_simple():
     # nested module apply self.register to a and plain assignment for b
@@ -75,14 +75,14 @@ def test_nested_module_simple():
         "mod.a": aparam,
         "a": a,
     }
-    assert_tensor_dict(dict(mod1.named_parameters()), named_params_dict1, assert_obj=True)
+    assert_mod_dict(mod1, named_params_dict1)
 
     mod2 = NestedModule(plmod1, a, b)
     named_params_dict2 = {
         "mod.a": a,
         "a": a
     }
-    assert_tensor_dict(dict(mod2.named_parameters()), named_params_dict2, assert_obj=True)
+    assert_mod_dict(mod2, named_params_dict2)
 
     mod3 = NestedModule(plmod2, a, b)
     named_params_dict3 = {
@@ -90,7 +90,7 @@ def test_nested_module_simple():
         "mod.b": bparam,
         "a": a
     }
-    assert_tensor_dict(dict(mod3.named_parameters()), named_params_dict3, assert_obj=True)
+    assert_mod_dict(mod3, named_params_dict3)
 
     mod4 = NestedModule(mod3, a, b)
     named_params_dict4 = {
@@ -99,13 +99,22 @@ def test_nested_module_simple():
         "mod.a": a,
         "a": a
     }
-    assert_tensor_dict(dict(mod4.named_parameters()), named_params_dict4, assert_obj=True)
+    assert_mod_dict(mod4, named_params_dict4)
 
-def assert_tensor_dict(dct1, dct2, assert_obj=True):
-    assert len(dct1) == len(dct2)
-    for k,v1 in dct1.items():
-        v2 = dct2[k]
-        if assert_obj:
+def assert_mod_dict(mod, dct2_orig):
+    recurse_modes = [True, False]
+    for recurse in recurse_modes:
+        dct2 = select_dct(dct2_orig, recurse)
+        dct1 = dict(mod.named_parameters(recurse=recurse))
+        assert len(dct1) == len(dct2)
+        for k,v1 in dct1.items():
+            v2 = dct2[k]
             assert v1 is v2
-        else:
-            assert torch.allclose(v1, v2)
+
+def select_dct(dct, recurse=True, nnparam_only=False):
+    res = {}
+    for key, val in dct.items():
+        cond1 = recurse or "." not in key
+        if cond1:
+            res[key] = val
+    return res
