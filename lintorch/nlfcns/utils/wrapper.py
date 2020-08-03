@@ -1,6 +1,9 @@
 import inspect
+from contextlib import contextmanager
+import traceback as tb
 import torch
 from lintorch.core.editable_module import EditableModule
+from lintorch.utils.attr import get_attr, set_attr, del_attr
 
 def wrap_fcn(fcn, params):
     """
@@ -36,6 +39,23 @@ def wrap_fcn(fcn, params):
         # get all the parameters
         obj_params = obj.getuniqueparams(method_name)
         all_params = [*unroller.unroll(params), *obj_params]
+
+    # do the similar thing as EditableModule for torch.nn.Module, but using
+    # obj.parameters() as the substitute as .getparams()
+    elif inspect.ismethod(fcn) and isinstance(fcn.__self__, torch.nn.Module):
+        obj = fcn.__self__
+
+        # get the tensors in the torch.nn.Module to be used as params
+        paramnames, obj_params = zip(*obj.named_parameters())
+        all_params = [*unroller.unroll(params), *obj_params]
+
+        def wrapped_fcn(*all_params2):
+            params = unroller.roll(all_params2[:nparams])
+            obj_params2 = all_params2[nparams:]
+            # substitute obj.parameters() with obj_params
+            with NNModuleUseParams(obj, paramnames, obj_params2):
+                res = fcn(*params)
+            return res
 
     # return as it is if fcn is just a function and params all are tensors
     elif unroller.all_tensors:
@@ -106,3 +126,25 @@ class ParamsUnroller(object):
             return 1
         else:
             raise RuntimeError("Unknown type %s" % type(p))
+
+@contextmanager
+def NNModuleUseParams(nnmodule, names, params):
+    try:
+        # substitute the state dictionary of the module with the new tensor
+
+        # save the current state
+        state_tensors = [get_attr(nnmodule, name) for name in names]
+
+        # substitute the state with the given tensor
+        for (name, param) in zip(names, params):
+            del_attr(nnmodule, name) # delete require in case the param is not a torch.nn.Parameter
+            set_attr(nnmodule, name, param)
+
+        yield nnmodule
+
+    except Exception as exc:
+        tb.print_exc()
+    finally:
+        # restore back the saved tensors
+        for (name, param) in zip(names, state_tensors):
+            set_attr(nnmodule, name, param)
