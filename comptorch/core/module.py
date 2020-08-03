@@ -124,6 +124,9 @@ class CParameterList(Module):
             raise IndexError("Cannot access index %d from list with %d elements" % (key, self._cparamlen))
         return self._cparameters["%d"%key]
 
+    def __len__(self):
+        return self._cparamlen
+
 if __name__ == "__main__":
     class NNModule(torch.nn.Module):
         def __init__(self, a):
