@@ -1,17 +1,13 @@
 import torch
 from abc import abstractmethod
 
-class _BaseCModule(torch.nn.Module):
-    # dummy base module for Module, to check the instance within the module definition
-    pass
-
-class Module(_BaseCModule):
+class Module(torch.nn.Module):
     def __init__(self):
         self.__dict__["_cparameters"] = {}
         super(Module, self).__init__()
 
     def register(self, x):
-        if isinstance(x, torch.Tensor):
+        if isinstance(x, torch.Tensor): # torch.nn.Parameter is a subtype of torch.Tensor
             return CParameter(x)
         elif hasattr(x, "__iter__"): # iterable (e.g. list, dict)
             # check is performed in the CParameterList and CParameterDict
@@ -19,29 +15,21 @@ class Module(_BaseCModule):
                 return CParameterDict(x)
             else:
                 return CParameterList(x)
-        elif isinstance(x, torch.nn.Parameter) or \
-             isinstance(x, torch.nn.Module) or \
-             isinstance(x, _BaseCModule):
+        elif isinstance(x, torch.nn.Module) or \
+             isinstance(x, Module):
             return x
         else:
             raise RuntimeError("Type %s cannot be registered" % type(x))
 
-    ################## torch.nn.Module overriden functions ##################
-    def parameters(self):
-        for name, val in self._param_generator():
+    def fullparams(self, recurse=True):
+        for name, val in self.named_fullparams(recurse=True):
             yield val
 
-    def named_parameters(self):
-        for name, val in self._param_generator():
-            yield name, val
-
-    def _param_generator(self):
+    def named_fullparams(self, recurse=True):
         for name,val in self._cparameters.items():
             yield name,val
-        for name,module in self.named_children():
-            for mod_name,mod_val in module.named_parameters():
-                fullname = "%s.%s"%(name,mod_name)
-                yield fullname, mod_val
+        for name,val in super().named_parameters(recurse=recurse):
+            yield name,val
 
     ################## __*attr__ functions ##################
     def __setattr__(self, name, value):
@@ -162,5 +150,5 @@ if __name__ == "__main__":
     btorch = torch.tensor([2.])
     a = NewModule(atorch, btorch)
     at = NNModule(atorch)
-    a2 = Module2(a, at, atorch)
+    a2 = Module2(a, at, torch.nn.Parameter(atorch))
     print(list(a2.named_parameters()))
