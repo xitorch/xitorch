@@ -8,7 +8,6 @@ class _BaseCModule(torch.nn.Module):
 class Module(_BaseCModule):
     def __init__(self):
         self.__dict__["_cparameters"] = {}
-        self.__dict__["_cmodules"] = {}
         super(Module, self).__init__()
 
     def register(self, x):
@@ -26,19 +25,17 @@ class Module(_BaseCModule):
 
     ################## torch.nn.Module overriden functions ##################
     def parameters(self):
-        for val in super(Module, self).parameters():
+        for name, val in self._param_generator():
             yield val
-        for name,val in self._cparameters.items():
-            yield val
-        for name,module in self._cmodules.items():
-            yield module.parameters()
 
     def named_parameters(self):
-        for name,val in super(Module, self).named_parameters():
-            yield name,val
+        for name, val in self._param_generator():
+            yield name, val
+
+    def _param_generator(self):
         for name,val in self._cparameters.items():
             yield name,val
-        for name,module in self._cmodules.items():
+        for name,module in self.named_children():
             for mod_name,mod_val in module.named_parameters():
                 fullname = "%s.%s"%(name,mod_name)
                 yield fullname, mod_val
@@ -57,21 +54,11 @@ class Module(_BaseCModule):
                 raise TypeError("Cannot assign type %s to self.%s (torch.Tensor and not torch.nn.Parameter is required)" %\
                     (type(value), name))
 
-        elif name in self._cmodules:
-            if not isinstance(value, _BaseCModule):
-                self._cmodules[name] = value
-            else:
-                raise TypeError("Cannot assign type %s to self.%s (comptorch.Module is required)" %\
-                    (type(value), name))
-
         # adding new parameters
         else:
             # TODO: add type
             if isinstance(value, CParameter):
                 self._cparameters[name] = value.tensor
-
-            elif isinstance(value, _BaseCModule):
-                self._cmodules[name] = value
 
             # regular type
             else:
@@ -82,18 +69,11 @@ class Module(_BaseCModule):
         if name in self._cparameters:
             return self._cparameters[name]
 
-        if name in self._cmodules:
-            return self._cmodules[name]
-
         return super(Module, self).__getattr__(name)
 
     def __delattr__(self, name):
         if name in self._cparameters:
             del self._cparameters[name]
-            return
-
-        if name in self._cmodules:
-            del self._cmodules[name]
             return
 
         super(Module, self).__delattr__(name)
@@ -115,7 +95,7 @@ class CParameterList(Module):
         for i,x in enumerate(xlist):
             if not isinstance(x, torch.Tensor):
                 raise TypeError("The %d-th element is not a tensor" % i)
-            setattr(self, "%d"%i, x)
+            setattr(self, "%d"%i, self.register(x))
 
     def __getitem__(self, key):
         if key < 0:
