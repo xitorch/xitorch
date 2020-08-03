@@ -23,7 +23,7 @@ def _set_attr(obj, names, val):
     if len(names) == 1:
         return setattr(obj, names[0], val)
     else:
-        return setattr(_set_attr(obj, names[0]), names[1], val)
+        return setattr(_get_attr(obj, names[0]), names[1], val)
 
 def _del_attr(obj, names):
     if len(names) == 1:

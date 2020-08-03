@@ -64,7 +64,7 @@ def test_rootfinder():
     nr = 4
     nbatch = 1
 
-    for clss in [DummyModule, DummyNNModule][:1]:
+    for clss in [DummyModule, DummyNNModule]:#[:1]:
         A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
         diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
         bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
@@ -99,7 +99,7 @@ def test_equil():
     nr = 4
     nbatch = 1
 
-    for clss in [DummyModule, DummyNNModule][:1]:
+    for clss in [DummyModule, DummyNNModule]:#[:1]:
         A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
         diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
         bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
@@ -109,7 +109,7 @@ def test_equil():
             bias = torch.nn.Parameter(bias)
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
-        model = DummyModule(A, addx=False)
+        model = DummyModule(A, addx=False) # intentionally left as DummyModule to test mix of Parameter and non-Parameter
         model.set_diag_bias(diag, bias)
         y = equilibrium(model.forward, y0)
         f = model.forward(y)

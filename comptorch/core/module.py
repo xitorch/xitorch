@@ -14,11 +14,9 @@ class Module(_BaseCModule):
     def register(self, x):
         if isinstance(x, torch.Tensor):
             return CParameter(x)
-        elif hasattr(x, "__iter__") and isinstance(x[0], torch.Tensor):
-            if isinstance(x[0], torch.nn.Parameter):
-                return torch.nn.ParameterList(x)
-            else:
-                return CParameterList(x)
+        elif hasattr(x, "__iter__"):
+            # check is performed in the CParameterList
+            return CParameterList(x)
         elif isinstance(x, torch.nn.Parameter) or \
              isinstance(x, torch.nn.Module) or \
              isinstance(x, _BaseCModule):
@@ -115,14 +113,16 @@ class CParameterList(Module):
         super(CParameterList, self).__init__()
         self._cparamlen = len(xlist)
         for i,x in enumerate(xlist):
-            self._cparameters["%d"%i] = x
+            if not isinstance(x, torch.Tensor):
+                raise TypeError("The %d-th element is not a tensor" % i)
+            setattr(self, "%d"%i, x)
 
     def __getitem__(self, key):
         if key < 0:
             key = key + self._cparamlen
         if key >= self._cparamlen:
             raise IndexError("Cannot access index %d from list with %d elements" % (key, self._cparamlen))
-        return self._cparameters["%d"%key]
+        return getattr(self, "%d"%key)
 
     def __len__(self):
         return self._cparamlen
