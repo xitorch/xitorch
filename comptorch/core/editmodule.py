@@ -27,7 +27,7 @@ def get_wrap_fcn(fcn, params):
         obj = fcn.__self__
 
         # get the tensors in the torch.nn.Module to be used as params
-        named_params = obj.named_params(recurse=True)
+        named_params = list(obj.named_parameters(recurse=True))
         if len(named_params) == 0:
             paramnames = []
             obj_params = []
