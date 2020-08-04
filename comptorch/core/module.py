@@ -100,6 +100,8 @@ class CParameterList(Module):
         super(CParameterList, self).__init__()
         self._cparamlen = len(xlist)
         for i,x in enumerate(xlist):
+            if isinstance(x, torch.nn.Module):
+                raise TypeError("Please use torch.nn.ModuleList if you want to register a list of module.")
             if not isinstance(x, torch.Tensor):
                 raise TypeError("The %d-th element is not a tensor" % i)
             setattr(self, "%d"%i, self.register(x))
@@ -120,6 +122,8 @@ class CParameterDict(Module):
         self._cparamlen = len(xdict)
         self._ckeys = xdict.keys()
         for k,x in xdict.items():
+            if isinstance(x, torch.nn.Module):
+                raise TypeError("Please use torch.nn.ModuleDict if you want to register a dict of module.")
             if not isinstance(x, torch.Tensor):
                 raise TypeError("The %d-th element is not a tensor" % i)
             setattr(self, str(k), self.register(x))
