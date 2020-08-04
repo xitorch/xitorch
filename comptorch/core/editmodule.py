@@ -59,9 +59,11 @@ def useparams(module, names, params):
         state_tensors = [get_attr(module, name) for name in names]
 
         # substitute the state with the given tensor
-        for (name, param) in zip(names, params):
+        for (name, new_param, old_param) in zip(names, params, state_tensors):
+            if old_param is new_param:
+                continue
             del_attr(module, name) # delete require in case the param is not a torch.nn.Parameter
-            set_attr(module, name, param)
+            set_attr(module, name, new_param)
 
         yield module
 
