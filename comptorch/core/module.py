@@ -23,7 +23,7 @@ class Module(torch.nn.Module):
         else:
             raise RuntimeError("Type %s cannot be registered" % type(x))
 
-    def parameters(self, prefix="", recurse=True, nnparam_only=False):
+    def parameters(self, recurse=True, nnparam_only=False):
         for name, val in self.named_parameters(prefix="", recurse=recurse, nnparam_only=nnparam_only):
             yield val
 
