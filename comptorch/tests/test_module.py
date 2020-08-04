@@ -1,3 +1,4 @@
+import itertools
 import torch
 from comptorch.core.module import Module
 
@@ -104,14 +105,13 @@ def test_nested_module_simple():
 def assert_mod_dict(mod, dct2_orig):
     recurse_modes = [True, False]
     nnparam_only_modes = [True, False]
-    for recurse in recurse_modes:
-        for nnparam_only in nnparam_only_modes:
-            dct2 = select_dct(dct2_orig, recurse, nnparam_only)
-            dct1 = dict(mod.named_parameters(recurse=recurse, nnparam_only=nnparam_only))
-            assert len(dct1) == len(dct2)
-            for k,v1 in dct1.items():
-                v2 = dct2[k]
-                assert v1 is v2
+    for recurse, nnparam_only in itertools.product(recurse_modes, nnparam_only_modes):
+        dct2 = select_dct(dct2_orig, recurse, nnparam_only)
+        dct1 = dict(mod.named_parameters(recurse=recurse, nnparam_only=nnparam_only))
+        assert len(dct1) == len(dct2)
+        for k,v1 in dct1.items():
+            v2 = dct2[k]
+            assert v1 is v2
 
 def select_dct(dct, recurse=True, nnparam_only=False):
     res = {}
