@@ -28,23 +28,12 @@ class Module(torch.nn.Module):
             yield val
 
     def named_parameters(self, prefix="", recurse=True, nnparam_only=False):
-        def get_members_fcn(module):
-            if isinstance(module, Module):
-                iter0 = super(Module, module).named_parameters(recurse=False)
-                return iter0 if nnparam_only else itertools.chain(module._cparameters.items(), iter0)
-            else:
-                return module.named_parameters(recurse=False)
-
         memo = set() # set to make sure it returns unique parameters
-        modules = self.named_modules(prefix=prefix) if recurse else [(prefix, self)]
-        for module_prefix, module in modules:
-            members = get_members_fcn(module)
-            for k, v in members:
-                if v is None or v in memo:
-                    continue
-                memo.add(v)
-                name = module_prefix + ("." if module_prefix else "") + k
-                yield name, v
+        for name, v in _param_traverser(self, prefix=prefix, recurse=recurse):
+            if v is None or (nnparam_only and not isinstance(v, torch.nn.Parameter)) or v in memo:
+                continue
+            memo.add(v)
+            yield name, v
 
     ################## __*attr__ functions ##################
     def __setattr__(self, name, value):
@@ -83,6 +72,24 @@ class Module(torch.nn.Module):
             return
 
         super(Module, self).__delattr__(name)
+
+def _param_traverser(obj, prefix="", recurse=True):
+    # traverse all the parameters of an object (not dropping the duplicate ones)
+    # NOTE: this uses torch.nn.Module._parameters attribute, which makes it
+    # highly coupled with torch.nn.Module implementation
+
+    def get_members_fcn(module):
+        if isinstance(module, Module):
+            return itertools.chain(module._cparameters.items(), module._parameters.items())
+        else:
+            return module._parameters.items()
+
+    modules = obj.named_modules(prefix=prefix) if recurse else [(prefix, obj)]
+    for module_prefix, module in modules:
+        members = get_members_fcn(module)
+        for k, v in members:
+            name = module_prefix + ("." if module_prefix else "") + k
+            yield name, v
 
 class CParameter(object):
     # CParameter is needed to differentiate the values that are going to be
