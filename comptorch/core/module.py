@@ -1,4 +1,5 @@
 import torch
+import itertools
 from abc import abstractmethod
 
 class Module(torch.nn.Module):
@@ -22,28 +23,28 @@ class Module(torch.nn.Module):
         else:
             raise RuntimeError("Type %s cannot be registered" % type(x))
 
-    def parameters(self, recurse=True, nnparam_only=False):
-        for name, val in self.named_parameters(recurse=recurse, nnparam_only=nnparam_only):
+    def parameters(self, prefix="", recurse=True, nnparam_only=False):
+        for name, val in self.named_parameters(prefix="", recurse=recurse, nnparam_only=nnparam_only):
             yield val
 
-    def named_parameters(self, recurse=True, nnparam_only=False):
-        if not nnparam_only:
-            for name,val in self._cparameters.items():
-                yield name,val
+    def named_parameters(self, prefix="", recurse=True, nnparam_only=False):
+        def get_members_fcn(module):
+            if isinstance(module, Module):
+                iter0 = super(Module, module).named_parameters(recurse=False)
+                return iter0 if nnparam_only else itertools.chain(module._cparameters.items(), iter0)
+            else:
+                return module.named_parameters(recurse=False)
 
-        for name,val in super().named_parameters(recurse=False):
-            yield name,val
-        if recurse:
-            for name,module in self.named_children():
-                kwargs = {"recurse": recurse}
-                if isinstance(module, Module):
-                    kwargs["nnparam_only"] = nnparam_only
-
-                for varname,value in module.named_parameters(**kwargs):
-                    fullname = "%s.%s" % (name,varname)
-                    yield fullname, value
-        # for name,val in super().named_parameters(recurse=recurse):
-        #     yield name,val
+        memo = set() # set to make sure it returns unique parameters
+        modules = self.named_modules(prefix=prefix) if recurse else [(prefix, self)]
+        for module_prefix, module in modules:
+            members = get_members_fcn(module)
+            for k, v in members:
+                if v is None or v in memo:
+                    continue
+                memo.add(v)
+                name = module_prefix + ("." if module_prefix else "") + k
+                yield name, v
 
     ################## __*attr__ functions ##################
     def __setattr__(self, name, value):
