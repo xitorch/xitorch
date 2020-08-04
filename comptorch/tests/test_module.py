@@ -16,11 +16,6 @@ class PlainModule(Module):
         self.a = self.register(a)
         self.b = b
 
-class ModuleWithList(Module):
-    def __init__(self, a, b):
-        super(ModuleWithList, self).__init__()
-        self.ab = self.register([a, b])
-
 class NestedModule(Module):
     def __init__(self, mod, a, b):
         super(NestedModule, self).__init__()
@@ -101,6 +96,71 @@ def test_nested_module_simple():
         "a": a
     }
     assert_mod_dict(mod4, named_params_dict4)
+
+    mod5 = NestedModule(mod3, mod2, b)
+    named_params_dict5 = {
+        "mod.mod.a": a,
+        "mod.mod.b": bparam,
+        "mod.a": a,
+        "a.mod.a": a,
+        "a.a": a
+    }
+    assert_mod_dict(mod5, named_params_dict5)
+
+    mod6 = NestedModule(mod3, mod2, mod1)
+    named_params_dict6 = {
+        "mod.mod.a": a,
+        "mod.mod.b": bparam,
+        "mod.a": a,
+        # from mod2
+        "a.mod.a": a,
+        "a.a": a,
+        # from mod1
+        "b.mod.a": aparam,
+        "b.a": a,
+    }
+    assert_mod_dict(mod6, named_params_dict6)
+
+def test_module_with_list():
+    a = torch.tensor([1.])
+    b = torch.tensor([2.])
+    aparam = torch.nn.Parameter(a)
+    bparam = torch.nn.Parameter(b)
+    nnmod = NNModule(aparam)
+
+    listmod1 = PlainModule([a, b], bparam)
+    named_params_dict1 = {
+        "a.0": a,
+        "a.1": b,
+        "b": bparam,
+    }
+    assert_mod_dict(listmod1, named_params_dict1)
+
+    listmod2 = PlainModule([aparam, b], a)
+    named_params_dict2 = {
+        "a.0": aparam,
+        "a.1": b,
+    }
+    assert_mod_dict(listmod2, named_params_dict2)
+
+    listmod3 = PlainModule([aparam, bparam], aparam)
+    named_params_dict3 = {
+        "a.0": aparam,
+        "a.1": bparam,
+        "b": aparam,
+    }
+    assert_mod_dict(listmod3, named_params_dict3)
+
+    listmod4 = PlainModule([aparam, bparam], listmod3)
+    named_params_dict4 = {
+        "a.0": aparam,
+        "a.1": bparam,
+        # from listmod3
+        "b.a.0": aparam,
+        "b.a.1": bparam,
+        "b.b": aparam
+    }
+    assert_mod_dict(listmod4, named_params_dict4)
 
 def assert_mod_dict(mod, dct2_orig):
     recurse_modes = [True, False]
