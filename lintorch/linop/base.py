@@ -220,57 +220,6 @@ class LinearOperator(EditableModule):
         else:
             raise KeyError("getparamnames for method %s is not implemented" % methodname)
 
-    def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
-        if methodname == "mv":
-            return self._getparams("_mv")
-        elif methodname == "mm":
-            if self._is_mm_implemented:
-                return self._getparams("_mm")
-            else:
-                return self._getparams("_mv")
-        elif methodname == "rmv":
-            if self._is_hermitian:
-                return self._getparams("_mv")
-            else:
-                return self._getparams("_rmv")
-        elif methodname == "rmm":
-            if self._is_hermitian:
-                return self.getparams("mm")
-            elif self._is_rmm_implemented:
-                return self._getparams("_rmm")
-            else:
-                return self._getparams("_rmv")
-        elif methodname == "fullmatrix":
-            return [self._matrix]
-        else:
-            raise RuntimeError("getparams for method %s is not implemented" % methodname)
-
-    def setparams(self, methodname:str, *params) -> int:
-        if methodname == "mv":
-            return self._setparams("_mv", *params)
-        elif methodname == "mm":
-            if self._is_mm_implemented:
-                return self._setparams("_mm", *params)
-            else:
-                return self._setparams("_mv", *params)
-        elif methodname == "rmv":
-            if self._is_hermitian:
-                return self._setparams("_mv", *params)
-            else:
-                return self._setparams("_rmv", *params)
-        elif methodname == "rmm":
-            if self._is_hermitian:
-                return self.setparams("mm", *params)
-            elif self._is_rmm_implemented:
-                return self._setparams("_rmm", *params)
-            else:
-                return self._setparams("_rmv", *params)
-        elif methodname == "fullmatrix":
-            self._matrix, = params[:1]
-            return 1
-        else:
-            raise RuntimeError("setparams for method %s is not implemented" % methodname)
-
     ############# cached properties ################
     @property
     def H(self):
