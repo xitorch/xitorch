@@ -70,14 +70,6 @@ class LinearOperator(EditableModule):
     def _getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         pass
 
-    # @abstractmethod
-    # def _getparams(self, methodname:str) -> Sequence[torch.Tensor]:
-    #     pass
-    #
-    # @abstractmethod
-    # def _setparams(self, methodname:str, *params) -> int:
-    #     pass
-
     ############# implemented functions ################
     def mv(self, x:torch.Tensor) -> torch.Tensor:
         """
