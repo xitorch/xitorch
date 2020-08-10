@@ -238,20 +238,6 @@ class _DfDy(LinearOperator):
             jac = -jac.view(*self.shape).transpose(-2,-1) # (nr,nr)
         return jac
 
-    def _getparams(self, methodname):
-        if methodname == "_mv":
-            return [self.yfcn] + self.params
-        else:
-            raise RuntimeError("_getparams has no method %s defined" % methodname)
-
-    def _setparams(self, methodname, *params):
-        if methodname == "_mv":
-            self.yfcn, = params[:1]
-            self.params = params[1:1+len(self.params)]
-            return 1+len(self.params)
-        else:
-            raise RuntimeError("_setparams has no method %s defined" % methodname)
-
 def connect_graph(out:torch.Tensor, params):
     # just to have a dummy graph, in case there is a parameter that
     # is disconnected in calculating df/dy
