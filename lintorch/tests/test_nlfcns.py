@@ -29,12 +29,8 @@ class DummyModule(lt.EditableModule):
             yr = yr + x.squeeze(-1)
         return yr
 
-    def getparams(self, methodname):
-        return [self.A, self.diag, self.bias]
-
-    def setparams(self, methodname, *params):
-        self.A, self.diag, self.bias = params[:3]
-        return 3
+    def getparamnames(self, methodname, prefix=""):
+        return [prefix+"A", prefix+"diag", prefix+"bias"]
 
 class DummyNNModule(torch.nn.Module):
     def __init__(self, A, addx=True):

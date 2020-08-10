@@ -12,18 +12,11 @@ class BaseLinOp(LinearOperator):
         self.mat = mat
         self.implemented_methods = []
 
-    def _getparams(self, methodname):
+    def _getparamnames(self, methodname):
         if methodname in self.implemented_methods:
-            return self.mat
+            return [prefix+"mat"]
         else:
-            raise RuntimeError("_getparams has no method %s" % methodname)
-
-    def _setparams(self, methodname, *params):
-        if methodname in self.implemented_methods:
-            self.mat, = params[:1]
-            return 1
-        else:
-            raise RuntimeError("_setparams has no method %s" % methodname)
+            raise KeyError("_getparams has no method %s" % methodname)
 
 class LinOp0(BaseLinOp):
     # LinearOperator where only nothing is implemented (should produce an error)

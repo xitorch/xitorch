@@ -67,12 +67,16 @@ class LinearOperator(EditableModule):
         pass
 
     @abstractmethod
-    def _getparams(self, methodname:str) -> Sequence[torch.Tensor]:
+    def _getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         pass
 
-    @abstractmethod
-    def _setparams(self, methodname:str, *params) -> int:
-        pass
+    # @abstractmethod
+    # def _getparams(self, methodname:str) -> Sequence[torch.Tensor]:
+    #     pass
+    #
+    # @abstractmethod
+    # def _setparams(self, methodname:str, *params) -> int:
+    #     pass
 
     ############# implemented functions ################
     def mv(self, x:torch.Tensor) -> torch.Tensor:
@@ -198,6 +202,31 @@ class LinearOperator(EditableModule):
                 self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
             self._matrix_defined = True
         return self._matrix
+
+    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+        if methodname == "mv":
+            return self._getparamnames("_mv")
+        elif methodname == "mm":
+            if self._is_mm_implemented:
+                return self._getparamnames("_mm")
+            else:
+                return self._getparamnames("_mv")
+        elif methodname == "rmv":
+            if self._is_hermitian:
+                return self._getparamnames("_mv")
+            else:
+                return self._getparamnames("_rmv")
+        elif methodname == "rmm":
+            if self._is_hermitian:
+                return self.getparamnames("mm")
+            elif self._is_rmm_implemented:
+                return self._getparamnames("_rmm")
+            else:
+                return self._getparamnames("_rmv")
+        elif methodname == "fullmatrix":
+            return [prefix+"_matrix"]
+        else:
+            raise KeyError("getparamnames for method %s is not implemented" % methodname)
 
     def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
         if methodname == "mv":

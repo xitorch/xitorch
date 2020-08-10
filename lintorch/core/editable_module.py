@@ -8,26 +8,37 @@ import traceback as tb
 import torch
 from typing import Sequence, Union, Mapping, List, Dict
 from lintorch.utils.exceptions import GetSetParamsError
+from lintorch.utils.attr import get_attr, set_attr
 
 __all__ = ["EditableModule"]
 
 torch_float_type = [torch.float32, torch.float, torch.float64, torch.float16]
 
 class EditableModule(object):
-    @abstractmethod
     def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
         """
         Returns a list of tensor parameters used in the object's operations
         """
-        pass
+        paramnames = self.getparamnames(methodname)
+        return [get_attr(self, name) for name in paramnames]
 
-    @abstractmethod
     def setparams(self, methodname:str, *params) -> int:
         """
         Set the input parameters to the object's parameters to make a copy of
         the operations.
         *params is an excessive list of the parameters to be set and the
         method will return the number of parameters it sets.
+        """
+        paramnames = self.getparamnames(methodname)
+        for name,val in zip(paramnames, params):
+            set_attr(self, name, val)
+        return len(params)
+
+    # @abstractmethod
+    def getparamnames(self, methodname, prefix="") -> List[str]:
+        """
+        Return the parameter names of tensors used in the method.
+        If the methodname is not on the list, returns KeyError
         """
         pass
 

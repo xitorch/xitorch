@@ -45,47 +45,23 @@ class ModuleTest(EditableModule):
     def _dummy_fcn(self, b:torch.Tensor) -> torch.Tensor:
         return self.a * b + self.c + b * self.d * self.e + self.fint
 
-    def getparams(self, methodname:str) -> List[torch.Tensor]:
+    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         if methodname == "method_no_preserve1":
-            return [self.a]
+            return [prefix+"a"]
         elif methodname == "method_no_preserve1":
             return []
         elif methodname == "method_correct_getsetparams":
-            return [self.a, self.c, self.d, self.e]
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_unmatched_getsetparams":
-            return [self.a, self.c, self.d, self.e]
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_nontensor_getparams":
-            return [self.a, self.c, self.d, self.e, self.fint]
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"fint"]
         elif methodname == "method_missing_getparams":
-            return [self.a, self.c, self.d]
+            return [prefix+"a", prefix+"c", prefix+"d"]
         elif methodname == "method_excess_getparams":
-            return [self.a, self.c, self.d, self.e, self.g]
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"g"]
         else:
             raise KeyError("getparams for %s is not implemented" % methodname)
-
-    def setparams(self, methodname:str, *params) -> int:
-        if methodname == "method_no_preserve1":
-            self.a, = params[:1]
-            return 1
-        elif methodname == "method_no_preserve2":
-            return 0
-        elif methodname == "method_correct_getsetparams":
-            self.a, self.c, self.d, self.e = params[:4]
-            return 4
-        elif methodname == "method_unmatched_getsetparams":
-            self.a, self.c = params[:2]
-            return 2
-        elif methodname == "method_nontensor_getparams":
-            self.a, self.c, self.d, self.e, self.fint = params[:5]
-            return 5
-        elif methodname == "method_missing_getparams":
-            self.a, self.c, self.d = params[:3]
-            return 3
-        elif methodname == "method_excess_getparams":
-            self.a, self.c, self.d, self.e, self.g = params[:5]
-            return 5
-        else:
-            raise KeyError("setparams for %s is not implemented" % methodname)
 
 a = torch.tensor([1.])
 b = torch.tensor([2.])
@@ -93,22 +69,6 @@ model = ModuleTest(a)
 
 def test_correct():
     model.assertparams("method_correct_getsetparams", b)
-
-def test_error_getsetparams():
-    error_methods = [
-        "method_no_preserve1",
-        "method_no_preserve2",
-        "method_unmatched_getsetparams",
-        "method_nontensor_getparams",
-        "method_excess_getparams"
-    ]
-    for methodname in error_methods:
-        try:
-            print(methodname)
-            model.assertparams(methodname, b)
-            assert False, "A GetSetParamsError must be raised in this case"
-        except GetSetParamsError:
-            pass
 
 def test_warning_getsetparams():
     warning_methods = ["method_missing_getparams"]
