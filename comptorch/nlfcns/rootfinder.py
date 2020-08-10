@@ -45,7 +45,7 @@ def rootfinder(
     * To obtain the correct gradient and higher order gradients, the fcn must be:
         - a torch.nn.Module with fcn.parameters() list the tensors that determine
             the output of the fcn.
-        - a method in comptorch.Module object with no out-of-scope parameters.
+        - a method in comptorch.CModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
     wrapped_fcn, all_params = get_wrap_fcn(fcn, (y0,))
@@ -86,7 +86,7 @@ def equilibrium(
     * To obtain the correct gradient and higher order gradients, the fcn must be:
         - a torch.nn.Module with fcn.parameters() list the tensors that determine
             the output of the fcn.
-        - a method in comptorch.Module object with no out-of-scope parameters.
+        - a method in comptorch.CModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
     wrapped_fcn, all_params = get_wrap_fcn(fcn, (y0,))
@@ -208,19 +208,20 @@ class _DfDy(LinearOperator):
         self.params = self.register(params)
         self.yfcnshape = yfcn.shape
 
+        with torch.enable_grad():
+            self.yout = self.fcn(self.yfcn, *self.params)
+
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nr)
         # self.yfcn: (*ny)
-        with torch.enable_grad():
-            yout = self.fcn(self.yfcn, *self.params) # (*ny)
 
         gy1 = gy.reshape(-1, *self.yfcnshape) # (nbatch, *ny)
         nbatch = gy1.shape[0]
         dfdy = []
         for i in range(nbatch):
             retain_graph = (i < nbatch-1) or torch.is_grad_enabled()
-            one_dfdy, = torch.autograd.grad(yout, (self.yfcn,), grad_outputs=gy1[i],
-                retain_graph=retain_graph, create_graph=torch.is_grad_enabled()) # (*ny)
+            one_dfdy, = torch.autograd.grad(self.yout, (self.yfcn,), grad_outputs=gy1[i],
+                retain_graph=True, create_graph=torch.is_grad_enabled()) # (*ny)
             dfdy.append(one_dfdy.unsqueeze(0))
         dfdy = torch.cat(dfdy, dim=0) # (nbatch, *ny)
 

@@ -2,7 +2,7 @@ import inspect
 from contextlib import contextmanager
 import traceback as tb
 import torch
-from comptorch.core.module import Module, _param_traverser
+from comptorch.core.module import CModule, _param_traverser
 from comptorch.utils.attr import get_attr, set_attr, del_attr
 
 def get_wrap_fcn(fcn, params):
@@ -27,8 +27,8 @@ def get_wrap_fcn(fcn, params):
         fcn = fcn.__call__
 
     obj = fcn.__self__
-    if not isinstance(obj, Module) and not isinstance(obj, torch.nn.Module):
-        raise RuntimeError("The object of the method must be comptorch.Module or torch.nn.Module")
+    if not isinstance(obj, CModule) and not isinstance(obj, torch.nn.Module):
+        raise RuntimeError("The object of the method must be comptorch.CModule or torch.nn.Module")
 
     nparams = len(params)
 

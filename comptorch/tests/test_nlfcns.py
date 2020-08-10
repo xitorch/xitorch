@@ -1,10 +1,10 @@
 import random
 import torch
 from torch.autograd import gradcheck, gradgradcheck
-from comptorch.core.module import Module
+from comptorch.core.module import CModule
 from comptorch.nlfcns.rootfinder import rootfinder, equilibrium
 
-class DummyModule(Module):
+class DummyModule(CModule):
     def __init__(self, A, addx=True):
         super(DummyModule, self).__init__()
         self.A = self.register(A) # (nr, nr)

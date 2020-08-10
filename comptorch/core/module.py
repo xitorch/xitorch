@@ -2,17 +2,19 @@ import torch
 import itertools
 from abc import abstractmethod
 
-class Module(torch.nn.Module):
+__all__ = ["CModule", "CParameter"]
+
+class CModule(torch.nn.Module):
     def __init__(self):
         self.__dict__["_cparameters"] = {}
-        super(Module, self).__init__()
+        super(CModule, self).__init__()
 
     def register(self, x):
         if isinstance(x, torch.Tensor) and not isinstance(x, torch.nn.Parameter):
             return CParameter(x)
         elif isinstance(x, torch.nn.Parameter) or \
              isinstance(x, torch.nn.Module) or \
-             isinstance(x, Module):
+             isinstance(x, CModule):
             return x
         elif hasattr(x, "__iter__"): # iterable (e.g. list, dict)
             # check is performed in the CParameterList and CParameterDict
@@ -57,21 +59,21 @@ class Module(torch.nn.Module):
 
             # regular type
             else:
-                super(Module, self).__setattr__(name, value)
+                super(CModule, self).__setattr__(name, value)
 
     def __getattr__(self, name):
         # called when `name` is not in the usual place
         if name in self._cparameters:
             return self._cparameters[name]
 
-        return super(Module, self).__getattr__(name)
+        return super(CModule, self).__getattr__(name)
 
     def __delattr__(self, name):
         if name in self._cparameters:
             del self._cparameters[name]
             return
 
-        super(Module, self).__delattr__(name)
+        super(CModule, self).__delattr__(name)
 
 def _param_traverser(obj, prefix="", recurse=True):
     # traverse all the parameters of an object (not dropping the duplicate ones)
@@ -79,7 +81,7 @@ def _param_traverser(obj, prefix="", recurse=True):
     # highly coupled with torch.nn.Module implementation
 
     def get_members_fcn(module):
-        if isinstance(module, Module):
+        if isinstance(module, CModule):
             return itertools.chain(module._cparameters.items(), module._parameters.items())
         else:
             return module._parameters.items()
@@ -103,7 +105,7 @@ class CParameter(object):
     def tensor(self):
         return self._val
 
-class CParameterList(Module):
+class CParameterList(CModule):
     def __init__(self, xlist):
         super(CParameterList, self).__init__()
         self._cparamlen = len(xlist)
@@ -124,7 +126,7 @@ class CParameterList(Module):
     def __len__(self):
         return self._cparamlen
 
-class CParameterDict(Module):
+class CParameterDict(CModule):
     def __init__(self, xdict):
         super(CParameterDict, self).__init__()
         self._cparamlen = len(xdict)
@@ -162,12 +164,12 @@ if __name__ == "__main__":
             super(NNModule, self).__init__()
             self.a = torch.nn.Parameter(a)
 
-    class NewModule(Module):
+    class NewModule(CModule):
         def __init__(self, a, b):
             super(NewModule, self).__init__()
             self.ab = self.register([a, b])
 
-    class Module2(Module):
+    class Module2(CModule):
         def __init__(self, amod, at, a):
             super(Module2, self).__init__()
             self.mod = amod

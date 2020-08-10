@@ -1,6 +1,6 @@
 import itertools
 import torch
-from comptorch.core.module import Module
+from comptorch.core.module import CModule
 from comptorch.core.editmodule import get_wrap_fcn
 
 class NNModule(torch.nn.Module):
@@ -14,7 +14,7 @@ class NNModule(torch.nn.Module):
     def forward(self, x):
         return self.a + x
 
-class PlainModule(Module):
+class PlainModule(CModule):
     def __init__(self, a, b, amodule=True):
         super(PlainModule, self).__init__()
         self.a = self.register(a)
@@ -27,7 +27,7 @@ class PlainModule(Module):
             x = x + self.a
         return x + self.b
 
-class ListModule(Module):
+class ListModule(CModule):
     def __init__(self, alist, b, amodule=True):
         super(ListModule, self).__init__()
         self.a = self.register(alist)

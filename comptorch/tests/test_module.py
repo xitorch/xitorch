@@ -1,6 +1,6 @@
 import itertools
 import torch
-from comptorch.core.module import Module
+from comptorch.core.module import CModule
 
 class NNModule(torch.nn.Module):
     def __init__(self, a):
@@ -10,13 +10,13 @@ class NNModule(torch.nn.Module):
         else:
             self.a = torch.nn.Parameter(a)
 
-class PlainModule(Module):
+class PlainModule(CModule):
     def __init__(self, a, b):
         super(PlainModule, self).__init__()
         self.a = self.register(a)
         self.b = b
 
-class NestedModule(Module):
+class NestedModule(CModule):
     def __init__(self, mod, a, b):
         super(NestedModule, self).__init__()
         self.mod = mod

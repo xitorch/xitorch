@@ -5,11 +5,11 @@ import traceback
 import torch
 from abc import abstractmethod, abstractproperty
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
-from comptorch.core.module import Module
+from comptorch.core.module import CModule
 
 __all__ = ["LinearOperator"]
 
-class LinearOperator(Module):
+class LinearOperator(CModule):
     """
     LinearOperator is a class designed to behave as a linear operator without
     explicitly determining the matrix.
