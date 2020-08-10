@@ -208,7 +208,8 @@ class LinearOperator(EditableModule):
 
     def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         if methodname in ["mv", "rmv", "mm", "rmm"]:
-            return self._getparamnames()
+            names = self._getparamnames()
+            return [(prefix+s) for s in names] if prefix != "" else names
         elif methodname == "fullmatrix":
             return [prefix+"_matrix"]
         else:
@@ -308,21 +309,8 @@ class AdjointLinearOperator(LinearOperator):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.obj._mv(x)
 
-    def _getparams(self, methodname:str) -> Sequence[torch.Tensor]:
-        if methodname == "_mv":
-            return self.obj._getparams("_rmv")
-        elif methodname == "_rmv":
-            return self.obj._getparams("_mv")
-        else:
-            raise RuntimeError("_getparams for method %s is not implemented" % methodname)
-
-    def _setparams(self, methodname:str, *params) -> int:
-        if methodname == "_mv":
-            return self.obj._setparams("_rmv", *params)
-        elif methodname == "_rmv":
-            return self.obj._setparams("_mv", *params)
-        else:
-            raise RuntimeError("_setparams for method %s is not implemented" % methodname)
+    def _getparamnames(self) -> Sequence[str]:
+        return self.obj._getparamnames()
 
 class MatrixLinOp(LinearOperator):
     def __init__(self, mat:torch.Tensor) -> None:
@@ -349,18 +337,8 @@ class MatrixLinOp(LinearOperator):
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparams(self, methodname:str) -> Sequence[torch.Tensor]:
-        if methodname in ["_mv", "_mm", "_rmv", "_rmm"]:
-            return [self.mat]
-        else:
-            raise RuntimeError("_getparams for method %s is not defined" % methodname)
-
-    def _setparams(self, methodname:str, *params) -> int:
-        if methodname in ["_mv", "_mm", "_rmv", "_rmm"]:
-            self.mat, = params[:1]
-            return 1
-        else:
-            raise RuntimeError("_setparams for method %s is not defined" % methodname)
+    def _getparamnames(self) -> Sequence[str]:
+        return ["mat"]
 
 def checklinop(linop:LinearOperator) -> None:
     """
