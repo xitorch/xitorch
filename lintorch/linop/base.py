@@ -4,6 +4,7 @@ import warnings
 import traceback
 import torch
 from abc import abstractmethod, abstractproperty
+from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from lintorch.core.editable_module import EditableModule
 
 __all__ = ["LinearOperator", "MatrixLinOp"]
@@ -194,6 +195,16 @@ class LinearOperator(EditableModule):
                 self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
             self._matrix_defined = True
         return self._matrix
+
+    def scipy_linalg_op(self):
+        to_tensor = lambda x: torch.tensor(x, dtype=self.dtype, device=self.device)
+        return spLinearOperator(
+            shape=self.shape,
+            matvec =lambda v: self.mv (to_tensor(v)).detach().numpy(),
+            rmatvec=lambda v: self.rmv(to_tensor(v)).detach().numpy(),
+            matmat =lambda v: self.mm (to_tensor(v)).detach().numpy(),
+            rmatmat=lambda v: self.rmm(to_tensor(v)).detach().numpy(),
+        )
 
     def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         if methodname in ["mv", "rmv", "mm", "rmm"]:
