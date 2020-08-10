@@ -57,41 +57,20 @@ class DummyNNModule(torch.nn.Module):
         return yr
 
 def test_rootfinder():
-    torch.manual_seed(100)
-    random.seed(100)
-    dtype = torch.float64
-
-    nr = 4
-    nbatch = 1
-
-    for clss in [DummyModule, DummyNNModule]:#[:1]:
-        A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
-        diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
-        bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
-        if clss is DummyNNModule:
-            A = torch.nn.Parameter(A)
-            diag = torch.nn.Parameter(diag)
-            bias = torch.nn.Parameter(bias)
-
-        y0 = torch.randn((nbatch, nr)).to(dtype)
-
-        model = clss(A, addx=True)
-        model.set_diag_bias(diag, bias)
-
-        y = rootfinder(model.forward, y0)
+    def assert_rf_fcn(model, y):
         f = model.forward(y)
         assert torch.allclose(f*0, f)
 
-        def getloss(A, y0, diag, bias):
-            model = clss(A, addx=True)
-            model.set_diag_bias(diag, bias)
-            y = rootfinder(model.forward, y0)
-            return y
-
-        gradcheck(getloss, (A, y0, diag, bias))
-        gradgradcheck(getloss, (A, y0, diag, bias))
+    assert_nlfcns(rootfinder, assert_rf_fcn, addx=True)
 
 def test_equil():
+    def assert_equil_fcn(model, y):
+        f = model.forward(y)
+        assert torch.allclose(y, f)
+
+    assert_nlfcns(equilibrium, assert_equil_fcn, addx=False)
+
+def assert_nlfcns(nlfcns, assert_fcn, addx):
     torch.manual_seed(100)
     random.seed(100)
     dtype = torch.float64
@@ -99,27 +78,36 @@ def test_equil():
     nr = 4
     nbatch = 1
 
-    for clss in [DummyModule, DummyNNModule]:#[:1]:
-        A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
-        diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
-        bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
-        if clss is DummyNNModule:
-            A = torch.nn.Parameter(A)
-            diag = torch.nn.Parameter(diag)
-            bias = torch.nn.Parameter(bias)
-        y0 = torch.randn((nbatch, nr)).to(dtype)
+    for clss in [DummyModule, DummyNNModule]:
+        # if the class is DummyModule, it should take Parameter and non-Parameter
+        # because it registers all the tensors
+        to_paramss = [True, False] if clss is DummyModule else [True]
 
-        model = DummyModule(A, addx=False) # intentionally left as DummyModule to test mix of Parameter and non-Parameter
-        model.set_diag_bias(diag, bias)
-        y = equilibrium(model.forward, y0)
-        f = model.forward(y)
-        assert torch.allclose(y, f)
+        for to_params in to_paramss:
+            # set up the nonlinear function parameters
+            A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+            diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+            bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
+            if to_params:
+                A = torch.nn.Parameter(A)
+                diag = torch.nn.Parameter(diag)
+                bias = torch.nn.Parameter(bias)
 
-        def getloss(A, y0, diag, bias):
-            model = DummyModule(A, addx=False)
+            # set up the initial guess
+            y0 = torch.randn((nbatch, nr)).to(dtype)
+
+            model = clss(A, addx=addx)
             model.set_diag_bias(diag, bias)
-            y = equilibrium(model.forward, y0)
-            return y
+            y = nlfcns(model.forward, y0)
+            assert_fcn(model, y)
+            # f = model.forward(y)
+            # assert torch.allclose(y, f)
 
-        gradcheck(getloss, (A, y0, diag, bias))
-        gradgradcheck(getloss, (A, y0, diag, bias))
+            def getloss(A, y0, diag, bias):
+                model = clss(A, addx=addx)
+                model.set_diag_bias(diag, bias)
+                y = nlfcns(model.forward, y0)
+                return y
+
+            gradcheck(getloss, (A, y0, diag, bias))
+            gradgradcheck(getloss, (A, y0, diag, bias))
