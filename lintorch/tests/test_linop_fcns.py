@@ -1,5 +1,7 @@
 import itertools
 import torch
+import pytest
+from torch.autograd import gradcheck, gradgradcheck
 from lintorch.linop.base import LinearOperator
 from lintorch.linop.lsymeig import lsymeig
 from lintorch.linop.solve import solve
@@ -21,8 +23,11 @@ class LinOp(LinearOperator):
     def _mv(self, x):
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
 
+    def _rmv(self, x):
+        return torch.matmul(self.mat.T, x.unsqueeze(-1)).squeeze(-1)
+
     def _getparamnames(self):
-        return [prefix+"mat"]
+        return ["mat"]
 
 ############## lsymeig ##############
 def test_lsymeig_nonhermit_err():
@@ -149,13 +154,56 @@ def test_solve_A():
         bmat = torch.rand(bshape, dtype=dtype)
         amat = amat + amat.transpose(-2,-1)
 
-        alinop = LinOp(amat)
+        amat = amat.requires_grad_()
+        bmat = bmat.requires_grad_()
 
-        x = solve(A=alinop, B=bmat)
+        def solvefcn(amat, bmat):
+            alinop = LinOp(amat)
+            x = solve(A=alinop, B=bmat)
+            return x
+
+        x = solvefcn(amat, bmat)
         assert list(x.shape) == xshape
 
-        ax = alinop.mm(x)
+        ax = LinOp(amat).mm(x)
         assert torch.allclose(ax, bmat)
+
+        # gradcheck
+        gradcheck(solvefcn, (amat, bmat))
+        gradgradcheck(solvefcn, (amat, bmat))
+
+# TODO: use fixtures' params to iterate the methods
+def test_solve_A_gmres():
+    na = 3
+    dtype = torch.float64
+    ashape = (na, na)
+    bshape = (2, na, na)
+    fwd_options = {"method": "gmres"}
+
+    ncols = bshape[-1]-1
+    bshape = [*bshape[:-1], ncols]
+    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
+
+    amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
+    bmat = torch.rand(bshape, dtype=dtype)
+    amat = amat + amat.transpose(-2,-1)
+
+    amat = amat.requires_grad_()
+    bmat = bmat.requires_grad_()
+
+    def solvefcn(amat, bmat):
+        alinop = LinOp(amat)
+        x = solve(A=alinop, B=bmat, fwd_options=fwd_options)
+        return x
+
+    x = solvefcn(amat, bmat)
+    assert list(x.shape) == xshape
+
+    ax = LinOp(amat).mm(x)
+    assert torch.allclose(ax, bmat)
+
+    gradcheck(solvefcn, (amat, bmat))
+    gradgradcheck(solvefcn, (amat, bmat))
 
 def test_solve_AE():
     na = 3

@@ -1,9 +1,12 @@
 import torch
 import warnings
 from typing import Union, Any, Mapping
+import numpy as np
+from scipy.sparse.linalg import gmres
 from lintorch.linop.base import LinearOperator
 from lintorch.utils.bcast import normalize_bcast_dims
 from lintorch.utils.debug import assert_runtime
+from lintorch.utils.misc import set_default_option
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None,
@@ -47,7 +50,154 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     if "method" not in fwd_options or fwd_options["method"].lower() == "exactsolve":
         return exactsolve(A, B, E, M)
     else:
-        raise RuntimeError("Method other than exactsolve has not been implemented")
+        # get the unique parameters of A
+        params = A.getlinopparams()
+        if M is not None:
+            mparams = M.getlinopparams()
+        else:
+            mparams = []
+        na = len(params)
+        posdef = False
+        return solve_torchfcn.apply(
+            A, B, E, M, posdef,
+            fwd_options, bck_options,
+            na, *params, *mparams)
+
+class solve_torchfcn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, A, B, E, M, posdef,
+                fwd_options, bck_options,
+                na, *all_params):
+        # A: (*BA, nr, nr)
+        # B: (*BB, nr, ncols)
+        # E: (*BE, ncols) or None
+        # M: (*BM, nr, nr) or None
+        # all_params: list of tensor of any shape
+        # returns: (*BABEM, nr, ncols)
+
+        # separate the parameters for A and for M
+        params = all_params[:na]
+        mparams = all_params[na:]
+
+        config = set_default_option({
+        }, fwd_options)
+        ctx.bck_config = set_default_option({
+            "method": config["method"],
+        }, bck_options)
+
+        # check the shape of the matrix
+        if A.shape[-2] != A.shape[-1]:
+            msg = "The solve function cannot be used for non-square transformation."
+            raise RuntimeError(msg)
+
+        method = config["method"].lower()
+        if method == "gmres":
+            x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
+        else:
+            raise RuntimeError("Unknown solve method: %s" % config["method"])
+
+        ctx.A = A
+        ctx.M = M
+        ctx.E = E
+        ctx.x = x
+        ctx.posdef = posdef
+        ctx.params = params
+        ctx.mparams = mparams
+        ctx.na = na
+        return x
+
+    @staticmethod
+    def backward(ctx, grad_x):
+        # grad_x: (*BABEM, nr, ncols)
+        # ctx.x: (*BABEM, nr, ncols)
+
+        # solve (A-biases*M)^T v = grad_x
+        # this is the grad of B
+        AT = ctx.A.H # (*BA, nr, nr)
+        MT = ctx.M.H if ctx.M is not None else None # (*BM, nr, nr)
+        v = solve_torchfcn.apply(AT, grad_x, ctx.E, ctx.M, ctx.posdef,
+                ctx.bck_config, ctx.bck_config,
+                ctx.na, *ctx.params, *ctx.mparams) # (*BABEM, nr, ncols)
+        grad_B = v
+
+        # calculate the biases gradient
+        grad_E = None
+        if ctx.E is not None:
+            if ctx.M is None:
+                Mx = ctx.x
+            else:
+                with ctx.M.useparams("mm", *ctx.mparams):
+                    Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
+            grad_E = (v * Mx).sum(dim=-2) # (*BABEM, ncols)
+
+        # calculate the grad of matrices parameters
+        with torch.enable_grad():
+            params = [p.clone().requires_grad_() for p in ctx.params]
+            with ctx.A.useparams("mm", *params):
+                loss = -ctx.A.mm(ctx.x) # (*BABEM, nr, ncols)
+
+        grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
+            create_graph=torch.is_grad_enabled())
+
+        # calculate the gradient to the biases matrices
+        grad_mparams = []
+        if ctx.M is not None:
+            with torch.enable_grad():
+                mparams = [p.clone() for p in ctx.mparams]
+                lmbdax = ctx.x * ctx.biases.unsqueeze(1)
+                with ctx.M.useparams("mm", *mparams):
+                    mloss = ctx.M.mm(lmbdax)
+
+            grad_mparams = torch.autograd.grad((mloss,), mparams,
+                grad_outputs=(v,),
+                create_graph=torch.is_grad_enabled())
+
+        return (None, grad_B, grad_E, None, None, None, None, None,
+                *grad_params, *grad_mparams)
+
+def wrap_gmres(A, params, B, E=None, M=None, mparams=[], posdef=False, **options):
+    # A: (*BA, nr, nr)
+    # B: (*BB, nr, ncols)
+    # E: (*BE, ncols) or None
+    # M: (*BM, nr, nr) or None
+
+    # NOTE: currently only works for batched B (1 batch dim), but unbatched A
+
+    # check the parameters
+    msg = "GMRES can only do AX=B"
+    assert A.shape[-2] == A.shape[-1], "GMRES can only work for square operator for now"
+    assert E is None, msg
+    assert M is None, msg
+
+    # set the default config options
+    nbatch, na, ncols = B.shape
+    config = set_default_option({
+        "min_eps": 1e-9,
+        "max_niter": 2*na,
+    }, options)
+    min_eps = config["min_eps"]
+    max_niter = config["max_niter"]
+
+    B = B.transpose(-1,-2) # (nbatch, ncols, na)
+
+    # convert the numpy/scipy
+    with A.uselinopparams(*params):
+        op = A.scipy_linalg_op()
+        B_np = B.detach().numpy()
+        res_np = np.empty(B.shape, dtype=np.float64)
+        for i in range(nbatch):
+            for j in range(ncols):
+                x, info = gmres(op, B_np[i,j,:], tol=min_eps, atol=1e-12, maxiter=max_niter)
+                if info > 0:
+                    msg = "The GMRES iteration does not converge to the desired value "\
+                          "(%.3e) after %d iterations" % \
+                          (config["min_eps"], info)
+                    warnings.warn(msg)
+                res_np[i,j,:] = x
+
+        res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
+        res = res.transpose(-1,-2) # (nbatch, na, ncols)
+        return res
 
 def exactsolve(A:LinearOperator, B:torch.Tensor,
                E:Union[torch.Tensor,None],

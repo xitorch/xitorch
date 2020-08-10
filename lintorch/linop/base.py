@@ -4,6 +4,7 @@ import warnings
 import traceback
 import torch
 from abc import abstractmethod, abstractproperty
+from contextlib import contextmanager
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from lintorch.core.editable_module import EditableModule
 
@@ -70,6 +71,23 @@ class LinearOperator(EditableModule):
     @abstractmethod
     def _getparamnames(self) -> Sequence[str]:
         pass
+
+    # linear operators must have a set of parameters that affects most of
+    # the methods (i.e. mm, mv, rmm, rmv)
+    def getlinopparams(self) -> Sequence[torch.Tensor]:
+        return self.getuniqueparams("mm")
+
+    @contextmanager
+    def uselinopparams(self, *params):
+        methodname = "mm"
+        try:
+            _orig_params_ = self.getuniqueparams(methodname)
+            self.setuniqueparams(methodname, *params)
+            yield self
+        except Exception as exc:
+            traceback.print_exc()
+        finally:
+            self.setuniqueparams(methodname, *_orig_params_)
 
     ############# implemented functions ################
     def mv(self, x:torch.Tensor) -> torch.Tensor:
@@ -310,7 +328,11 @@ class AdjointLinearOperator(LinearOperator):
         return self.obj._mv(x)
 
     def _getparamnames(self) -> Sequence[str]:
-        return self.obj._getparamnames()
+        return ["obj."+s for s in self.obj._getparamnames()]
+
+    @property
+    def H(self):
+        return self.obj
 
 class MatrixLinOp(LinearOperator):
     def __init__(self, mat:torch.Tensor) -> None:
