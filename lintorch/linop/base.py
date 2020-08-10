@@ -67,7 +67,7 @@ class LinearOperator(EditableModule):
         pass
 
     @abstractmethod
-    def _getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self) -> Sequence[str]:
         pass
 
     ############# implemented functions ################
@@ -196,25 +196,8 @@ class LinearOperator(EditableModule):
         return self._matrix
 
     def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
-        if methodname == "mv":
-            return self._getparamnames("_mv")
-        elif methodname == "mm":
-            if self._is_mm_implemented:
-                return self._getparamnames("_mm")
-            else:
-                return self._getparamnames("_mv")
-        elif methodname == "rmv":
-            if self._is_hermitian:
-                return self._getparamnames("_mv")
-            else:
-                return self._getparamnames("_rmv")
-        elif methodname == "rmm":
-            if self._is_hermitian:
-                return self.getparamnames("mm")
-            elif self._is_rmm_implemented:
-                return self._getparamnames("_rmm")
-            else:
-                return self._getparamnames("_rmv")
+        if methodname in ["mv", "rmv", "mm", "rmm"]:
+            return self._getparamnames()
         elif methodname == "fullmatrix":
             return [prefix+"_matrix"]
         else:

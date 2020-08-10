@@ -21,11 +21,8 @@ class LinOp(LinearOperator):
     def _mv(self, x):
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
 
-    def _getparamnames(self, methodname, prefix=""):
-        if methodname in self.implemented_methods:
-            return [prefix+"mat"]
-        else:
-            raise KeyError("_getparamnames has no method %s" % methodname)
+    def _getparamnames(self):
+        return [prefix+"mat"]
 
 ############## lsymeig ##############
 def test_lsymeig_nonhermit_err():
