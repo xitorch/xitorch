@@ -217,15 +217,12 @@ class EditableModule(object):
                     raise GetSetParamsError(msg)
                 else:
                     excess_names.append(name)
-        # if there are excess parameters, raise an error because it can cause
-        # infinite loop in backward operation of some functions
-        # (some backward functions are usually recursive and pytorch backward
-        # process will travel backward in the graph until it finds the parameters,
-        # so if there are excess parameters, the process will travel backward
-        # indefinitely)
+        # if there are excess parameters, give warnings
         if len(excess_names) > 0:
-            raise GetSetParamsError("getparams for %s.%s has excess parameters: %s" % \
-                (clsname, methodname, ", ".join(excess_names)))
+            msg = "getparams for %s.%s has excess parameters: %s" % \
+                (clsname, methodname, ", ".join(excess_names))
+            warnings.warn(msg)
+            # raise GetSetParamsError()
 
     def __list_operating_params(self, method, *args, **kwargs):
         """

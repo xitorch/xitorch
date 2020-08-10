@@ -70,8 +70,25 @@ model = ModuleTest(a)
 def test_correct():
     model.assertparams("method_correct_getsetparams", b)
 
+def test_error_getsetparams():
+    error_methods = [
+        "method_no_preserve1",
+        "method_no_preserve2",
+        "method_nontensor_getparams",
+    ]
+    for methodname in error_methods:
+        try:
+            print(methodname)
+            model.assertparams(methodname, b)
+            assert False, "A GetSetParamsError must be raised in this case"
+        except GetSetParamsError:
+            pass
+
 def test_warning_getsetparams():
-    warning_methods = ["method_missing_getparams"]
+    warning_methods = [
+        "method_missing_getparams",
+        "method_excess_getparams",
+    ]
     for methodname in warning_methods:
         with pytest.warns(UserWarning):
             model.assertparams(methodname, b)
