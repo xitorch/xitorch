@@ -8,9 +8,11 @@ from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
 from lintorch.nlfcns.utils.wrapper import wrap_fcn
 from lintorch.nlfcns.utils.fcncheck import assertfcn
+from lintorch.utils.decorators import deprecated
 
 __all__ = ["equilibrium", "rootfinder"]
 
+@deprecated
 def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
     """
     Solving the rootfinder equation of a given function,
@@ -25,6 +27,7 @@ def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
+@deprecated
 def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
     """
     Solving nonlinear equation to solve the equation

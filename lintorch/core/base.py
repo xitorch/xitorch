@@ -3,10 +3,12 @@ from abc import abstractmethod, abstractproperty
 import torch
 from scipy.sparse.linalg import LinearOperator
 from lintorch.utils.exceptions import UnimplementedError
+from lintorch.utils.decorators import deprecated
 from lintorch.core.editable_module import EditableModule, getmethodparams, setmethodparams
 
 __all__ = ["Module", "module", "module_like"]
 
+@deprecated
 class Module(EditableModule):
     def __init__(self, shape,
                is_symmetric=True,

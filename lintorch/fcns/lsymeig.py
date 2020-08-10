@@ -2,6 +2,7 @@ import torch
 from lintorch.utils.misc import set_default_option
 from lintorch.fcns.solve import solve
 from lintorch.utils.tensor import tallqr, to_fortran_order, ortho
+from lintorch.utils.decorators import deprecated
 from lintorch.utils.eig import eig
 
 """
@@ -11,6 +12,7 @@ This file contains methods to obtain eigenpairs of a linear transformation
 
 __all__ = ["lsymeig"]
 
+@deprecated
 def lsymeig(A, params, neig, M=None, mparams=[], fwd_options={}, bck_options={}):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a large matrix.

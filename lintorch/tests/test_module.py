@@ -2,6 +2,8 @@ import torch
 import lintorch as lt
 from lintorch.tests.utils import device_dtype_float_test
 
+# uses deprecated modules
+
 @device_dtype_float_test()
 def test_decor(dtype, device):
     na = 25

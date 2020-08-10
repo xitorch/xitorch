@@ -2,10 +2,12 @@ import torch
 import warnings
 import numpy as np
 from lintorch.utils.misc import set_default_option
+from lintorch.utils.decorators import deprecated
 from scipy.sparse.linalg import gmres, minres, lsqr
 
 __all__ = ["solve"]
 
+@deprecated
 def solve(A, params, B, biases=None, M=None, mparams=[],
           posdef=False, fwd_options={}, bck_options={}):
     """

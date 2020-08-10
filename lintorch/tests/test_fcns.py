@@ -3,6 +3,8 @@ import lintorch as lt
 from lintorch.tests.utils import compare_grad_with_fd, device_dtype_float_test, \
     get_diagonally_dominant_class, get_lower_mat_class
 
+# uses deprecated functions
+
 @device_dtype_float_test()
 def test_lsymeig(dtype, device):
     # generate the matrix
