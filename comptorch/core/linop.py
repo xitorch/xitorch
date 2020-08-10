@@ -18,7 +18,7 @@ class LinearOperator(Module):
     """
     @classmethod
     def m(cls, mat):
-        return MatrixLinOp(mat)
+        return _MatrixLinOp(mat)
 
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
@@ -209,7 +209,7 @@ class LinearOperator(Module):
     ############# cached properties ################
     @property
     def H(self):
-        return AdjointLinearOperator(self)
+        return _AdjointLinearOperator(self)
 
     ############# properties ################
     @property
@@ -282,9 +282,9 @@ class LinearOperator(Module):
         base_method = getattr(LinearOperator, methodname)
         return this_method is not base_method
 
-class AdjointLinearOperator(LinearOperator):
+class _AdjointLinearOperator(LinearOperator):
     def __init__(self, obj:LinearOperator):
-        super(AdjointLinearOperator, self).__init__(
+        super(_AdjointLinearOperator, self).__init__(
             shape = (*obj.shape[:-2], obj.shape[-1], obj.shape[-2]),
             is_hermitian = obj.is_hermitian,
             dtype = obj.dtype,
@@ -300,9 +300,9 @@ class AdjointLinearOperator(LinearOperator):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.obj._mv(x)
 
-class MatrixLinOp(LinearOperator):
+class _MatrixLinOp(LinearOperator):
     def __init__(self, mat:torch.Tensor) -> None:
-        super(MatrixLinOp, self).__init__(
+        super(_MatrixLinOp, self).__init__(
             shape = mat.shape,
             is_hermitian = False,
             dtype = mat.dtype,
