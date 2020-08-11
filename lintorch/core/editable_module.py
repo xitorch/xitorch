@@ -99,7 +99,7 @@ class EditableModule(object):
         return idxs
 
     @contextmanager
-    def useparams(self, methodname:str, *params):
+    def useuniqueparams(self, methodname:str, *params):
         try:
             _orig_params_ = self.getuniqueparams(methodname)
             self.setuniqueparams(methodname, *params)
@@ -291,7 +291,7 @@ def wrap_fcn(fcn, params):
         def wrapped_fcn(*all_params):
             params = all_params[:nparams]
             obj_params = all_params[nparams:]
-            with obj.useparams(method_name, *obj_params) as model:
+            with obj.useuniqueparams(method_name, *obj_params) as model:
                 res = fcn(*params)
             return res
 

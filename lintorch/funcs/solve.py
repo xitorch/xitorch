@@ -126,14 +126,14 @@ class solve_torchfcn(torch.autograd.Function):
             if ctx.M is None:
                 Mx = ctx.x
             else:
-                with ctx.M.useparams("mm", *ctx.mparams):
+                with ctx.M.useuniqueparams("mm", *ctx.mparams):
                     Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
             grad_E = (v * Mx).sum(dim=-2) # (*BABEM, ncols)
 
         # calculate the grad of matrices parameters
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
-            with ctx.A.useparams("mm", *params):
+            with ctx.A.useuniqueparams("mm", *params):
                 loss = -ctx.A.mm(ctx.x) # (*BABEM, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
@@ -145,7 +145,7 @@ class solve_torchfcn(torch.autograd.Function):
             with torch.enable_grad():
                 mparams = [p.clone() for p in ctx.mparams]
                 lmbdax = ctx.x * ctx.biases.unsqueeze(1)
-                with ctx.M.useparams("mm", *mparams):
+                with ctx.M.useuniqueparams("mm", *mparams):
                     mloss = ctx.M.mm(lmbdax)
 
             grad_mparams = torch.autograd.grad((mloss,), mparams,
