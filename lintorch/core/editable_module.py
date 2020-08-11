@@ -157,10 +157,10 @@ class EditableModule(object):
 
         # check if the params are assigned correctly in the correct order
         params1 = self.getparams(methodname)
+        names1 = self.getparamnames(methodname)
         for i,p0,p1 in zip(range(len(params0)), params0, params1):
             if id(p0) != id(p1):
-                msg = "The parameter #%d in getparams and setparams does not match\n" % i
-                msg += self.__get_error_message_ith_params(methodname, params1, i)
+                msg = "The parameter %s in getparams and setparams does not match" % names1[i]
                 raise GetSetParamsError(msg)
 
     def __assert_get_correct_params(self, method, *args, **kwargs):
@@ -180,22 +180,20 @@ class EditableModule(object):
 
         # get the parameter tensors used in the operation and the tensors specified by the developer
         oper_names, oper_params = self.__list_operating_params(method, *args, **kwargs)
-        user_params = self.getparams(method.__name__)
-        id_operparams = [id(p) for p in oper_params]
-        id_userparams = [id(p) for p in user_params]
+        user_names = self.getparamnames(method.__name__)
+        user_params = [get_attr(self, name) for name in user_names]
 
         # check if the userparams contains non-tensor
         for i in range(len(user_params)):
             param = user_params[i]
             if (not isinstance(param, torch.Tensor)) or (isinstance(param, torch.Tensor) and param.dtype not in torch_float_type):
-                msg = "Non-floating point tensor param is detected at position #%d (type: %s).\n" % (i, type(param))
-                msg += self.__get_error_message_ith_params(methodname, user_params, i)
+                msg = "Parameter %s is a non-floating point tensor" % user_names[i]
                 raise GetSetParamsError(msg)
 
         # check if there are missing parameters (present in operating params, but not in the user params)
         missing_names = []
-        for i in range(len(oper_params)):
-            if id_operparams[i] not in id_userparams:
+        for i in range(len(oper_names)):
+            if oper_names[i] not in user_names:
                 missing_names.append(oper_names[i])
         # if there are missing parameters, give a warning (because the program
         # can still run correctly, e.g. missing parameters are parameters that
@@ -206,23 +204,14 @@ class EditableModule(object):
 
         # check if there are excessive parameters (present in the user params, but not in the operating params)
         excess_names = []
-        for i in range(len(user_params)):
-            if id_userparams[i] not in id_operparams:
-                name = _get_tensor_name(user_params[i])
-                # if name is None, it means the getparams returns parameters that
-                # are not tensors or not a member of the class
-                if name is None:
-                    msg = "The parameter #%d in getparams is not a float tensor member of the class\n"
-                    msg += self.__get_error_message_ith_params(methodname, user_params, i)
-                    raise GetSetParamsError(msg)
-                else:
-                    excess_names.append(name)
+        for i in range(len(user_names)):
+            if user_names[i] not in oper_names:
+                excess_names.append(user_names[i])
         # if there are excess parameters, give warnings
         if len(excess_names) > 0:
             msg = "getparams for %s.%s has excess parameters: %s" % \
                 (clsname, methodname, ", ".join(excess_names))
             warnings.warn(msg)
-            # raise GetSetParamsError()
 
     def __list_operating_params(self, method, *args, **kwargs):
         """
@@ -254,17 +243,6 @@ class EditableModule(object):
             params.append(all_tensors[i])
 
         return names, params
-
-    def __get_error_message_ith_params(self, methodname, params, i):
-        # return the message indicating where the i-th parameter is
-        msg = "The position of the parameter #%d (0-based) can be detected using setparams as below:\n" % i
-        msg += "--------\n"
-        try:
-            self.setparams(methodname, *params[:i])
-        except:
-            s = tb.format_exc()
-            msg += s
-        return msg
 
 def getmethodparams(method):
     if not inspect.ismethod(method):
@@ -375,7 +353,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
 
     if hasattr(obj, "__dict__"):
         generator = obj.__dict__.items()
-        name_format = "{prefix}.{key}"
+        name_format = "{prefix}{key}"
         objdict = obj.__dict__
     elif hasattr(obj, "__iter__"):
         generator = enumerate(obj)
@@ -385,21 +363,27 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
         raise RuntimeError("The object must be iterable or keyable")
 
     for key,elmt in generator:
-        if id(elmt) in exception_ids:
-            continue
-        else:
-            exception_ids.add(id(elmt))
-
         name = name_format.format(prefix=prefix, key=key)
         if crit(elmt):
             action(elmt, name, objdict, key)
-        elif hasattr(elmt, "__dict__") or hasattr(elmt, "__iter__"):
+            continue
+
+        hasdict = hasattr(elmt, "__dict__")
+        hasiter = hasattr(elmt, "__iter__")
+        if hasdict or hasiter:
+            # add exception to avoid infinite loop if there is a mutual dependant on objects
+            if id(elmt) in exception_ids:
+                continue
+            else:
+                exception_ids.add(id(elmt))
+
+            prefix = name+"." if hasdict else name
             if max_depth > 0:
-                _traverse_obj(elmt, action=action, prefix=name, max_depth=max_depth-1, exception_ids=exception_ids)
+                _traverse_obj(elmt, action=action, prefix=prefix, max_depth=max_depth-1, exception_ids=exception_ids)
             else:
                 raise RecursionError("Maximum number of recursion reached")
 
-def _get_tensors(obj, prefix="self", max_depth=20):
+def _get_tensors(obj, prefix="", max_depth=20):
     """
     Collect all tensors in an object recursively and return the tensors as well
     as their "names" (names meaning the address, e.g. "self.a[0].elmt").

@@ -5,10 +5,6 @@ from lintorch.core.editable_module import EditableModule
 from lintorch.utils.exceptions import GetSetParamsError
 
 class ModuleTest(EditableModule):
-    # this class contains two methods that do not preserve and rest of the methods
-    # preserve.
-    # for the preserving methods: 1 with unmatched getsetparams,
-    #
     def __init__(self, a:torch.Tensor) -> None:
         self.a = a
         self.c = a * 2.
@@ -16,6 +12,8 @@ class ModuleTest(EditableModule):
         self.e = a+3.
         self.fint = 1
         self.g = a + 1.
+        self.aa = a
+        self.aaa = a
 
     def method_no_preserve1(self, b:torch.Tensor) -> torch.Tensor:
         # this method changes a parameter
@@ -27,10 +25,17 @@ class ModuleTest(EditableModule):
         self.b = b
         return self.b * 2.0
 
-    def method_correct_getsetparams(self, b:torch.Tensor) -> torch.Tensor:
-        return self._dummy_fcn(b)
+    def method_duplicate_missing(self, b:torch.Tensor) -> torch.Tensor:
+        # `aa` is `a`, but `aa` will be missing in getparamnames
+        return self._dummy_fcn(b) + self.aa
 
-    def method_unmatched_getsetparams(self, b:torch.Tensor) -> torch.Tensor:
+    def method_duplicate_excess(self, b:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self.aa
+
+    def method_duplicate_correct(self, b:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self.aa
+
+    def method_correct_getsetparams(self, b:torch.Tensor) -> torch.Tensor:
         return self._dummy_fcn(b)
 
     def method_nontensor_getparams(self, b:torch.Tensor) -> torch.Tensor:
@@ -50,9 +55,13 @@ class ModuleTest(EditableModule):
             return [prefix+"a"]
         elif methodname == "method_no_preserve1":
             return []
-        elif methodname == "method_correct_getsetparams":
+        elif methodname == "method_duplicate_correct":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"aa"]
+        elif methodname == "method_duplicate_missing":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
-        elif methodname == "method_unmatched_getsetparams":
+        elif methodname == "method_duplicate_excess":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"aa", prefix+"aaa"]
+        elif methodname == "method_correct_getsetparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_nontensor_getparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"fint"]
@@ -68,7 +77,12 @@ b = torch.tensor([2.])
 model = ModuleTest(a)
 
 def test_correct():
-    model.assertparams("method_correct_getsetparams", b)
+    correct_methods = [
+        "method_correct_getsetparams",
+        "method_duplicate_correct",
+    ]
+    for m in correct_methods:
+        model.assertparams(m, b)
 
 def test_error_getsetparams():
     error_methods = [
@@ -88,6 +102,8 @@ def test_warning_getsetparams():
     warning_methods = [
         "method_missing_getparams",
         "method_excess_getparams",
+        "method_duplicate_missing",
+        "method_duplicate_excess",
     ]
     for methodname in warning_methods:
         with pytest.warns(UserWarning):
