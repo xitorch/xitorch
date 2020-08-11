@@ -4,8 +4,10 @@ from lintorch.core.linop import LinearOperator
 from lintorch.core.editable_module import wrap_fcn
 from lintorch.utils.debug import assert_type
 
+__all__ = ["jac", "hess"]
+
 def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
-        idxs:Union[None,Sequence[int]]=None) -> List[LinearOperator]:
+        idxs:Union[None,int,Sequence[int]]=None) -> List[LinearOperator]:
     """
     Returns the LinearOperator that acts as the jacobian of the params.
     The shape of LinearOperator is (nout, nin) where `nout` and `nin` are the
@@ -17,7 +19,7 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
         Callable with tensor output and arbitrary numbers of input parameters.
     * params: Sequence[Any]
         List of input parameters of the function.
-    * idxs: list of int or None
+    * idxs: int or list of int or None
         List of the parameters indices to get the jacobian.
         The pointed parameters in `params` must be tensors and requires_grad.
         If it is None, then it will return all jacobian for all parameters that
@@ -29,16 +31,58 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
         List of LinearOperator of the jacobian
     """
     # check idxs
-    if idxs is None:
-        idxs = [i for i,t in enumerate(params) if isinstance(t, torch.Tensor) and t.requires_grad]
-    else:
-        for p in idxs:
-            assert_type(isinstance(params[p], torch.Tensor) and params[p].requires_grad,
-                "The %d-th element (0-based) must be a tensor which requires grad" % p)
+    idxs_list = _setup_idxs(idxs, params)
 
     # make the function a functional (depends on all parameters in the object)
     fcn, params = wrap_fcn(fcn, params)
-    return [_Jac(fcn, params, idx) for idx in idxs]
+    res = [_Jac(fcn, params, idx) for idx in idxs_list]
+    if isinstance(idxs, int):
+        res = res[idxs]
+    return res
+
+def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
+        idxs:Union[None,int,Sequence[int]]=None) -> List[LinearOperator]:
+    """
+    Returns the LinearOperator that acts as the Hessian of the params.
+    The shape of LinearOperator is (nin, nin) where `nin` is the
+    total number of elements in the input.
+
+    Arguments
+    ---------
+    * fcn: Callable[...,torch.Tensor]
+        Callable with tensor output and arbitrary numbers of input parameters.
+        The numel of the output must be 1.
+    * params: Sequence[Any]
+        List of input parameters of the function.
+    * idxs: int or list of int or None
+        List of the parameters indices to get the jacobian.
+        The pointed parameters in `params` must be tensors and requires_grad.
+        If it is None, then it will return all Hessian for all parameters that
+        are tensor which requires_grad.
+
+    Returns
+    -------
+    * linops: list of LinearOperator
+        List of LinearOperator of the Hessian
+    """
+    idxs_list = _setup_idxs(idxs, params)
+
+    def get_deriv_fcn(fcn, params, i):
+        def deriv_fcn(*inputparams):
+            y = fcn(*inputparams)
+
+            # check if output of fcn has only 1 elements
+            if torch.numel(y) != 1:
+                raise RuntimeError("The number of output elements of fcn for hess must be 1")
+
+            return torch.autograd.grad(fcn, (inputparams[i],), retain_graph=True,
+                create_graph=torch.autograd.is_grad_enabled())[0]
+        return deriv_fcn
+
+    res = [jac(get_deriv_fcn(fcn, params, i), params=params, idxs=i) for i in idxs_list]
+    if isinstance(idxs, int):
+        res = res[idxs]
+    return res
 
 class _Jac(LinearOperator):
     def __init__(self, fcn:Callable[...,torch.Tensor],
@@ -151,3 +195,14 @@ def connect_graph(out, params):
     # just to have a dummy graph, in case there is a parameter that
     # is disconnected in calculating df/dy
     return out + sum([p.view(-1)[0]*0 for p in params])
+
+def _setup_idxs(idxs, params):
+    if idxs is None:
+        idxs = [i for i,t in enumerate(params) if isinstance(t, torch.Tensor) and t.requires_grad]
+    elif isinstance(idxs, int):
+        idxs = [idxs]
+
+    for p in idxs:
+        assert_type(isinstance(params[p], torch.Tensor) and params[p].requires_grad,
+            "The %d-th element (0-based) must be a tensor which requires grad" % p)
+    return idxs
