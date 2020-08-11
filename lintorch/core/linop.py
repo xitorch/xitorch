@@ -106,6 +106,10 @@ class LinearOperator(EditableModule):
         * y: torch.tensor (...,p)
             The result of the linear operation.
         """
+        if x.shape[-1] != self.shape[-1]:
+            raise RuntimeError("Cannot operate .mv on shape %s. Expected (...,%d)" %\
+                (str(tuple(x.shape)), self.shape[-1]))
+
         return self._mv(x)
 
     def mm(self, x:torch.Tensor) -> torch.Tensor:
@@ -124,6 +128,10 @@ class LinearOperator(EditableModule):
         * y: torch.tensor (...,p,r)
             The result of the linear operation.
         """
+        if x.shape[-2] != self.shape[-1]:
+            raise RuntimeError("Cannot operate .mm on shape %s. Expected (...,%d,*)" %\
+                (str(tuple(x.shape)), self.shape[-1]))
+
         xbatchshape = list(x.shape[:-2])
         if self._is_mm_implemented:
             return self._mm(x)
@@ -158,6 +166,10 @@ class LinearOperator(EditableModule):
         * y: torch.tensor (...,q)
             The result of the adjoint linear operation.
         """
+        if x.shape[-1] != self.shape[-2]:
+            raise RuntimeError("Cannot operate .rmv on shape %s. Expected (...,%d)" %\
+                (str(tuple(x.shape)), self.shape[-2]))
+
         if self._is_hermitian:
             return self._mv(x)
         elif not self._is_rmv_implemented:
@@ -181,6 +193,10 @@ class LinearOperator(EditableModule):
         * y: torch.tensor (...,q,r)
             The result of the adjoint linear operation.
         """
+        if x.shape[-2] != self.shape[-2]:
+            raise RuntimeError("Cannot operate .rmm on shape %s. Expected (...,%d,*)" %\
+                (str(tuple(x.shape)), self.shape[-2]))
+
         if self._is_hermitian:
             return self.mm(x)
 
