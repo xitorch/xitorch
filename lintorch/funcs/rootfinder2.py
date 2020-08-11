@@ -6,8 +6,8 @@ import scipy.optimize
 import lintorch as lt
 from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
-# from lintorch.fcns.solve import solve
 from lintorch.funcs.solve import solve
+from lintorch.funcs.jac import jac
 from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import wrap_fcn
 
@@ -179,9 +179,8 @@ class _RootFinder(torch.autograd.Function):
         yout = ctx.yout # (*ny)
         params = ctx.params
         # dL/df
-        _apply_DfDy = _DfDy(fcn=ctx.fcn, yfcn=yout, params=params)
-        # _apply_DfDy.check()
-        gyfcn = solve(A=_apply_DfDy, B=grad_yout.unsqueeze(-1),
+        jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
+        gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.unsqueeze(-1),
             fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
 
         # get the grad for the params
@@ -192,67 +191,3 @@ class _RootFinder(torch.autograd.Function):
             create_graph=torch.is_grad_enabled())
 
         return (None, None, None, None, *grad_params)
-
-class _DfDy(LinearOperator):
-    def __init__(self, fcn:Callable[...,torch.Tensor],
-            yfcn:torch.Tensor,
-            params:Iterable[torch.Tensor]) -> None:
-
-        nr = torch.numel(yfcn)
-        super(_DfDy, self).__init__(
-            shape=(nr,nr),
-            dtype=yfcn.dtype,
-            device=yfcn.device)
-        self.fcn = fcn
-        self.yfcn = yfcn.requires_grad_() # (*ny), prod(*ny) == nr
-        self.params = params
-        self.yfcnshape = yfcn.shape
-
-    def _mv(self, gy:torch.Tensor) -> torch.Tensor:
-        # gy: (..., nr)
-        # self.yfcn: (*ny)
-        with torch.enable_grad():
-            yout = self.fcn(self.yfcn, *self.params) # (*ny)
-
-        gy1 = gy.reshape(-1, *self.yfcnshape) # (nbatch, *ny)
-        nbatch = gy1.shape[0]
-        dfdy = []
-        for i in range(nbatch):
-            retain_graph = (i < nbatch-1) or torch.is_grad_enabled()
-            one_dfdy, = torch.autograd.grad(yout, (self.yfcn,), grad_outputs=gy1[i],
-                retain_graph=retain_graph, create_graph=torch.is_grad_enabled()) # (*ny)
-            dfdy.append(one_dfdy.unsqueeze(0))
-        dfdy = torch.cat(dfdy, dim=0) # (nbatch, *ny)
-
-        if torch.is_grad_enabled():
-            dfdy = connect_graph(dfdy, self.params)
-
-        res = -dfdy.reshape(*gy.shape[:-1], self.shape[-1]) # (..., nr)
-        return res
-
-    def _fullmatrix(self) -> torch.Tensor:
-        with torch.enable_grad():
-            fcn_wrap = lambda y: self.fcn(y, *self.params)
-            jac = torch.autograd.functional.jacobian(fcn_wrap, self.yfcn,
-                create_graph=torch.is_grad_enabled()) # (*ny,*ny)
-            jac = -jac.view(*self.shape).transpose(-2,-1) # (nr,nr)
-        return jac
-
-    def _getparams(self, methodname):
-        if methodname == "_mv":
-            return [self.yfcn] + self.params
-        else:
-            raise RuntimeError("_getparams has no method %s defined" % methodname)
-
-    def _setparams(self, methodname, *params):
-        if methodname == "_mv":
-            self.yfcn, = params[:1]
-            self.params = params[1:1+len(self.params)]
-            return 1+len(self.params)
-        else:
-            raise RuntimeError("_setparams has no method %s defined" % methodname)
-
-def connect_graph(out:torch.Tensor, params):
-    # just to have a dummy graph, in case there is a parameter that
-    # is disconnected in calculating df/dy
-    return out + sum([p.reshape(-1)[0]*0 for p in params])
