@@ -1,6 +1,6 @@
 import torch
 from typing import Union, Mapping, Any
-from lintorch.linop.base import LinearOperator
+from lintorch.core.linop import LinearOperator
 from lintorch.utils.debug import assert_runtime
 
 def lsymeig(A:LinearOperator, neig:Union[int,None]=None,

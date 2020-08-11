@@ -8,7 +8,7 @@ from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 # from lintorch.fcns.solve import solve
 from lintorch.linop.solve import solve
-from lintorch.linop.base import LinearOperator, checklinop
+from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.nlfcns.utils.wrapper import wrap_fcn
 
 __all__ = ["equilibrium2", "rootfinder2"]
