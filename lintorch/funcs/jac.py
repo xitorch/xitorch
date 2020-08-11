@@ -1,9 +1,10 @@
 import torch
-from typing import Callable, List, Any, Union
+from typing import Callable, List, Any, Union, Sequence
 from lintorch.core.linop import LinearOperator
+from lintorch.core.editable_module import wrap_fcn
 from lintorch.utils.debug import assert_type
 
-def jac(fcn:Callable[...,torch.Tensor], params:List[Any],
+def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
         params_idxs:Union[None,Sequence[int]]=None) -> List[LinearOperator]:
     """
     Returns the LinearOperator that acts as the jacobian of the params.
@@ -14,7 +15,7 @@ def jac(fcn:Callable[...,torch.Tensor], params:List[Any],
     ---------
     * fcn: Callable[...,torch.Tensor]
         Callable with tensor output and arbitrary numbers of input parameters.
-    * params: List[Any]
+    * params: Sequence[Any]
         List of input parameters of the function.
     * params_idxs: list of int or None
         List of the parameters indices to get the jacobian.
@@ -35,6 +36,10 @@ def jac(fcn:Callable[...,torch.Tensor], params:List[Any],
             assert_type(isinstance(params[p], torch.Tensor) and t.requires_grad,
                 "The %d-th element (0-based) must be a tensor which requires grad" % p)
 
+    # make the function a functional (depends on all parameters in the object)
+    fcn, params = wrap_fcn(fcn, params)
+    return [_Jac(fcn, params, idx) for idx in params_idxs]
+
 class _Jac(LinearOperator):
     def __init__(self, fcn:Callable[...,torch.Tensor],
             params:Sequence[Any], idx:int) -> None:
@@ -46,7 +51,7 @@ class _Jac(LinearOperator):
         with torch.enable_grad():
             yout = fcn(*params) # (*nout)
             v = torch.ones_like(yout).to(yout.device).requires_grad_() # (*nout)
-            dfdy = torch.autograd.grad(yout, (yparam,), grad_outputs=v, create_graph=True) # (*nin)
+            dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=v, create_graph=True) # (*nin)
 
         inshape = yparam.shape
         outshape = yout.shape
@@ -60,7 +65,7 @@ class _Jac(LinearOperator):
 
         self.fcn = fcn
         self.yparam = yparam
-        self.params = params
+        self.params = list(params)
         self.yout = yout
         self.v = v
         self.idx = idx
@@ -73,10 +78,10 @@ class _Jac(LinearOperator):
         # params tensor is the LinearOperator's parameters
         self.params_tensor_idx, params_tensor = zip(*[(i,param) for i,param in enumerate(params) if isinstance(param, torch.Tensor)])
         self.params_tensor = {i:p for i,p in enumerate(params_tensor)} # convert to dictionary
-        self.id_params_tensor = [id(param) for param in self.params_tensor]
+        self.id_params_tensor = [id(param) for param in self.params_tensor.values()]
 
     def _getparamnames(self) -> Sequence[str]:
-        return ["params_tensor[%d]"%i for i in self.params_tensor]
+        return ["yparam"] + ["params_tensor[%d]"%i for i in self.params_tensor]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nin)
@@ -91,9 +96,9 @@ class _Jac(LinearOperator):
             yparam = self.yparam
             with torch.enable_grad():
                 self.__update_params()
-                yout = fcn(*self.params) # (*nout)
+                yout = self.fcn(*self.params) # (*nout)
                 v = torch.ones_like(yout).to(yout.device).requires_grad_() # (*nout)
-                dfdy = torch.autograd.grad(yout, (yparam,), grad_outputs=v, create_graph=True) # (*nin)
+                dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=v, create_graph=True) # (*nin)
 
         gy1 = gy.reshape(-1, self.nin) # (nbatch, nin)
         nbatch = gy1.shape[0]
@@ -105,6 +110,7 @@ class _Jac(LinearOperator):
         dfdyfs = torch.cat(dfdyfs, dim=0) # (nbatch, *nout)
 
         res = dfdyfs.reshape(*gy.shape[:-1], self.nout) # (..., nout)
+        res = connect_graph(res, self.params_tensor.values())
         return res
 
     def _rmv(self, gout:torch.Tensor) -> torch.Tensor:
@@ -112,12 +118,14 @@ class _Jac(LinearOperator):
         # self.yfcn: (*nin)
         if self.__param_tensors_unchanged():
             yout = self.yout
-            yparam = self.yparams
+            yparam = self.yparam
         else:
             with torch.enable_grad():
+                # print("Before", [p.shape for p in self.params])
                 self.__update_params()
+                # print("After ", [p.shape for p in self.params])
                 yparam = self.params[self.idx]
-                yout = fcn(*self.params) # (*nout)
+                yout = self.fcn(*self.params) # (*nout)
 
         gout1 = gout.reshape(-1, self.nout) # (nbatch, nout)
         nbatch = gout1.shape[0]
@@ -129,11 +137,17 @@ class _Jac(LinearOperator):
         dfdy = torch.cat(dfdy, dim=0) # (nbatch, *nin)
 
         res = dfdy.reshape(*gout.shape[:-1], self.nin) # (..., nin)
+        res = connect_graph(res, self.params_tensor.values())
         return res # (..., nin)
 
     def __param_tensors_unchanged(self):
-        return [id(param) for param in self.params_tensor] == self.id_params_tensor
+        return [id(param) for param in self.params_tensor.values()] == self.id_params_tensor
 
     def __update_params(self):
         for i,idx in enumerate(self.params_tensor_idx):
             self.params[idx] = self.params_tensor[i]
+
+def connect_graph(out, params):
+    # just to have a dummy graph, in case there is a parameter that
+    # is disconnected in calculating df/dy
+    return out + sum([p.view(-1)[0]*0 for p in params])

@@ -105,7 +105,7 @@ class EditableModule(object):
             self.setuniqueparams(methodname, *params)
             yield self
         except Exception as exc:
-            tb.print_exc()
+            raise exc
         finally:
             self.setuniqueparams(methodname, *_orig_params_)
 
