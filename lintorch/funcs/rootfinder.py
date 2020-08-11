@@ -7,7 +7,6 @@ from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, grad
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
 from lintorch.core.editable_module import wrap_fcn
-from lintorch.funcs.utils.fcncheck import assertfcn
 from lintorch.utils.decorators import deprecated
 
 __all__ = ["equilibrium", "rootfinder"]
@@ -22,7 +21,6 @@ def rootfinder(fcn, y0, params=[], fwd_options={}, bck_options={}):
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
     """
-    assertfcn(fcn)
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
@@ -37,7 +35,6 @@ def equilibrium(fcn, y0, params=[], fwd_options={}, bck_options={}):
     where `fcn` is a function that can be non-linear and produce output of shape
     of `y`.
     """
-    assertfcn(fcn)
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     def new_fcn(y, *params):
