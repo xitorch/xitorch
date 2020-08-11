@@ -7,7 +7,7 @@ import lintorch as lt
 from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 # from lintorch.fcns.solve import solve
-from lintorch.linop.solve import solve
+from lintorch.funcs.solve import solve
 from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import wrap_fcn
 
