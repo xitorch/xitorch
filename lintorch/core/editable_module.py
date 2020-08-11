@@ -359,7 +359,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
         name_format = "{prefix}{key}"
         objdict = obj.__dict__
     elif hasattr(obj, "__iter__"):
-        generator = enumerate(obj)
+        generator = obj.items() if isinstance(obj, dict) else enumerate(obj)
         name_format = "{prefix}[{key}]"
         objdict = obj
     else:
@@ -382,7 +382,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
 
             prefix = name+"." if hasdict else name
             if max_depth > 0:
-                _traverse_obj(elmt, action=action, prefix=prefix, max_depth=max_depth-1, exception_ids=exception_ids)
+                _traverse_obj(elmt, action=action, crit=crit, prefix=prefix, max_depth=max_depth-1, exception_ids=exception_ids)
             else:
                 raise RecursionError("Maximum number of recursion reached")
 
@@ -396,7 +396,7 @@ def _get_tensors(obj, prefix="", max_depth=20):
     * obj: an instance
         The object user wants to traverse down
     * prefix: str
-        Prefix of the name of the collected tensors. Default: "self"
+        Prefix of the name of the collected tensors. Default: ""
 
     Returns
     -------
@@ -436,4 +436,4 @@ def _set_tensors(obj, all_params, max_depth=20):
         objdict[key] = all_params.pop(0)
     # traverse down the object to collect the tensors
     crit = lambda elmt: isinstance(elmt, torch.Tensor) and elmt.dtype in torch_float_type
-    _traverse_obj(obj, action=action, crit=crit, prefix="self", max_depth=max_depth)
+    _traverse_obj(obj, action=action, crit=crit, prefix="", max_depth=max_depth)

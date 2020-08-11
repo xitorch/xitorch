@@ -37,12 +37,15 @@ def _preproc_name(name):
 
 def _traverse_attr(obj, names, attrfcn, itemfcn):
     if len(names) == 1:
-        if names[0].startswith("["):
-            key = ast.literal_eval(names[0][1:-1])
-            if not hasattr(obj, "keys"):
-                raise TypeError("The parameter with [] must be a dictionary")
-            return itemfcn(obj, key)
-        else:
-            return attrfcn(obj, names[0])
+        return _applyfcn(obj, names[0], attrfcn, itemfcn)
     else:
-        return attrfcn(_get_attr(obj, names[:-1]), names[-1])
+        return _applyfcn(_get_attr(obj, names[:-1]), names[-1], attrfcn, itemfcn)
+
+def _applyfcn(obj, name, attrfcn, itemfcn):
+    if name.startswith("["):
+        key = ast.literal_eval(name[1:-1])
+        if not hasattr(obj, "keys"):
+            raise TypeError("The parameter with [] must be a dictionary")
+        return itemfcn(obj, key)
+    else:
+        return attrfcn(obj, name)

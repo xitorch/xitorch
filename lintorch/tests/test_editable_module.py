@@ -16,6 +16,11 @@ class ModuleTest(EditableModule):
         self.g = a + 1.
         self.aa = a
         self.aaa = a
+        self.dctparams = {
+            0: a+0.1,
+            1: a+1.,
+            2: a+2.,
+        }
 
     def method_no_preserve1(self, b:torch.Tensor) -> torch.Tensor:
         # this method changes a parameter
@@ -26,6 +31,15 @@ class ModuleTest(EditableModule):
         # this method adds a parameter to the object
         self.b = b
         return self.b * 2.0
+
+    def method_dict_correct(self, b:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self.dctparams[0] + self.dctparams[2]
+
+    def method_dict_missing(self, b:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self.dctparams[0] + self.dctparams[2]
+
+    def method_dict_excess(self, b:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self.dctparams[0] + self.dctparams[2]
 
     def method_duplicate_missing(self, b:torch.Tensor) -> torch.Tensor:
         # `aa` is `a`, but `aa` will be missing in getparamnames
@@ -60,16 +74,26 @@ class ModuleTest(EditableModule):
             return [prefix+"a"]
         elif methodname == "method_no_preserve1":
             return []
+
+        elif methodname == "method_dict_correct":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"dctparams[0]", prefix+"dctparams[2]"]
+        elif methodname == "method_dict_missing":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"dctparams[0]"]
+        elif methodname == "method_dict_excess":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"dctparams[0]", prefix+"dctparams[1]", prefix+"dctparams[2]"]
+
         elif methodname == "method_duplicate_correct":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"aa"]
         elif methodname == "method_duplicate_missing":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_duplicate_excess":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"aa", prefix+"aaa"]
+
         elif methodname == "method_correct_getsetparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_correct_getsetparams2":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
+
         elif methodname == "method_nontensor_getparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"fint"]
         elif methodname == "method_missing_getparams":
@@ -88,6 +112,7 @@ def test_correct():
         "method_correct_getsetparams": (b,),
         "method_correct_getsetparams2": (b,b),
         "method_duplicate_correct": (b,),
+        "method_dict_correct": (b,),
     }
     for m in correct_methods:
         model.assertparams(m, *correct_methods[m])
@@ -112,6 +137,8 @@ def test_warning_getsetparams():
         "method_excess_getparams",
         "method_duplicate_missing",
         "method_duplicate_excess",
+        "method_dict_missing",
+        "method_dict_excess",
     ]
     for methodname in warning_methods:
         with pytest.warns(UserWarning):
@@ -146,3 +173,13 @@ def test_edit_duplicate():
     newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
     f = fcn(*newparams)
     assert torch.allclose(f, f*0+18) # (1+2+3+4+5+1) + 2
+
+def test_edit_dict():
+    fcn, params = wrap_fcn(model.method_dict_correct, (b,))
+    assert len(params) == 7
+    assert params[0] is b
+    assert params[-1] is model.dctparams[2]
+    assert params[-2] is model.dctparams[0]
+    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
+    f = fcn(*newparams)
+    assert torch.allclose(f, f*0+29) # (1+2+3+4+5+1) + 6+7
