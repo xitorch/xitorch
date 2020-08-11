@@ -8,3 +8,7 @@ def assert_broadcastable(shape1, shape2):
 def assert_runtime(cond, msg=""):
     if not cond:
         raise RuntimeError(msg)
+
+def assert_type(cond, msg=""):
+    if not cond:
+        raise TypeError(msg)
