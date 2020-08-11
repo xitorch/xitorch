@@ -371,7 +371,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
     if exception_ids is None:
         # None is set as default arg to avoid expanding list for multiple
         # invokes of _get_tensors without exception_ids argument
-        exception_ids = []
+        exception_ids = set()
 
     if hasattr(obj, "__dict__"):
         generator = obj.__dict__.items()
@@ -388,7 +388,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
         if id(elmt) in exception_ids:
             continue
         else:
-            exception_ids.append(id(elmt))
+            exception_ids.add(id(elmt))
 
         name = name_format.format(prefix=prefix, key=key)
         if crit(elmt):
