@@ -5,7 +5,7 @@ from lintorch.core.editable_module import wrap_fcn
 from lintorch.utils.debug import assert_type
 
 def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
-        params_idxs:Union[None,Sequence[int]]=None) -> List[LinearOperator]:
+        idxs:Union[None,Sequence[int]]=None) -> List[LinearOperator]:
     """
     Returns the LinearOperator that acts as the jacobian of the params.
     The shape of LinearOperator is (nout, nin) where `nout` and `nin` are the
@@ -17,7 +17,7 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
         Callable with tensor output and arbitrary numbers of input parameters.
     * params: Sequence[Any]
         List of input parameters of the function.
-    * params_idxs: list of int or None
+    * idxs: list of int or None
         List of the parameters indices to get the jacobian.
         The pointed parameters in `params` must be tensors and requires_grad.
         If it is None, then it will return all jacobian for all parameters that
@@ -28,17 +28,17 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     * linops: list of LinearOperator
         List of LinearOperator of the jacobian
     """
-    # check params_idxs
-    if params_idxs is None:
-        params_idxs = [i for i,t in enumerate(params) if isinstance(t, torch.Tensor) and t.requires_grad]
+    # check idxs
+    if idxs is None:
+        idxs = [i for i,t in enumerate(params) if isinstance(t, torch.Tensor) and t.requires_grad]
     else:
-        for p in params_idxs:
-            assert_type(isinstance(params[p], torch.Tensor) and t.requires_grad,
+        for p in idxs:
+            assert_type(isinstance(params[p], torch.Tensor) and params[p].requires_grad,
                 "The %d-th element (0-based) must be a tensor which requires grad" % p)
 
     # make the function a functional (depends on all parameters in the object)
     fcn, params = wrap_fcn(fcn, params)
-    return [_Jac(fcn, params, idx) for idx in params_idxs]
+    return [_Jac(fcn, params, idx) for idx in idxs]
 
 class _Jac(LinearOperator):
     def __init__(self, fcn:Callable[...,torch.Tensor],

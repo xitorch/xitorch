@@ -1,51 +1,82 @@
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 from lintorch.funcs.jac import jac
-from lintorch.core.editable_module import wrap_fcn
+from lintorch.core.editable_module import EditableModule, wrap_fcn
 
 dtype = torch.float64
 
-def func1(A, x0, b):
+def func1(A, b, x0):
     x = torch.matmul(A, x0) + b
     x = torch.nn.Softplus()(x)
     return x
 
-def getnnparams(na):
+class func2(EditableModule):
+    def __init__(self, b):
+        self.b = b
+
+    def getparamnames(self, methodname, prefix=""):
+        if methodname == "__call__":
+            return [prefix+"b"]
+        else:
+            raise KeyError("Params for method %s cannot be found" % methodname)
+
+    def __call__(self, A, b, x0):
+        x = torch.matmul(A * self.b, x0) + b
+        x = torch.nn.Softplus()(x)
+        return x
+
+def getfnparams(na):
     A = torch.rand((na,na), dtype=dtype, requires_grad=True)
-    x = torch.rand((na,1 ), dtype=dtype, requires_grad=True)
     b = torch.rand((na,1 ), dtype=dtype, requires_grad=True)
-    return (A, x, b)
+    x = torch.rand((na,1 ), dtype=dtype, requires_grad=True)
+    return (A, b, x)
+
+def getnnparams(na):
+    b = torch.rand((na,1), dtype=dtype, requires_grad=True)
+    return (b,)
 
 def test_jac_func():
     na = 3
-    params = getnnparams(na)
-    jacs = jac(func1, params)
-    assert len(jacs) == len(params)
+    params = getfnparams(na)
+    nnparams = getnnparams(na)
+    nparams = len(params)
+    all_idxs = [None, (0,), (1,), (0,1), (0,1,2)]
+    funcs = [func1, func2(*nnparams)]
 
-    y = func1(*params)
-    nout = torch.numel(y)
-    nins = [torch.numel(p) for p in params]
-    v = torch.rand_like(y).requires_grad_()
-    for i in range(len(jacs)):
-        assert list(jacs[i].shape) == [nout, nins[i]]
+    for func in funcs:
+        for idxs in all_idxs:
+            if idxs is None:
+                gradparams = params
+            else:
+                gradparams = [params[i] for i in idxs]
 
-    # get rmv
-    jacs_rmv = torch.autograd.grad(y, params, grad_outputs=v, create_graph=True)
-    # the jac LinearOperator has shape of (nout, nin), so we need to flatten v
-    jacs_rmv0 = [jc.rmv(v.view(-1)) for jc in jacs]
+            jacs = jac(func, params, idxs=idxs)
+            assert len(jacs) == len(gradparams)
 
-    # calculate the mv
-    w = [torch.rand_like(p) for p in params]
-    jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[0] for i in range(len(jacs))]
-    jacs_lmv0 = [jacs[i].mv(w[i].view(-1)) for i in range(len(jacs))]
+            y = func(*params)
+            nout = torch.numel(y)
+            nins = [torch.numel(p) for p in gradparams]
+            v = torch.rand_like(y).requires_grad_()
+            for i in range(len(jacs)):
+                assert list(jacs[i].shape) == [nout, nins[i]]
 
-    for i in range(len(jacs)):
-        assert torch.allclose(jacs_rmv[i].view(-1), jacs_rmv0[i].view(-1))
-        assert torch.allclose(jacs_lmv[i].view(-1), jacs_lmv0[i].view(-1))
+            # get rmv
+            jacs_rmv = torch.autograd.grad(y, gradparams, grad_outputs=v, create_graph=True)
+            # the jac LinearOperator has shape of (nout, nin), so we need to flatten v
+            jacs_rmv0 = [jc.rmv(v.view(-1)) for jc in jacs]
+
+            # calculate the mv
+            w = [torch.rand_like(p) for p in gradparams]
+            jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[0] for i in range(len(jacs))]
+            jacs_lmv0 = [jacs[i].mv(w[i].view(-1)) for i in range(len(jacs))]
+
+            for i in range(len(jacs)):
+                assert torch.allclose(jacs_rmv[i].view(-1), jacs_rmv0[i].view(-1))
+                assert torch.allclose(jacs_lmv[i].view(-1), jacs_lmv0[i].view(-1))
 
 def test_jac_grad():
     na = 3
-    params = getnnparams(na)
+    params = getfnparams(na)
     params2 = [torch.rand(1, dtype=dtype).requires_grad_() for p in params]
     jacs = jac(func1, params)
     nout = jacs[0].shape[-2]
@@ -81,3 +112,31 @@ def test_jac_grad():
         gradgradcheck(fcnr2, (i, v, *params2))
         gradcheck    (fcnl2, (i, w[i], *params2))
         gradgradcheck(fcnl2, (i, w[i], *params2))
+
+def test_jac_method_grad():
+    na = 3
+    params = getfnparams(na)
+    nnparams = getnnparams(na)
+    num_nnparams = len(nnparams)
+    jacs = jac(func2(*nnparams), params)
+    nout = jacs[0].shape[-2]
+
+    def fcnr(i, v, *allparams):
+        nnparams = allparams[:num_nnparams]
+        params = allparams[num_nnparams:]
+        jacs = jac(func2(*nnparams), params)
+        return jacs[i].rmv(v.view(-1))
+
+    def fcnl(i, v, *allparams):
+        nnparams = allparams[:num_nnparams]
+        params = allparams[num_nnparams:]
+        jacs = jac(func2(*nnparams), params)
+        return jacs[i].mv(v.view(-1))
+
+    v = torch.rand((na,), dtype=dtype, requires_grad=True)
+    w = [torch.rand_like(p).requires_grad_() for p in params]
+    for i in range(len(jacs)):
+        gradcheck    (fcnr, (i, v, *nnparams, *params))
+        gradgradcheck(fcnr, (i, v, *nnparams, *params))
+        gradcheck    (fcnl, (i, w[i], *nnparams, *params))
+        gradgradcheck(fcnl, (i, w[i], *nnparams, *params))
