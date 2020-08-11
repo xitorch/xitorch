@@ -6,7 +6,7 @@ from lintorch.utils.misc import set_default_option
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.fcns.solve import solve
 from lintorch.core.base import Module as LintorchModule
-from lintorch.nlfcns.utils.wrapper import wrap_fcn
+from lintorch.core.editable_module import wrap_fcn
 from lintorch.nlfcns.utils.fcncheck import assertfcn
 from lintorch.utils.decorators import deprecated
 
