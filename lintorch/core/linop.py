@@ -377,7 +377,7 @@ def checklinop(linop:LinearOperator) -> None:
     * AssertionError
         Raised if there is a shape mismatch
     * RuntimeError
-        Riased if there is an error when evaluating the .mv, .mm, .rmv, or .rmm methods
+        Raised if there is an error when evaluating the .mv, .mm, .rmv, or .rmm methods
     """
     shape = linop.shape
     p, q = shape[-2:]
