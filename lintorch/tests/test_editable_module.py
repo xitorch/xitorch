@@ -1,9 +1,11 @@
 import torch
 import pytest
 from typing import List
-from lintorch.core.editable_module import EditableModule
+from lintorch.core.editable_module import EditableModule, wrap_fcn
 from lintorch.utils.exceptions import GetSetParamsError
 
+##############
+# test the assertion with methods with various problems
 class ModuleTest(EditableModule):
     def __init__(self, a:torch.Tensor) -> None:
         self.a = a
@@ -38,6 +40,9 @@ class ModuleTest(EditableModule):
     def method_correct_getsetparams(self, b:torch.Tensor) -> torch.Tensor:
         return self._dummy_fcn(b)
 
+    def method_correct_getsetparams2(self, b:torch.Tensor, b2:torch.Tensor) -> torch.Tensor:
+        return self._dummy_fcn(b) + self._dummy_fcn(b2)
+
     def method_nontensor_getparams(self, b:torch.Tensor) -> torch.Tensor:
         return self._dummy_fcn(b)
 
@@ -48,7 +53,7 @@ class ModuleTest(EditableModule):
         return self._dummy_fcn(b)
 
     def _dummy_fcn(self, b:torch.Tensor) -> torch.Tensor:
-        return self.a * b + self.c + b * self.d * self.e + self.fint
+        return self.a + b + self.c + self.d + self.e + self.fint
 
     def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         if methodname == "method_no_preserve1":
@@ -63,6 +68,8 @@ class ModuleTest(EditableModule):
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"aa", prefix+"aaa"]
         elif methodname == "method_correct_getsetparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
+        elif methodname == "method_correct_getsetparams2":
+            return [prefix+"a", prefix+"c", prefix+"d", prefix+"e"]
         elif methodname == "method_nontensor_getparams":
             return [prefix+"a", prefix+"c", prefix+"d", prefix+"e", prefix+"fint"]
         elif methodname == "method_missing_getparams":
@@ -73,16 +80,17 @@ class ModuleTest(EditableModule):
             raise KeyError("getparams for %s is not implemented" % methodname)
 
 a = torch.tensor([1.])
-b = torch.tensor([2.])
+b = torch.tensor([2.1])
 model = ModuleTest(a)
 
 def test_correct():
-    correct_methods = [
-        "method_correct_getsetparams",
-        "method_duplicate_correct",
-    ]
+    correct_methods = {
+        "method_correct_getsetparams": (b,),
+        "method_correct_getsetparams2": (b,b),
+        "method_duplicate_correct": (b,),
+    }
     for m in correct_methods:
-        model.assertparams(m, b)
+        model.assertparams(m, *correct_methods[m])
 
 def test_error_getsetparams():
     error_methods = [
@@ -108,3 +116,33 @@ def test_warning_getsetparams():
     for methodname in warning_methods:
         with pytest.warns(UserWarning):
             model.assertparams(methodname, b)
+
+##############
+# test the wrap function to make it a functional
+def test_edit_simple():
+    fcn, params = wrap_fcn(model.method_correct_getsetparams, (b,))
+    assert len(params) == 5 # 4 obj params + 1 method param
+    assert params[0] is b
+    assert params[1] is not b
+    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
+    f = fcn(*newparams)
+    assert torch.allclose(f, f*0+16) # (1+2+3+4+5+1)
+
+    fcn2, params2 = wrap_fcn(model.method_correct_getsetparams2, (b, b))
+    assert len(params2) == 6 # 4 obj params + 2 method param
+    assert params2[0] is b
+    assert params2[1] is b
+    assert params2[2] is not b
+    newparams2 = [torch.tensor([1.0*i+1]) for i in range(len(params2))]
+    f2 = fcn2(*newparams2)
+    assert torch.allclose(f2, f2*0+41) # (1+3+4+5+6+1) + (2+3+4+5+6+1)
+
+def test_edit_duplicate():
+    fcn, params = wrap_fcn(model.method_duplicate_correct, (b,))
+    assert len(params) == 5 # aa is a duplicate, so not included here
+    assert params[0] is b
+    assert params[1] is model.a
+    assert params[1] is model.aa
+    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
+    f = fcn(*newparams)
+    assert torch.allclose(f, f*0+18) # (1+2+3+4+5+1) + 2

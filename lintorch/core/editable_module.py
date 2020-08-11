@@ -10,7 +10,7 @@ from typing import Sequence, Union, Mapping, List, Dict
 from lintorch.utils.exceptions import GetSetParamsError
 from lintorch.utils.attr import get_attr, set_attr, del_attr
 
-__all__ = ["EditableModule"]
+__all__ = ["EditableModule", "wrap_fcn"]
 
 torch_float_type = [torch.float32, torch.float, torch.float64, torch.float16]
 
@@ -270,6 +270,9 @@ def wrap_fcn(fcn, params):
 
     # if the fcn is an object that has __call__ attribute, then assign it to fcn
     # to make fcn a method
+    if isinstance(params, torch.Tensor):
+        params = [params]
+
     if not inspect.ismethod(fcn) and not inspect.isfunction(fcn):
         if hasattr(fcn, "__call__"):
             fcn = fcn.__call__
