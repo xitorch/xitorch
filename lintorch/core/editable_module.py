@@ -385,9 +385,13 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
             else:
                 exception_ids.add(id(elmt))
 
-            prefix = name+"." if hasdict else name
             if max_depth > 0:
-                _traverse_obj(elmt, action=action, crit=crit, prefix=prefix, max_depth=max_depth-1, exception_ids=exception_ids)
+                _traverse_obj(elmt,
+                    action = action,
+                    crit = crit,
+                    prefix = name+"." if hasdict else name,
+                    max_depth = max_depth - 1,
+                    exception_ids=exception_ids)
             else:
                 raise RecursionError("Maximum number of recursion reached")
 
