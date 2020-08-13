@@ -18,34 +18,42 @@ def del_attr(obj, name):
 
 def _get_attr(obj, names):
     attrfcn = lambda obj, name: getattr(obj, name)
-    itemfcn = lambda obj, key: obj.__getitem__(key)
-    return _traverse_attr(obj, names, attrfcn, itemfcn)
+    dictfcn = lambda obj, key: obj.__getitem__(key)
+    listfcn = lambda obj, key: obj.__getitem__(key)
+    return _traverse_attr(obj, names, attrfcn, dictfcn, listfcn)
 
 def _set_attr(obj, names, val):
     attrfcn = lambda obj, name: setattr(obj, name, val)
-    itemfcn = lambda obj, key: obj.__setitem__(key, val)
-    return _traverse_attr(obj, names, attrfcn, itemfcn)
+    dictfcn = lambda obj, key: obj.__setitem__(key, val)
+    listfcn = lambda obj, key: obj.__setitem__(key, val)
+    return _traverse_attr(obj, names, attrfcn, dictfcn, listfcn)
 
 def _del_attr(obj, names):
     attrfcn = lambda obj, name: delattr(obj, name)
-    itemfcn = lambda obj, key: obj.__delitem__(key)
-    return _traverse_attr(obj, names, attrfcn, itemfcn)
+    dictfcn = lambda obj, key: obj.__delitem__(key)
+    def listfcn(obj, key):
+        obj.__delitem__(key)
+        obj.insert(key, None) # to preserve the length
+    return _traverse_attr(obj, names, attrfcn, dictfcn, listfcn)
 
 
 def _preproc_name(name):
     return sp.findall(name)
 
-def _traverse_attr(obj, names, attrfcn, itemfcn):
+def _traverse_attr(obj, names, attrfcn, dictfcn, listfcn):
     if len(names) == 1:
-        return _applyfcn(obj, names[0], attrfcn, itemfcn)
+        return _applyfcn(obj, names[0], attrfcn, dictfcn, listfcn)
     else:
-        return _applyfcn(_get_attr(obj, names[:-1]), names[-1], attrfcn, itemfcn)
+        return _applyfcn(_get_attr(obj, names[:-1]), names[-1], attrfcn, dictfcn, listfcn)
 
-def _applyfcn(obj, name, attrfcn, itemfcn):
+def _applyfcn(obj, name, attrfcn, dictfcn, listfcn):
     if name.startswith("["):
         key = ast.literal_eval(name[1:-1])
-        if not hasattr(obj, "keys"):
-            raise TypeError("The parameter with [] must be a dictionary")
-        return itemfcn(obj, key)
+        if isinstance(obj, dict):
+            return dictfcn(obj, key)
+        elif isinstance(obj, list):
+            return listfcn(obj, key)
+        else:
+            raise TypeError("The parameter with [] must be either a dictionary or a list")
     else:
         return attrfcn(obj, name)
