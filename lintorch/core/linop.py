@@ -18,8 +18,8 @@ class LinearOperator(EditableModule):
     of (B1,B2,...,Bb,p,q) where B* is the (optional) batch dimensions.
     """
     @classmethod
-    def m(cls, mat):
-        return _MatrixLinOp(mat)
+    def m(cls, mat:torch.Tensor, is_hermitian:Union[bool,None]=None):
+        return _MatrixLinOp(mat, is_hermitian=is_hermitian)
 
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
@@ -355,10 +355,16 @@ class AdjointLinearOperator(LinearOperator):
         return self.obj
 
 class _MatrixLinOp(LinearOperator):
-    def __init__(self, mat:torch.Tensor) -> None:
+    def __init__(self, mat:torch.Tensor, is_hermitian:Union[bool,None]=None) -> None:
+        if is_hermitian is None:
+            if mat.shape[-2] != mat.shape[-1]:
+                is_hermitian = False
+            else:
+                is_hermitian = torch.allclose(mat, mat.transpose(-2,-1))
+
         super(_MatrixLinOp, self).__init__(
             shape = mat.shape,
-            is_hermitian = False,
+            is_hermitian = is_hermitian,
             dtype = mat.dtype,
             device = mat.device
         )
