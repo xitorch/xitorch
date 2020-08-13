@@ -19,7 +19,16 @@ class LinearOperator(EditableModule):
     """
     @classmethod
     def m(cls, mat:torch.Tensor, is_hermitian:Union[bool,None]=None):
-        return _MatrixLinOp(mat, is_hermitian=is_hermitian)
+        if is_hermitian is None:
+            if mat.shape[-2] != mat.shape[-1]:
+                is_hermitian = False
+            else:
+                is_hermitian = torch.allclose(mat, mat.transpose(-2,-1))
+
+        if is_hermitian:
+            return _MatrixHermitLinOp(mat)
+        else:
+            return _MatrixNonHermitLinOp(mat)
 
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
@@ -354,17 +363,14 @@ class AdjointLinearOperator(LinearOperator):
     def H(self):
         return self.obj
 
-class _MatrixLinOp(LinearOperator):
-    def __init__(self, mat:torch.Tensor, is_hermitian:Union[bool,None]=None) -> None:
-        if is_hermitian is None:
-            if mat.shape[-2] != mat.shape[-1]:
-                is_hermitian = False
-            else:
-                is_hermitian = torch.allclose(mat, mat.transpose(-2,-1))
+# distinguishing the classes of Hermitian and non-Hermitian matrices to suppress
+# the warnings about redundant implementation of rmm and rmv
+class _MatrixNonHermitLinOp(LinearOperator):
+    def __init__(self, mat:torch.Tensor) -> None:
 
-        super(_MatrixLinOp, self).__init__(
+        super(_MatrixNonHermitLinOp, self).__init__(
             shape = mat.shape,
-            is_hermitian = is_hermitian,
+            is_hermitian = False,
             dtype = mat.dtype,
             device = mat.device
         )
@@ -387,6 +393,32 @@ class _MatrixLinOp(LinearOperator):
 
     def _getparamnames(self) -> Sequence[str]:
         return ["mat"]
+
+class _MatrixHermitLinOp(LinearOperator):
+    def __init__(self, mat:torch.Tensor) -> None:
+        super(_MatrixHermitLinOp, self).__init__(
+            shape = mat.shape,
+            is_hermitian = True,
+            dtype = mat.dtype,
+            device = mat.device
+        )
+        self.mat = mat
+
+    def _mv(self, x:torch.Tensor) -> torch.Tensor:
+        return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
+
+    def _mm(self, x:torch.Tensor) -> torch.Tensor:
+        return torch.matmul(self.mat, x)
+
+    def _fullmatrix(self) -> torch.Tensor:
+        return self.mat
+
+    def _getparamnames(self) -> Sequence[str]:
+        return ["mat"]
+
+    @property
+    def H(self):
+        return self
 
 def checklinop(linop:LinearOperator) -> None:
     """
