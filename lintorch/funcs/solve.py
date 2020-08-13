@@ -162,6 +162,7 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[], posdef=False, **options
     # M: (*BM, nr, nr) or None
 
     # NOTE: currently only works for batched B (1 batch dim), but unbatched A
+    assert len(A.shape) == 2 and len(B.shape) == 3, "Currently only works for batched B (1 batch dim), but unbatched A"
 
     # check the parameters
     msg = "GMRES can only do AX=B"
