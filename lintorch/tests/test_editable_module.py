@@ -124,6 +124,7 @@ a = torch.tensor([1.])
 b = torch.tensor([2.1])
 model = ModuleTest(a)
 
+@pytest.mark.filterwarnings("error")
 def test_correct():
     correct_methods = {
         "method_correct_getsetparams": (b,),
