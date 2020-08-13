@@ -37,7 +37,7 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     fcn, params = wrap_fcn(fcn, params)
     res = [_Jac(fcn, params, idx) for idx in idxs_list]
     if isinstance(idxs, int):
-        res = res[idxs]
+        res = res[0]
     return res
 
 def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
@@ -75,13 +75,17 @@ def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
             if torch.numel(y) != 1:
                 raise RuntimeError("The number of output elements of fcn for hess must be 1")
 
-            return torch.autograd.grad(fcn, (inputparams[i],), retain_graph=True,
-                create_graph=torch.autograd.is_grad_enabled())[0]
+            return torch.autograd.grad(y, (inputparams[i],), retain_graph=True,
+                create_graph=torch.is_grad_enabled())[0]
         return deriv_fcn
 
-    res = [jac(get_deriv_fcn(fcn, params, i), params=params, idxs=i) for i in idxs_list]
+    # res = [jac(get_deriv_fcn(fcn, params, i), params=params, idxs=i) for i in idxs_list]
+
+    # make the function a functional (depends on all parameters in the object)
+    fcn, params = wrap_fcn(fcn, params)
+    res = [_Hess(fcn, params, idx) for idx in idxs_list]
     if isinstance(idxs, int):
-        res = res[idxs]
+        res = res[0]
     return res
 
 class _Jac(LinearOperator):
@@ -137,9 +141,9 @@ class _Jac(LinearOperator):
             dfdy = self.dfdy
         # otherwise, reevaluate by replacing the parameters with the new tensor params
         else:
-            yparam = self.yparam
             with torch.enable_grad():
                 self.__update_params()
+                yparam = self.params[self.idx]
                 yout = self.fcn(*self.params) # (*nout)
                 v = torch.ones_like(yout).to(yout.device).requires_grad_() # (*nout)
                 dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=v, create_graph=True) # (*nin)
@@ -165,9 +169,7 @@ class _Jac(LinearOperator):
             yparam = self.yparam
         else:
             with torch.enable_grad():
-                # print("Before", [p.shape for p in self.params])
                 self.__update_params()
-                # print("After ", [p.shape for p in self.params])
                 yparam = self.params[self.idx]
                 yout = self.fcn(*self.params) # (*nout)
 
@@ -183,6 +185,69 @@ class _Jac(LinearOperator):
         res = dfdy.reshape(*gout.shape[:-1], self.nin) # (..., nin)
         res = connect_graph(res, self.params_tensor.values())
         return res # (..., nin)
+
+    def __param_tensors_unchanged(self):
+        return [id(param) for param in self.params_tensor.values()] == self.id_params_tensor
+
+    def __update_params(self):
+        for i,idx in enumerate(self.params_tensor_idx):
+            self.params[idx] = self.params_tensor[i]
+
+class _Hess(LinearOperator):
+    def __init__(self, fcn:Callable[...,torch.Tensor],
+                 params:Sequence[Any], idx:int) -> None:
+        yparam = params[idx]
+        with torch.enable_grad():
+            yout = fcn(*params)
+            dfdy = torch.autograd.grad(yout, (yparam,), create_graph=True)[0]
+            dfdy = connect_graph(dfdy, [yparam])
+
+        inshape = yparam.shape
+        nin = torch.numel(yparam)
+
+        super(_Hess, self).__init__(
+            shape=(nin, nin),
+            is_hermitian=True,
+            dtype=yparam.dtype,
+            device=yparam.device)
+
+        self.fcn = fcn
+        self.dfdy = dfdy
+        self.yparam = yparam
+        self.params = list(params)
+        self.nin = nin
+        self.inshape = yparam.shape
+
+        # params tensor is the LinearOperator's parameters
+        self.params_tensor_idx, params_tensor = zip(*[(i,param) for i,param in enumerate(params) if isinstance(param, torch.Tensor)])
+        self.params_tensor = {i:p for i,p in enumerate(params_tensor)} # convert to dictionary
+        self.id_params_tensor = [id(param) for param in self.params_tensor.values()]
+
+    def _mv(self, gy:torch.Tensor) -> torch.Tensor:
+        # gy: (..., *nin)
+        if self.__param_tensors_unchanged():
+            dfdy = self.dfdy
+            yparam = self.yparam
+        else:
+            with torch.enable_grad():
+                self.__update_params()
+                yparam = self.params[self.idx]
+                yout = self.fcn(*self.params)
+                dfdy = torch.autograd.grad(yout, (yparam,), create_graph=True)[0]
+                dfdy = connect_graph(dfdy, [yparam])
+
+        gy1 = gy.reshape(-1, self.nin) # (nbatch, nin)
+        nbatch = gy1.shape[0]
+        d2fdy2s = []
+        for i in range(nbatch):
+            d2fdy2, = torch.autograd.grad(dfdy, (yparam,), grad_outputs=gy1[i].reshape(*self.inshape),
+                create_graph=torch.is_grad_enabled())
+            d2fdy2s.append(d2fdy2.unsqueeze(0))
+        d2fdy2s = torch.cat(d2fdy2s, dim=0) # (nbatch, *nin)
+
+        res = d2fdy2s.reshape(*gy.shape[:-1], self.nin) # (..., nin)
+        res = connect_graph(res, self.params_tensor.values())
+        return res
 
     def __param_tensors_unchanged(self):
         return [id(param) for param in self.params_tensor.values()] == self.id_params_tensor

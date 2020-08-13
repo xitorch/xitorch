@@ -1,6 +1,6 @@
 import torch
 from torch.autograd import gradcheck, gradgradcheck
-from lintorch.funcs.jac import jac
+from lintorch.funcs.jac import jac, hess
 from lintorch.core.editable_module import EditableModule, wrap_fcn
 
 dtype = torch.float64
@@ -9,6 +9,11 @@ def func1(A, b, x0):
     x = torch.matmul(A, x0) + b
     x = torch.nn.Softplus()(x)
     return x
+
+def hfunc1(A, b, x0):
+    x = torch.matmul(A, x0) + b
+    x = torch.nn.Softplus()(x)
+    return x.sum()
 
 class func2(EditableModule):
     def __init__(self, b):
@@ -24,6 +29,21 @@ class func2(EditableModule):
         x = torch.matmul(A * self.b, x0) + b
         x = torch.nn.Softplus()(x)
         return x
+
+class hfunc2(EditableModule):
+    def __init__(self, b):
+        self.b = b
+
+    def getparamnames(self, methodname, prefix=""):
+        if methodname == "__call__":
+            return [prefix+"b"]
+        else:
+            raise KeyError("Params for method %s cannot be found" % methodname)
+
+    def __call__(self, A, b, x0):
+        x = torch.matmul(A * self.b, x0) + b
+        x = torch.nn.Softplus()(x)
+        return x.sum()
 
 def getfnparams(na):
     A = torch.rand((na,na), dtype=dtype, requires_grad=True)
@@ -140,3 +160,50 @@ def test_jac_method_grad():
         gradgradcheck(fcnr, (i, v, *nnparams, *params))
         gradcheck    (fcnl, (i, w[i], *nnparams, *params))
         gradgradcheck(fcnl, (i, w[i], *nnparams, *params))
+
+def test_hess_func():
+    na = 3
+    params = getfnparams(na)
+    nnparams = getnnparams(na)
+    nparams = len(params)
+    all_idxs = [None, (0,), (1,), (0,1), (0,1,2)]
+    funcs = [hfunc1, hfunc2(*nnparams)]
+
+    for func in funcs:
+        for idxs in all_idxs:
+            if idxs is None:
+                gradparams = params
+            else:
+                gradparams = [params[i] for i in idxs]
+
+            hs = hess(func, params, idxs=idxs)
+            assert len(hs) == len(gradparams)
+
+            y = func(*params)
+            nins = [torch.numel(p) for p in gradparams]
+            w = [torch.rand_like(p) for p in gradparams]
+            for i in range(len(hs)):
+                assert list(hs[i].shape) == [nins[i], nins[i]]
+
+            # assert the values
+            dfdy = torch.autograd.grad(y, gradparams, create_graph=True)
+            hs_mv_man = [torch.autograd.grad(dfdy[i], (gradparams[i],), grad_outputs=w[i],
+                retain_graph=True)[0] for i in range(len(dfdy))]
+            hs_mv = [hs[i].mv(w[i].reshape(-1,nins[i])) for i in range(len(dfdy))]
+            for i in range(len(dfdy)):
+                assert torch.allclose(hs_mv[i].view(-1), hs_mv_man[i].view(-1))
+
+def test_hess_grad():
+    na = 3
+    params = getfnparams(na)
+    # params2 = [torch.rand(1, dtype=dtype).requires_grad_() for p in params]
+    hs = hess(hfunc1, params)
+
+    def fcnl(i, v, *params):
+        hs = hess(hfunc1, params)
+        return hs[i].mv(v.view(-1))
+
+    w = [torch.rand_like(p).requires_grad_() for p in params]
+    for i in range(len(hs)):
+        gradcheck    (fcnl, (i, w[i], *params))
+        gradgradcheck(fcnl, (i, w[i], *params))
