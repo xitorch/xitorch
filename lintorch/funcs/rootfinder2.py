@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Iterable, Mapping, Any
+from typing import Callable, Iterable, Mapping, Any, Sequence
 import torch
 import numpy as np
 import scipy.optimize
@@ -16,12 +16,13 @@ __all__ = ["equilibrium2", "rootfinder2"]
 def rootfinder2(
         fcn:Callable[[torch.Tensor],torch.Tensor],
         y0:torch.Tensor,
+        params:Sequence[Any]=[],
         fwd_options:Mapping[str,Any]={},
         bck_options:Mapping[str,Any]={}):
     """
     Solving the rootfinder equation of a given function,
 
-        0 = fcn(y)
+        0 = fcn(y, *params)
 
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
@@ -32,6 +33,8 @@ def rootfinder2(
         The function
     * y0: torch.tensor with shape (*ny)
         Initial guess of the solution
+    * params: list
+        List of any other parameters to be put in fcn
     * fwd_options: dict
         Options for the rootfinder method
     * bck_options: dict
@@ -50,19 +53,20 @@ def rootfinder2(
         - a method in lt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0,))
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
 def equilibrium2(
         fcn:Callable[[torch.Tensor],torch.Tensor],
         y0:torch.Tensor,
+        params:Sequence[Any]=[],
         fwd_options:Mapping[str,Any]={},
         bck_options:Mapping[str,Any]={}):
     """
     Solving the equilibrium equation of a given function,
 
-        y = fcn(y)
+        y = fcn(y, *params)
 
     where `fcn` is a function that can be non-linear and produce output of shape
     `y`. The output of this block is `y` that produces the 0 as the output.
@@ -73,6 +77,8 @@ def equilibrium2(
         The function
     * y0: torch.tensor with shape (*ny)
         Initial guess of the solution
+    * params: list
+        List of any other parameters to be put in fcn
     * fwd_options: dict
         Options for the rootfinder method
     * bck_options: dict
@@ -91,7 +97,7 @@ def equilibrium2(
         - a method in lt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0,))
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     def new_fcn(y, *params):
         return y - wrapped_fcn(y, *params)
