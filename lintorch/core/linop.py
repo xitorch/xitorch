@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from lintorch.core.editable_module import EditableModule
 
-__all__ = ["LinearOperator", "MatrixLinOp"]
+__all__ = ["LinearOperator"]
 
 class LinearOperator(EditableModule):
     """
@@ -17,10 +17,14 @@ class LinearOperator(EditableModule):
     This LinearOperator can operate a batch of linear operator and it has shape
     of (B1,B2,...,Bb,p,q) where B* is the (optional) batch dimensions.
     """
+    @classmethod
+    def m(cls, mat):
+        return _MatrixLinOp(mat)
+
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
-            dtype:torch.dtype = torch.float32,
-            device:torch.device = torch.device('cpu')) -> None:
+            dtype:Union[torch.dtype,None] = None,
+            device:Union[torch.device,None] = None) -> None:
 
         super(LinearOperator, self).__init__()
         if len(shape) < 2:
@@ -28,8 +32,8 @@ class LinearOperator(EditableModule):
         self._shape = shape
         self._batchshape = list(shape[:-2])
         self._is_hermitian = is_hermitian
-        self._dtype = dtype
-        self._device = device
+        self._dtype = dtype if dtype is not None else torch.float32
+        self._device = device if device is not None else torch.device("cpu")
         if is_hermitian and shape[-1] != shape[-2]:
             raise RuntimeError("The object is indicated as Hermitian, but the shape is not square")
 
@@ -350,9 +354,9 @@ class AdjointLinearOperator(LinearOperator):
     def H(self):
         return self.obj
 
-class MatrixLinOp(LinearOperator):
+class _MatrixLinOp(LinearOperator):
     def __init__(self, mat:torch.Tensor) -> None:
-        super(MatrixLinOp, self).__init__(
+        super(_MatrixLinOp, self).__init__(
             shape = mat.shape,
             is_hermitian = False,
             dtype = mat.dtype,
@@ -472,5 +476,5 @@ def checklinop(linop:LinearOperator) -> None:
 
 if __name__ == "__main__":
     mat = torch.tensor([[1.2, 3.4], [2.1, 5.6]])
-    matlinop = MatrixLinOp(mat)
+    matlinop = _MatrixLinOp(mat)
     matlinop.check()
