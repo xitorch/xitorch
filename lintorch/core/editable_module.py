@@ -305,7 +305,12 @@ def wrap_fcn(fcn, params):
         obj = fcn.__self__
 
         # get the tensors in the torch.nn.Module to be used as params
-        paramnames, obj_params = zip(*obj.named_parameters())
+        named_params = list(obj.named_parameters())
+        if len(named_params) == 0:
+            paramnames = []
+            obj_params = []
+        else:
+            paramnames, obj_params = zip(*named_params)
         all_params = [*params, *obj_params]
 
         def wrapped_fcn(*all_params2):
