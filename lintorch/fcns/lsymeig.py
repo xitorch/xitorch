@@ -5,11 +5,6 @@ from lintorch.utils.tensor import tallqr, to_fortran_order, ortho
 from lintorch.utils.decorators import deprecated
 from lintorch.utils.eig import eig
 
-"""
-This file contains methods to obtain eigenpairs of a linear transformation
-    which is a subclass of ddft.modules.base_linear.BaseLinearModule
-"""
-
 __all__ = ["lsymeig"]
 
 @deprecated
