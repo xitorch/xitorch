@@ -9,31 +9,11 @@ from lintorch.utils.bcast import get_bcasted_dims
 
 torch.manual_seed(12345)
 
-class LinOp(LinearOperator):
-    def __init__(self, mat, is_hermitian=False):
-        super(LinOp, self).__init__(
-            shape = mat.shape,
-            is_hermitian = is_hermitian,
-            dtype = mat.dtype,
-            device = mat.device
-        )
-        self.mat = mat
-        self.implemented_methods = ["_mv"]
-
-    def _mv(self, x):
-        return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
-
-    def _rmv(self, x):
-        return torch.matmul(self.mat.T, x.unsqueeze(-1)).squeeze(-1)
-
-    def _getparamnames(self):
-        return ["mat"]
-
 ############## lsymeig ##############
 def test_lsymeig_nonhermit_err():
     mat = torch.rand((3,3))
-    linop = LinOp(mat, False)
-    linop2 = LinOp(mat+mat.transpose(-2,-1), True)
+    linop = LinearOperator.m(mat, False)
+    linop2 = LinearOperator.m(mat+mat.transpose(-2,-1), True)
 
     try:
         res = lsymeig(linop)
@@ -52,8 +32,8 @@ def test_lsymeig_mismatch_err():
     mat2 = torch.rand((2,2))
     mat1 = mat1 + mat1.transpose(-2,-1)
     mat2 = mat2 + mat2.transpose(-2,-1)
-    linop1 = LinOp(mat1, True)
-    linop2 = LinOp(mat2, True)
+    linop1 = LinearOperator.m(mat1, True)
+    linop2 = LinearOperator.m(mat2, True)
 
     try:
         res = lsymeig(linop1, M=linop2)
@@ -66,7 +46,7 @@ def test_lsymeig_A():
     for shape in shapes:
         mat1 = torch.rand(shape, dtype=torch.float64)
         mat1 = mat1 + mat1.transpose(-2,-1)
-        linop1 = LinOp(mat1, True)
+        linop1 = LinearOperator.m(mat1, True)
 
         for neig in [2,shape[-1]]:
             eigvals, eigvecs = lsymeig(linop1, neig=neig) # eigvals: (..., neig), eigvecs: (..., na, neig)
@@ -85,8 +65,8 @@ def test_lsymeig_AM():
         matm = torch.rand(mshape, dtype=dtype) + torch.eye(mshape[-1], dtype=dtype) # make sure it's not singular
         mata = mata + mata.transpose(-2,-1)
         matm = matm + matm.transpose(-2,-1)
-        linopa = LinOp(mata, True)
-        linopm = LinOp(matm, True)
+        linopa = LinearOperator.m(mata, True)
+        linopm = LinearOperator.m(matm, True)
 
         na = ashape[-1]
         bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
@@ -103,8 +83,8 @@ def test_lsymeig_AM():
 def test_solve_nonsquare_err():
     mat = torch.rand((3,2))
     mat2 = torch.rand((3,3))
-    linop = LinOp(mat)
-    linop2 = LinOp(mat2)
+    linop = LinearOperator.m(mat)
+    linop2 = LinearOperator.m(mat2)
     B = torch.rand(3,1)
 
     try:
@@ -133,8 +113,8 @@ def test_solve_mismatch_err():
         amat = amat + amat.transpose(-2,-1)
         mmat = mmat + mmat.transpose(-2,-1)
 
-        alinop = LinOp(amat)
-        mlinop = LinOp(mmat)
+        alinop = LinearOperator.m(amat)
+        mlinop = LinearOperator.m(mmat)
         try:
             res = solve(alinop, B=bmat, M=mlinop)
             assert False, "A RuntimeError must be raised if %s" % msg
@@ -158,14 +138,14 @@ def test_solve_A():
         bmat = bmat.requires_grad_()
 
         def solvefcn(amat, bmat):
-            alinop = LinOp(amat)
+            alinop = LinearOperator.m(amat)
             x = solve(A=alinop, B=bmat)
             return x
 
         x = solvefcn(amat, bmat)
         assert list(x.shape) == xshape
 
-        ax = LinOp(amat).mm(x)
+        ax = LinearOperator.m(amat).mm(x)
         assert torch.allclose(ax, bmat)
 
         # gradcheck
@@ -192,14 +172,14 @@ def test_solve_A_gmres():
     bmat = bmat.requires_grad_()
 
     def solvefcn(amat, bmat):
-        alinop = LinOp(amat)
+        alinop = LinearOperator.m(amat)
         x = solve(A=alinop, B=bmat, fwd_options=fwd_options)
         return x
 
     x = solvefcn(amat, bmat)
     assert list(x.shape) == xshape
 
-    ax = LinOp(amat).mm(x)
+    ax = LinearOperator.m(amat).mm(x)
     assert torch.allclose(ax, bmat)
 
     gradcheck(solvefcn, (amat, bmat))
@@ -220,7 +200,7 @@ def test_solve_AE():
         emat = torch.rand(eshape, dtype=dtype)
         amat = amat + amat.transpose(-2,-1)
 
-        alinop = LinOp(amat)
+        alinop = LinearOperator.m(amat)
 
         x = solve(A=alinop, B=bmat, E=emat)
         assert list(x.shape) == xshape
@@ -246,8 +226,8 @@ def test_solve_AEM():
         amat = amat + amat.transpose(-2,-1)
         mmat = mmat + mmat.transpose(-2,-1)
 
-        alinop = LinOp(amat)
-        mlinop = LinOp(mmat)
+        alinop = LinearOperator.m(amat)
+        mlinop = LinearOperator.m(mmat)
 
         x = solve(A=alinop, B=bmat, E=emat, M=mlinop)
         assert list(x.shape) == xshape
