@@ -9,7 +9,8 @@ from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, grad
 from lintorch.funcs.solve import solve
 from lintorch.funcs.jac import jac
 from lintorch.core.linop import LinearOperator, checklinop
-from lintorch.core.editable_module import wrap_fcn
+from lintorch.core.editable_module import EditableModule, wrap_fcn
+from lintorch.utils.debugmodes import is_debug_enabled
 
 __all__ = ["equilibrium2", "rootfinder2"]
 
@@ -53,6 +54,11 @@ def rootfinder2(
         - a method in lt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
+    # perform implementation check if debug mode is enabled
+    if is_debug_enabled():
+        if inspect.ismethod(fcn) and instance(fcn.__self__, EditableModule):
+            fcn.__self__.assertparams(fcn.__name__, y0, *params)
+
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
@@ -97,6 +103,11 @@ def equilibrium2(
         - a method in lt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
+    # perform implementation check if debug mode is enabled
+    if is_debug_enabled():
+        if inspect.ismethod(fcn) and instance(fcn.__self__, EditableModule):
+            fcn.__self__.assertparams(fcn.__name__, y0, *params)
+
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
     def new_fcn(y, *params):

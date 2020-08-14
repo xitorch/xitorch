@@ -7,6 +7,7 @@ from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from lintorch.core.editable_module import EditableModule
+from lintorch.utils.debugmodes import is_debug_enabled
 
 __all__ = ["LinearOperator"]
 
@@ -306,17 +307,19 @@ class LinearOperator(EditableModule):
         return self._is_fullmatrix_implemented
 
     ############ debug functions ##############
-    def check(self, warn:bool=True) -> None:
+    def check(self, warn:Union[bool,None]=None) -> None:
         """
         Perform checks to make sure the linear operator behaves as a proper
         linear operator.
 
         Arguments
         ---------
-        * warn: bool
+        * warn: bool or None
             If True, then raises a warning to the user that the check might slow
             down the program. This is to remind the user to turn off the check
             when not in a debugging mode.
+            If None, it will raise a warning if it runs not in a debug mode, but
+            will be silent if it runs in a debug mode.
 
         Exceptions
         ----------
@@ -327,6 +330,8 @@ class LinearOperator(EditableModule):
             Raised if the linear operations do not behave as proper linear operations.
             (e.g. not scaling linearly)
         """
+        if warn is None:
+            warn = not is_debug_enabled()
         if warn:
             msg = "The linear operator check is performed. This might slow down your program."
             warnings.warn(msg, stacklevel=2)

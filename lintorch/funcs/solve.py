@@ -7,6 +7,7 @@ from lintorch.core.linop import LinearOperator
 from lintorch.utils.bcast import normalize_bcast_dims
 from lintorch.utils.assertfuncs import assert_runtime
 from lintorch.utils.misc import set_default_option
+from lintorch.utils.debugmodes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None,
@@ -46,6 +47,12 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         assert_runtime(E.shape[-1] == B.shape[-1], "The last dimension of E & B must match (E: %s, B: %s)" % (E.shape, B.shape))
     if E is None and M is not None:
         warnings.warn("M is supplied but will be ignored because E is not supplied")
+
+    # perform expensive check if debug mode is enabled
+    if is_debug_enabled():
+        A.check()
+        if M is not None:
+            M.check()
 
     if "method" not in fwd_options or fwd_options["method"].lower() == "exactsolve":
         return exactsolve(A, B, E, M)

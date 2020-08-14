@@ -2,6 +2,7 @@ import torch
 from typing import Union, Mapping, Any
 from lintorch.core.linop import LinearOperator
 from lintorch.utils.assertfuncs import assert_runtime
+from lintorch.utils.debugmodes import is_debug_enabled
 
 def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
         M:Union[LinearOperator,None]=None,
@@ -36,6 +37,12 @@ def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
     if M is not None:
         assert_runtime(M.is_hermitian, "The linear operator M must be Hermitian")
         assert_runtime(M.shape[-1] == A.shape[-1], "The shape of A & M must match (A: %s, M: %s)" % (A.shape, M.shape))
+
+    # perform expensive check if debug mode is enabled
+    if is_debug_enabled():
+        A.check()
+        if M is not None:
+            M.check()
 
     if "method" not in fwd_options or fwd_options["method"].lower() == "exacteig":
         return exacteig(A, neig, M)
