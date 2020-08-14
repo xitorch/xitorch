@@ -134,7 +134,7 @@ def test_correct():
         "method_list_correct": (b,),
     }
     for m in correct_methods:
-        model.assertparams(m, *correct_methods[m])
+        model.assertparams(getattr(model, m), *correct_methods[m])
 
 def test_error_getsetparams():
     error_methods = [
@@ -145,7 +145,7 @@ def test_error_getsetparams():
     for methodname in error_methods:
         try:
             print(methodname)
-            model.assertparams(methodname, b)
+            model.assertparams(getattr(model, methodname), b)
             assert False, "A GetSetParamsError must be raised in this case"
         except GetSetParamsError:
             pass
@@ -163,7 +163,7 @@ def test_warning_getsetparams():
     ]
     for methodname in warning_methods:
         with pytest.warns(UserWarning):
-            model.assertparams(methodname, b)
+            model.assertparams(getattr(model, methodname), b)
 
 ##############
 # test the wrap function to make it a functional

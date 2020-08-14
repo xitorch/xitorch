@@ -110,13 +110,13 @@ class EditableModule(object):
             self.setuniqueparams(methodname, *_orig_params_)
 
     ############# debugging #############
-    def assertparams(self, methodname, *args, **kwargs):
+    def assertparams(self, method, *args, **kwargs):
         """
         Perform a rigorous check on the implemented getparams and setparams
         in the class for a given method and its arguments (as well as keyword
         arguments)
         """
-        method = getattr(self, methodname)
+        methodname = method.__name__
 
         self.__assert_method_preserve(method, *args, **kwargs) # assert if the method preserve the float tensors of the object
         self.__assert_match_getsetparams(methodname) # check if getparams and setparams matched the tensors

@@ -56,8 +56,8 @@ def rootfinder2(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        if inspect.ismethod(fcn) and instance(fcn.__self__, EditableModule):
-            fcn.__self__.assertparams(fcn.__name__, y0, *params)
+        if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
+            fcn.__self__.assertparams(fcn, y0, *params)
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -105,8 +105,8 @@ def equilibrium2(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        if inspect.ismethod(fcn) and instance(fcn.__self__, EditableModule):
-            fcn.__self__.assertparams(fcn.__name__, y0, *params)
+        if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
+            fcn.__self__.assertparams(fcn, y0, *params)
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
