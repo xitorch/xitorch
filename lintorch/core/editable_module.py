@@ -182,6 +182,11 @@ class EditableModule(object):
         oper_names, oper_params = self.__list_operating_params(method, *args, **kwargs)
         user_names = self.getparamnames(method.__name__)
         user_params = [get_attr(self, name) for name in user_names]
+        user_params_id = [id(p) for p in user_params]
+        oper_params_id = [id(p) for p in oper_params]
+        user_params_id_set = set(user_params_id)
+        oper_params_id_set = set(oper_params_id)
+
 
         # check if the userparams contains non-tensor
         for i in range(len(user_params)):
@@ -193,7 +198,8 @@ class EditableModule(object):
         # check if there are missing parameters (present in operating params, but not in the user params)
         missing_names = []
         for i in range(len(oper_names)):
-            if oper_names[i] not in user_names:
+            if oper_params_id[i] not in user_params_id_set:
+            # if oper_names[i] not in user_names:
                 missing_names.append(oper_names[i])
         # if there are missing parameters, give a warning (because the program
         # can still run correctly, e.g. missing parameters are parameters that
@@ -205,7 +211,8 @@ class EditableModule(object):
         # check if there are excessive parameters (present in the user params, but not in the operating params)
         excess_names = []
         for i in range(len(user_names)):
-            if user_names[i] not in oper_names:
+            if user_params_id[i] not in oper_params_id_set:
+            # if user_names[i] not in oper_names:
                 excess_names.append(user_names[i])
         # if there are excess parameters, give warnings
         if len(excess_names) > 0:

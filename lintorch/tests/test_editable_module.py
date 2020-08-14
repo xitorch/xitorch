@@ -130,6 +130,8 @@ def test_correct():
         "method_correct_getsetparams": (b,),
         "method_correct_getsetparams2": (b,b),
         "method_duplicate_correct": (b,),
+        "method_duplicate_missing": (b,),
+        "method_duplicate_excess": (b,),
         "method_dict_correct": (b,),
         "method_list_correct": (b,),
     }
@@ -154,8 +156,6 @@ def test_warning_getsetparams():
     warning_methods = [
         "method_missing_getparams",
         "method_excess_getparams",
-        "method_duplicate_missing",
-        "method_duplicate_excess",
         "method_dict_missing",
         "method_dict_excess",
         "method_list_missing",
