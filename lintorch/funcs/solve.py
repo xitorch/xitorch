@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse.linalg import gmres
 from lintorch.core.linop import LinearOperator
 from lintorch.utils.bcast import normalize_bcast_dims
-from lintorch.utils.debug import assert_runtime
+from lintorch.utils.assertfuncs import assert_runtime
 from lintorch.utils.misc import set_default_option
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,

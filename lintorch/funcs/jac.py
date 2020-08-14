@@ -2,7 +2,7 @@ import torch
 from typing import Callable, List, Any, Union, Sequence
 from lintorch.core.linop import LinearOperator
 from lintorch.core.editable_module import wrap_fcn
-from lintorch.utils.debug import assert_type
+from lintorch.utils.assertfuncs import assert_type
 
 __all__ = ["jac", "hess"]
 
