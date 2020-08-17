@@ -6,11 +6,11 @@ from scipy.sparse.linalg import gmres
 from lintorch.core.linop import LinearOperator
 from lintorch.utils.bcast import normalize_bcast_dims
 from lintorch.utils.assertfuncs import assert_runtime
-from lintorch.utils.misc import set_default_option
+from lintorch.utils.misc import set_default_option, dummy_context_manager
 from lintorch.utils.debugmodes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
-          M:Union[LinearOperator,None]=None,
+          M:Union[LinearOperator,None]=None, posdef=False,
           fwd_options:Mapping[str,Any]={},
           bck_options:Mapping[str,Any]={}):
     """
@@ -59,12 +59,8 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     else:
         # get the unique parameters of A
         params = A.getlinopparams()
-        if M is not None:
-            mparams = M.getlinopparams()
-        else:
-            mparams = []
+        mparams = M.getlinopparams() if M is not None else []
         na = len(params)
-        posdef = False
         return solve_torchfcn.apply(
             A, B, E, M, posdef,
             fwd_options, bck_options,
@@ -92,11 +88,6 @@ class solve_torchfcn(torch.autograd.Function):
             "method": config["method"],
         }, bck_options)
 
-        # check the shape of the matrix
-        if A.shape[-2] != A.shape[-1]:
-            msg = "The solve function cannot be used for non-square transformation."
-            raise RuntimeError(msg)
-
         method = config["method"].lower()
         if method == "gmres":
             x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
@@ -122,9 +113,9 @@ class solve_torchfcn(torch.autograd.Function):
         # this is the grad of B
         AT = ctx.A.H # (*BA, nr, nr)
         MT = ctx.M.H if ctx.M is not None else None # (*BM, nr, nr)
-        v = solve_torchfcn.apply(AT, grad_x, ctx.E, ctx.M, ctx.posdef,
-                ctx.bck_config, ctx.bck_config,
-                ctx.na, *ctx.params, *ctx.mparams) # (*BABEM, nr, ncols)
+        with AT.uselinopparams(*ctx.params), MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
+            v = solve(AT, grad_x, ctx.E, MT, posdef=ctx.posdef,
+                fwd_options=ctx.bck_config, bck_options=ctx.bck_config) # (*BABEM, nr, ncols)
         grad_B = v
 
         # calculate the biases gradient
@@ -133,14 +124,14 @@ class solve_torchfcn(torch.autograd.Function):
             if ctx.M is None:
                 Mx = ctx.x
             else:
-                with ctx.M.useuniqueparams("mm", *ctx.mparams):
+                with ctx.M.uselinopparams(*ctx.mparams):
                     Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
             grad_E = (v * Mx).sum(dim=-2) # (*BABEM, ncols)
 
         # calculate the grad of matrices parameters
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
-            with ctx.A.useuniqueparams("mm", *params):
+            with ctx.A.uselinopparams(*params):
                 loss = -ctx.A.mm(ctx.x) # (*BABEM, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
@@ -152,7 +143,7 @@ class solve_torchfcn(torch.autograd.Function):
             with torch.enable_grad():
                 mparams = [p.clone() for p in ctx.mparams]
                 lmbdax = ctx.x * ctx.biases.unsqueeze(1)
-                with ctx.M.useuniqueparams("mm", *mparams):
+                with ctx.M.uselinopparams(*mparams):
                     mloss = ctx.M.mm(lmbdax)
 
             grad_mparams = torch.autograd.grad((mloss,), mparams,

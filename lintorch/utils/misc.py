@@ -1,3 +1,4 @@
+import contextlib
 import torch
 
 def set_default_option(defopt, opt=None):
@@ -16,3 +17,7 @@ def extract_differentiable_tensors(model):
         if var.requires_grad:
             res.append(var)
     return res
+
+@contextlib.contextmanager
+def dummy_context_manager():
+    yield None
