@@ -67,20 +67,6 @@ def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     """
     idxs_list = _setup_idxs(idxs, params)
 
-    def get_deriv_fcn(fcn, params, i):
-        def deriv_fcn(*inputparams):
-            y = fcn(*inputparams)
-
-            # check if output of fcn has only 1 elements
-            if torch.numel(y) != 1:
-                raise RuntimeError("The number of output elements of fcn for hess must be 1")
-
-            return torch.autograd.grad(y, (inputparams[i],), retain_graph=True,
-                create_graph=torch.is_grad_enabled())[0]
-        return deriv_fcn
-
-    # res = [jac(get_deriv_fcn(fcn, params, i), params=params, idxs=i) for i in idxs_list]
-
     # make the function a functional (depends on all parameters in the object)
     fcn, params = wrap_fcn(fcn, params)
     res = [_Hess(fcn, params, idx) for idx in idxs_list]
