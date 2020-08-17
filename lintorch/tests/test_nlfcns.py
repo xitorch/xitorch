@@ -74,14 +74,14 @@ def test_rootfinder(dtype, device):
 
         model = clss(A, addx=True)
         model.set_diag_bias(diag, bias)
-        y = lt.rootfinder2(model.forward, y0)
+        y = lt.rootfinder(model.forward, y0)
         f = model.forward(y)
         assert torch.allclose(f*0, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=True)
             model.set_diag_bias(diag, bias)
-            y = lt.rootfinder2(model.forward, y0)
+            y = lt.rootfinder(model.forward, y0)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -104,14 +104,14 @@ def test_equil(dtype, device):
 
         model = DummyModule(A, addx=False)
         model.set_diag_bias(diag, bias)
-        y = lt.equilibrium2(model.forward, y0)
+        y = lt.equilibrium(model.forward, y0)
         f = model.forward(y)
         assert torch.allclose(y, f)
 
         def getloss(A, y0, diag, bias):
             model = DummyModule(A, addx=False)
             model.set_diag_bias(diag, bias)
-            y = lt.equilibrium2(model.forward, y0)
+            y = lt.equilibrium(model.forward, y0)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))

@@ -12,9 +12,9 @@ from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import EditableModule, wrap_fcn
 from lintorch.utils.debugmodes import is_debug_enabled
 
-__all__ = ["equilibrium2", "rootfinder2"]
+__all__ = ["equilibrium", "rootfinder"]
 
-def rootfinder2(
+def rootfinder(
         fcn:Callable[[torch.Tensor],torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
@@ -63,7 +63,7 @@ def rootfinder2(
     all_params = all_params[1:] # to exclude y0
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
-def equilibrium2(
+def equilibrium(
         fcn:Callable[[torch.Tensor],torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
