@@ -143,8 +143,8 @@ class lsymeig_torchfcn(torch.autograd.Function):
         gevalsA = grad_evals.unsqueeze(-2) * evecs # (*BAM, na, neig)
 
         # calculate the contributions from the eigenvectors
-        # orthogonalize the grad_evecs with evecs
         with M.uselinopparams(*ctx.mparams) if M is not None else dummy_context_manager():
+            # orthogonalize the grad_evecs with evecs
             B = ortho(grad_evecs, evecs, dim=-2, M=M, mright=False)
             with A.uselinopparams(*ctx.params):
                 gevecs = solve(A, -B, evals, M, fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
@@ -171,7 +171,6 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
             # the contribution from the parallel elements
             gevecsM_par = (-0.5 * torch.einsum("...ae,...ae->...e", grad_evecs, evecs)).unsqueeze(-2) * evecs # (*BAM, na, neig)
-            # gevecsM_par = -0.5 * (grad_evecs * evecs).sum(dim=-2, keepdim=True) * evecs
 
             gaccumM = gevalsM + gevecsM + gevecsM_par
             grad_mparams = torch.autograd.grad(
