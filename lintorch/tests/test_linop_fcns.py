@@ -145,9 +145,9 @@ def test_symeig_A_large():
 
         # the matrix's eigenvalues will be around arange(na)
         if mode == "lowest":
-            assert (eigvals < na*0.5).all()
+            assert (eigvals < neig * 2).all()
         elif mode == "uppermost":
-            assert (eigvals > na*0.5).all()
+            assert (eigvals > na - neig * 2).all()
 
         assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
         assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
