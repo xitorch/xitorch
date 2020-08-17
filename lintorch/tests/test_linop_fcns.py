@@ -43,13 +43,16 @@ def test_lsymeig_mismatch_err():
 
 def test_lsymeig_A():
     shapes = [(4,4), (2,4,4), (2,3,4,4)]
-    for shape in shapes:
+    methods = ["exacteig", "davidson"]
+    for shape, method in itertools.product(shapes, methods):
         mat1 = torch.rand(shape, dtype=torch.float64)
         mat1 = mat1 + mat1.transpose(-2,-1)
+        mat1 = mat1.requires_grad_()
         linop1 = LinearOperator.m(mat1, True)
+        fwd_options = {"method": method}
 
         for neig in [2,shape[-1]]:
-            eigvals, eigvecs = lsymeig(linop1, neig=neig) # eigvals: (..., neig), eigvecs: (..., na, neig)
+            eigvals, eigvecs = lsymeig(linop1, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
             assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
             assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
 
@@ -57,27 +60,56 @@ def test_lsymeig_A():
             xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
             assert torch.allclose(ax, xe)
 
+            # only perform gradcheck if neig is full, to reduce the computational cost
+            if neig == shape[-1]:
+                def lsymeig_fcn(amat):
+                    amat = (amat + amat.transpose(-2,-1)) * 0.5 # symmetrize
+                    alinop = LinearOperator.m(amat, is_hermitian=True)
+                    eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, fwd_options=fwd_options)
+                    return eigvals_, eigvecs_
+
+                gradcheck(lsymeig_fcn, (mat1,))
+                gradgradcheck(lsymeig_fcn, (mat1,))
+
 def test_lsymeig_AM():
     shapes = [(3,3), (2,3,3), (2,1,3,3)]
+    methods = ["exacteig", "davidson"]
     dtype = torch.float64
-    for ashape,mshape in itertools.product(shapes, shapes):
+    for ashape,mshape,method in itertools.product(shapes, shapes, methods):
         mata = torch.rand(ashape, dtype=dtype)
         matm = torch.rand(mshape, dtype=dtype) + torch.eye(mshape[-1], dtype=dtype) # make sure it's not singular
         mata = mata + mata.transpose(-2,-1)
         matm = matm + matm.transpose(-2,-1)
+        mata = mata.requires_grad_()
+        matm = matm.requires_grad_()
         linopa = LinearOperator.m(mata, True)
         linopm = LinearOperator.m(matm, True)
+        fwd_options = {"method": method}
 
         na = ashape[-1]
         bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
         for neig in [2,ashape[-1]]:
-            eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig) # eigvals: (..., neig)
+            eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig)
             assert list(eigvals.shape) == list([*bshape, neig])
             assert list(eigvecs.shape) == list([*bshape, na, neig])
 
             ax = linopa.mm(eigvecs)
             mxe = linopm.mm(torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1)))
             assert torch.allclose(ax, mxe)
+
+            # only perform gradcheck if neig is full, to reduce the computational cost
+            if neig == ashape[-1]:
+                def lsymeig_fcn(amat, mmat):
+                    # symmetrize
+                    amat = (amat + amat.transpose(-2,-1)) * 0.5
+                    mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+                    alinop = LinearOperator.m(amat, is_hermitian=True)
+                    mlinop = LinearOperator.m(mmat, is_hermitian=True)
+                    eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, fwd_options=fwd_options)
+                    return eigvals_, eigvecs_
+
+                gradcheck(lsymeig_fcn, (mata, matm))
+                gradgradcheck(lsymeig_fcn, (mata, matm))
 
 ############## solve ##############
 def test_solve_nonsquare_err():
