@@ -86,10 +86,7 @@ def exacteig(A:LinearOperator, neig:Union[int,None],
         neig = A.shape[-1]
     if M is None:
         evals, evecs = torch.symeig(Amatrix, eigenvectors=True) # (*BA, q), (*BA, q, q)
-        if mode == "lowest":
-            return evals[...,:neig], evecs[...,:neig]
-        else: # uppest
-            return evals[...,neig:], evecs[...,neig:]
+        return _take_eigpairs(evals, evecs, neig, mode)
     else:
         Mmatrix = M.fullmatrix() # (*BM, q, q)
 
@@ -104,12 +101,7 @@ def exacteig(A:LinearOperator, neig:Union[int,None],
         # calculate the eigenvalues and eigenvectors
         # (the eigvecs are normalized in M-space)
         evals, evecs = torch.symeig(A2, eigenvectors=True) # (*BAM, q, q)
-        if mode == "lowest":
-            evals = evals[...,:neig] # (*BAM, neig)
-            evecs = evecs[...,:neig] # (*BAM, q, neig)
-        else: # uppest
-            evals = evals[...,neig:] # (*BAM, neig)
-            evecs = evecs[...,neig:] # (*BAM, q, neig)
+        evals, evecs = _take_eigpairs(evals, evecs, neig, mode) # (*BAM, neig) and (*BAM, q, neig)
         evecs = torch.matmul(LinvT, evecs)
         return evals, evecs
 
@@ -238,6 +230,10 @@ def davidson(A, params, neig, mode, M=None, mparams=[], **options):
     * eigvecs: torch.tensor (*BAM, na, neig)
         The `neig` lowest eigenpairs
     """
+    # TODO: optimize for large linear operator and strict min_eps
+    # Ideas:
+    # (1) use better strategy to get the estimate on eigenvalues
+    # (2) use restart strategy
     config = set_default_option({
         "max_niter": 1000,
         "nguess": neig, # number of initial guess
@@ -280,7 +276,7 @@ def davidson(A, params, neig, mode, M=None, mparams=[], **options):
         # V = V.reshape(*bcast_dims, na, nguess) # (*BAM, na, nguess)
 
         # estimating the lowest eigenvalues
-        min_eig_est, rms_eig = _estimate_eigvals(A, neig, mode,
+        eig_est, rms_eig = _estimate_eigvals(A, neig, mode,
             bcast_dims=bcast_dims, na=na, ntest=20,
             dtype=V.dtype, device=V.device)
 
@@ -297,12 +293,7 @@ def davidson(A, params, neig, mode, M=None, mparams=[], **options):
             # eigvals are sorted from the lowest
             # eval: (*BAM, nguess), evec: (*BAM, nguess, nguess)
             eigvalT, eigvecT = torch.symeig(T, eigenvectors=True)
-            if mode == "lowest":
-                eigvalT = eigvalT[...,:neig] # (*BAM,neig)
-                eigvecT = eigvecT[...,:neig] # (*BAM,nguess,neig)
-            else: # uppest
-                eigvalT = eigvalT[...,neig:] # (*BAM,neig)
-                eigvecT = eigvecT[...,neig:] # (*BAM,nguess,neig)
+            eigvalT, eigvecT = _take_eigpairs(eigvalT, eigvecT, neig, mode) # (*BAM, neig) and (*BAM, nguess, neig)
 
             # calculate the eigenvectors of A
             eigvecA = torch.matmul(V, eigvecT) # (*BAM, na, neig)
@@ -336,7 +327,7 @@ def davidson(A, params, neig, mode, M=None, mparams=[], **options):
             # apply the preconditioner
             # initial guess of the eigenvalues are actually help really much
             if not shift_is_eigvalT:
-                z = min_eig_est # (*BAM,neig)
+                z = eig_est # (*BAM,neig)
             else:
                 z = eigvalT # (*BAM,neig)
             # if A.is_precond_set():
@@ -351,9 +342,9 @@ def davidson(A, params, neig, mode, M=None, mparams=[], **options):
                 if diff_eigvalT.abs().max() < rms_eig*1e-2:
                     shift_is_eigvalT = True
                 else:
-                    change_idx = min_eig_est > eigvalT
+                    change_idx = eig_est > eigvalT
                     next_value = eigvalT - 2*diff_eigvalT
-                    min_eig_est[change_idx] = next_value[change_idx]
+                    eig_est[change_idx] = next_value[change_idx]
 
             # orthogonalize t with the rest of the V
             t = to_fortran_order(t)
@@ -411,3 +402,14 @@ def _estimate_eigvals(A, neig, mode, bcast_dims, na, ntest, dtype, device):
         eig_est = mean_eig + 2*rms_eig # (*BAM,)
     eig_est = eig_est.unsqueeze(-1).repeat_interleave(repeats=neig, dim=-1) # (*BAM,neig)
     return eig_est, rms_eig.max()
+
+def _take_eigpairs(eival, eivec, neig, mode):
+    # eival: (*BV, na)
+    # eivec: (*BV, na, na)
+    if mode == "lowest":
+        eival = eival[...,:neig]
+        eivec = eivec[...,:neig]
+    else: # uppest
+        eival = eival[...,-neig:]
+        eivec = eivec[...,-neig:]
+    return eival, eivec

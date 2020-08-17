@@ -3,7 +3,7 @@ import torch
 import pytest
 from torch.autograd import gradcheck, gradgradcheck
 from lintorch.core.linop import LinearOperator
-from lintorch.funcs.symeig import lsymeig
+from lintorch.funcs.symeig import lsymeig, symeig
 from lintorch.funcs.solve import solve
 from lintorch.utils.bcast import get_bcasted_dims
 
@@ -110,6 +110,51 @@ def test_lsymeig_AM():
 
                 gradcheck(lsymeig_fcn, (mata, matm))
                 gradgradcheck(lsymeig_fcn, (mata, matm))
+
+def test_symeig_A_large():
+    class ALarge(LinearOperator):
+        def __init__(self, shape, dtype):
+            super(ALarge, self).__init__(shape,
+                is_hermitian=True,
+                dtype=dtype)
+            na = shape[-1]
+            self.b = torch.arange(na, dtype=dtype).repeat(*shape[:-2], 1)
+
+        def _mv(self, x):
+            # x: (*BX, na)
+            xb = x * self.b
+            xsmall = x * 1e-3
+            xp1 = torch.roll(xsmall, shifts=1, dims=-1)
+            xm1 = torch.roll(xsmall, shifts=-1, dims=-1)
+            return xb + xp1 + xm1
+
+        def _getparamnames(self):
+            return ["b"]
+
+    na = 1000
+    shapes = [(na,na), (2,na,na), (2,3,na,na)]
+    methods = ["davidson"]
+    modes = ["uppermost", "lowest"]
+    neig = 2
+    dtype = torch.float64
+    for shape, method, mode in itertools.product(shapes, methods, modes):
+        linop1 = ALarge(shape, dtype=dtype)
+        fwd_options = {"method": method, "min_eps": 1e-8}
+
+        eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
+
+        # the matrix's eigenvalues will be around arange(na)
+        if mode == "lowest":
+            assert (eigvals < na*0.5).all()
+        elif mode == "uppermost":
+            assert (eigvals > na*0.5).all()
+
+        assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
+        assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
+
+        ax = linop1.mm(eigvecs)
+        xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
+        assert torch.allclose(ax, xe)
 
 ############## solve ##############
 def test_solve_nonsquare_err():
@@ -267,3 +312,6 @@ def test_solve_AEM():
         ax = alinop.mm(x)
         mxe = mlinop.mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
         assert torch.allclose(ax - mxe, bmat)
+
+if __name__ == "__main__":
+    test_symeig_A_large()
