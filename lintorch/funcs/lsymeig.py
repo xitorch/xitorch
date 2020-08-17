@@ -10,8 +10,20 @@ from lintorch.utils.bcast import get_bcasted_dims
 from lintorch.utils.misc import set_default_option, dummy_context_manager
 from lintorch.utils.tensor import tallqr, to_fortran_order, ortho
 
+__all__ = ["lsymeig", "usymeig", "symeig"]
+
 def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
         M:Union[LinearOperator,None]=None,
+        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
+    return symeig(A, neig, "lowest", M, fwd_options, bck_options)
+
+def usymeig(A:LinearOperator, neig:Union[int,None]=None,
+        M:Union[LinearOperator,None]=None,
+        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
+    return symeig(A, neig, "uppest", M, fwd_options, bck_options)
+
+def symeig(A:LinearOperator, neig:Union[int,None]=None,
+        mode:str="lowest", M:Union[LinearOperator,None]=None,
         fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a linear operator.
@@ -24,6 +36,9 @@ def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
     * neig: int or None
         The number of eigenpairs to be retrieved. If None, all eigenpairs are
         retrieved
+    * mode: str
+        "lowest" or "uppermost"/"uppest". If "lowest", it will take the lowest
+        `neig` eigenpairs. If "uppest", it will take the uppermost `neig`.
     * M: lintorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
         The transformation on the right hand side. If None, then M=I.
     * fwd_options: dict with str as key
@@ -43,6 +58,9 @@ def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
     if M is not None:
         assert_runtime(M.is_hermitian, "The linear operator M must be Hermitian")
         assert_runtime(M.shape[-1] == A.shape[-1], "The shape of A & M must match (A: %s, M: %s)" % (A.shape, M.shape))
+    mode = mode.lower()
+    if mode == "uppermost":
+        mode = "uppest"
 
     # perform expensive check if debug mode is enabled
     if is_debug_enabled():
@@ -51,23 +69,27 @@ def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
             M.check()
 
     if "method" not in fwd_options or fwd_options["method"].lower() == "exacteig":
-        return exacteig(A, neig, M)
+        return exacteig(A, neig, mode, M)
     else:
         # get the unique parameters of A & M
         params = A.getlinopparams()
         mparams = M.getlinopparams() if M is not None else []
         na = len(params)
-        return lsymeig_torchfcn.apply(A, neig, M,
+        return symeig_torchfcn.apply(A, neig, mode, M,
             fwd_options, bck_options,
             na, *params, *mparams)
 
-def exacteig(A:LinearOperator, neig:Union[int,None], M:Union[LinearOperator,None]):
+def exacteig(A:LinearOperator, neig:Union[int,None],
+        mode:str, M:Union[LinearOperator,None]):
     Amatrix = A.fullmatrix() # (*BA, q, q)
     if neig is None:
         neig = A.shape[-1]
     if M is None:
         evals, evecs = torch.symeig(Amatrix, eigenvectors=True) # (*BA, q), (*BA, q, q)
-        return evals[...,:neig], evecs[...,:neig]
+        if mode == "lowest":
+            return evals[...,:neig], evecs[...,:neig]
+        else: # uppest
+            return evals[...,neig:], evecs[...,neig:]
     else:
         Mmatrix = M.fullmatrix() # (*BM, q, q)
 
@@ -82,14 +104,18 @@ def exacteig(A:LinearOperator, neig:Union[int,None], M:Union[LinearOperator,None
         # calculate the eigenvalues and eigenvectors
         # (the eigvecs are normalized in M-space)
         evals, evecs = torch.symeig(A2, eigenvectors=True) # (*BAM, q, q)
-        evals = evals[...,:neig] # (*BAM, neig)
-        evecs = evecs[...,:neig] # (*BAM, q, neig)
+        if mode == "lowest":
+            evals = evals[...,:neig] # (*BAM, neig)
+            evecs = evecs[...,:neig] # (*BAM, q, neig)
+        else: # uppest
+            evals = evals[...,neig:] # (*BAM, neig)
+            evecs = evecs[...,neig:] # (*BAM, q, neig)
         evecs = torch.matmul(LinvT, evecs)
         return evals, evecs
 
-class lsymeig_torchfcn(torch.autograd.Function):
+class symeig_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, neig, M, fwd_options, bck_options, na, *amparams):
+    def forward(ctx, A, neig, mode, M, fwd_options, bck_options, na, *amparams):
         # A: LinearOperator (*BA, q, q)
         # M: LinearOperator (*BM, q, q) or None
 
@@ -105,7 +131,7 @@ class lsymeig_torchfcn(torch.autograd.Function):
 
         method = config["method"].lower()
         if method == "davidson":
-            evals, evecs = davidson(A, params, neig, M, mparams, **config)
+            evals, evecs = davidson(A, params, neig, mode, M, mparams, **config)
         else:
             raise RuntimeError("Unknown eigen decomposition method: %s" % config["method"])
 
@@ -180,9 +206,9 @@ class lsymeig_torchfcn(torch.autograd.Function):
                 create_graph=torch.is_grad_enabled(),
             )
 
-        return (None, None, None, None, None, None, *grad_params, *grad_mparams)
+        return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
 
-def davidson(A, params, neig, M=None, mparams=[], **options):
+def davidson(A, params, neig, mode, M=None, mparams=[], **options):
     """
     Iterative methods to obtain the `neig` lowest eigenvalues and eigenvectors.
     This function is written so that the backpropagation can be done.
@@ -197,6 +223,8 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         List of differentiable torch.tensor to be put to A.
     * neig: int
         The number of eigenpairs to be retrieved.
+    * mode: str
+        Take the `neig` "lowest" or "uppest" of the eigenpairs.
     * M: LinearOperator instance (*BM, na, na) or None
         The transformation on the right hand side. If None, then M=I.
     * mparams: list of differentiable torch.tensor of any shapes
@@ -252,7 +280,7 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
         # V = V.reshape(*bcast_dims, na, nguess) # (*BAM, na, nguess)
 
         # estimating the lowest eigenvalues
-        min_eig_est, rms_eig = _estimate_lowest_eigvals(A, neig,
+        min_eig_est, rms_eig = _estimate_eigvals(A, neig, mode,
             bcast_dims=bcast_dims, na=na, ntest=20,
             dtype=V.dtype, device=V.device)
 
@@ -269,8 +297,12 @@ def davidson(A, params, neig, M=None, mparams=[], **options):
             # eigvals are sorted from the lowest
             # eval: (*BAM, nguess), evec: (*BAM, nguess, nguess)
             eigvalT, eigvecT = torch.symeig(T, eigenvectors=True)
-            eigvalT = eigvalT[...,:neig] # (*BAM,neig)
-            eigvecT = eigvecT[...,:neig] # (*BAM,nguess,neig)
+            if mode == "lowest":
+                eigvalT = eigvalT[...,:neig] # (*BAM,neig)
+                eigvecT = eigvecT[...,:neig] # (*BAM,nguess,neig)
+            else: # uppest
+                eigvalT = eigvalT[...,neig:] # (*BAM,neig)
+                eigvecT = eigvecT[...,neig:] # (*BAM,nguess,neig)
 
             # calculate the eigenvectors of A
             eigvecA = torch.matmul(V, eigvecT) # (*BAM, na, neig)
@@ -363,7 +395,7 @@ def _set_initial_v(vinit_type, dtype, device, batch_dims, na, nguess,
         V, R = tallqr(V)
     return V
 
-def _estimate_lowest_eigvals(A, neig, bcast_dims, na, ntest, dtype, device):
+def _estimate_eigvals(A, neig, mode, bcast_dims, na, ntest, dtype, device):
     # estimate the lowest eigen value
     x = torch.randn((*bcast_dims, na, ntest), dtype=dtype, device=device) # (*BAM, na, ntest)
     x = x / x.norm(dim=-2, keepdim=True)
@@ -373,6 +405,9 @@ def _estimate_lowest_eigvals(A, neig, bcast_dims, na, ntest, dtype, device):
     std_f = (xTAx).std(dim=-1) # (*BAM,)
     std_x2 = (x*x).std()
     rms_eig = (std_f / std_x2) / (na**0.5) # (*BAM,)
-    min_eig_est = mean_eig - 2*rms_eig # (*BAM,)
-    min_eig_est = min_eig_est.unsqueeze(-1).repeat_interleave(repeats=neig, dim=-1) # (*BAM,neig)
-    return min_eig_est, rms_eig.max()
+    if mode == "lowest":
+        eig_est = mean_eig - 2*rms_eig # (*BAM,)
+    else: # uppest
+        eig_est = mean_eig + 2*rms_eig # (*BAM,)
+    eig_est = eig_est.unsqueeze(-1).repeat_interleave(repeats=neig, dim=-1) # (*BAM,neig)
+    return eig_est, rms_eig.max()
