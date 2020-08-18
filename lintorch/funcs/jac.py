@@ -139,7 +139,7 @@ class _Jac(LinearOperator):
         dfdyfs = []
         for i in range(nbatch):
             dfdyf, = torch.autograd.grad(dfdy, (v,), grad_outputs=gy1[i].reshape(*self.inshape),
-                create_graph=torch.is_grad_enabled()) # (*nout)
+                retain_graph=True, create_graph=torch.is_grad_enabled()) # (*nout)
             dfdyfs.append(dfdyf.unsqueeze(0))
         dfdyfs = torch.cat(dfdyfs, dim=0) # (nbatch, *nout)
 
