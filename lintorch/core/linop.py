@@ -99,7 +99,8 @@ class LinearOperator(EditableModule):
             self.setuniqueparams(methodname, *params)
             yield self
         except Exception as exc:
-            traceback.print_exc()
+            raise exc
+            # traceback.print_exc()
         finally:
             self.setuniqueparams(methodname, *_orig_params_)
 

@@ -350,7 +350,8 @@ def NNModuleUseParams(nnmodule, names, params):
         yield nnmodule
 
     except Exception as exc:
-        tb.print_exc()
+        raise exc
+        # tb.print_exc()
     finally:
         # restore back the saved tensors
         for (name, param) in zip(names, state_tensors):

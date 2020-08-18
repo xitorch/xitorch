@@ -93,7 +93,8 @@ def _useparams(module, names, params, unique_map):
         yield module
 
     except Exception as exc:
-        tb.print_exc()
+        raise exc
+        # tb.print_exc()
     finally:
         # restore back the saved tensors
         for (name, new_param, old_param) in zip(names, params, state_tensors):
