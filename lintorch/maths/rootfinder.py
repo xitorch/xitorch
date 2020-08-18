@@ -280,7 +280,7 @@ def lbfgs(f, x0, jinv0=1.0, **options):
     ---------
     * f: callable
         Callable that takes params as the input and output nfeat-outputs.
-    * x0: torch.tensor (nbatch, nfeat)
+    * x0: torch.tensor (*, nfeat)
         Initial value of parameters to be put in the function, f.
     * jinv0: float or torch.tensor (nbatch, nfeat, nfeat)
         The initial inverse of the Jacobian. If float, it will be the diagonal.
@@ -309,29 +309,29 @@ def lbfgs(f, x0, jinv0=1.0, **options):
     alpha = config["alpha0"]
 
     # set up the initial jinv and the memories
-    H0 = _set_jinv0_diag(jinv0, x0) # (nbatch, nfeat)
+    H0 = _set_jinv0_diag(jinv0, x0) # (*, nfeat)
     sk_history = []
     yk_history = []
     rk_history = []
 
     def _apply_Vk(rk, sk, yk, grad):
-        # sk: (nbatch, nfeat)
-        # yk: (nbatch, nfeat)
-        # rk: (nbatch, 1)
+        # sk: (*, nfeat)
+        # yk: (*, nfeat)
+        # rk: (*, 1)
         return grad - (sk * grad).sum(dim=-1, keepdim=True) * rk * yk
 
     def _apply_VkT(rk, sk, yk, grad):
-        # sk: (nbatch, nfeat)
-        # yk: (nbatch, nfeat)
-        # rk: (nbatch, 1)
+        # sk: (*, nfeat)
+        # yk: (*, nfeat)
+        # rk: (*, 1)
         return grad - (yk * grad).sum(dim=-1, keepdim=True) * rk * sk
 
     def _apply_Hk(H0, sk_hist, yk_hist, rk_hist, gk):
-        # H0: (nbatch, nfeat)
-        # sk: (nbatch, nfeat)
-        # yk: (nbatch, nfeat)
-        # rk: (nbatch, 1)
-        # gk: (nbatch, nfeat)
+        # H0: (*, nfeat)
+        # sk: (*, nfeat)
+        # yk: (*, nfeat)
+        # rk: (*, 1)
+        # gk: (*, nfeat)
         nhist = len(sk_hist)
         if nhist == 0:
             return H0 * gk
@@ -369,9 +369,9 @@ def lbfgs(f, x0, jinv0=1.0, **options):
         xknew, gknew = _line_search(xk, gk, dk, f)
 
         # store the history
-        sk = xknew - xk # (nbatch, nfeat)
+        sk = xknew - xk # (*, nfeat)
         yk = gknew - gk
-        inv_rhok = 1.0 / (sk * yk).sum(dim=-1, keepdim=True) # (nbatch, 1)
+        inv_rhok = 1.0 / (sk * yk).sum(dim=-1, keepdim=True) # (*, 1)
         sk_history.append(sk)
         yk_history.append(yk)
         rk_history.append(inv_rhok)
