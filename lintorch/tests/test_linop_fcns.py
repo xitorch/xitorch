@@ -211,7 +211,8 @@ def test_solve_A():
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
     methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
-    hermits = [True, False]
+    # hermitian check here to make sure the gradient propagated symmetrically
+    hermits = [False, True]
     for ashape, bshape, method, hermit in itertools.product(shapes, shapes, methods, hermits):
         print(ashape, bshape, method, hermit)
 
@@ -230,9 +231,8 @@ def test_solve_A():
         bmat = bmat.requires_grad_()
 
         def solvefcn(amat, bmat):
-            if hermit:
-                amat = (amat + amat.transpose(-2,-1)) * 0.5
-            alinop = LinearOperator.m(amat)
+            # is_hermitian=hermit is required to force the hermitian status in numerical gradient
+            alinop = LinearOperator.m(amat, is_hermitian=hermit)
             x = solve(A=alinop, B=bmat,
                 fwd_options=fwd_options,
                 bck_options=bck_options)
@@ -244,7 +244,6 @@ def test_solve_A():
         ax = LinearOperator.m(amat).mm(x)
         assert torch.allclose(ax, bmat)
 
-        # grad check only performed at AEM, to save time
         gradcheck(solvefcn, (amat, bmat))
         gradgradcheck(solvefcn, (amat, bmat))
 

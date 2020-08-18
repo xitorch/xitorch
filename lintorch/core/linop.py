@@ -407,7 +407,8 @@ class _MatrixHermitLinOp(LinearOperator):
             dtype = mat.dtype,
             device = mat.device
         )
-        self.mat = mat
+        # make sure the gradient is symmetrically distributed in the matrix
+        self.mat = (mat + mat.transpose(-2,-1)) * 0.5
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
