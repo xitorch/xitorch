@@ -210,16 +210,18 @@ def test_solve_A():
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
-    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
+    # custom exactsolve to check the backward implementation
+    methods = ["exactsolve", "custom_exactsolve", "lbfgs"]
     # hermitian check here to make sure the gradient propagated symmetrically
     hermits = [False, True]
     for ashape, bshape, method, hermit in itertools.product(shapes, shapes, methods, hermits):
         print(ashape, bshape, method, hermit)
+        checkgrad = method.endswith("exactsolve")
 
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
-        fwd_options = {"method": method}
+        fwd_options = {"method": method, "min_eps": 1e-9}
         bck_options = {"method": method}
 
         amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
@@ -244,8 +246,9 @@ def test_solve_A():
         ax = LinearOperator.m(amat).mm(x)
         assert torch.allclose(ax, bmat)
 
-        gradcheck(solvefcn, (amat, bmat))
-        gradgradcheck(solvefcn, (amat, bmat))
+        if checkgrad:
+            gradcheck(solvefcn, (amat, bmat))
+            gradgradcheck(solvefcn, (amat, bmat))
 
 # TODO: use fixtures' params to iterate the methods
 def test_solve_A_gmres():
@@ -285,12 +288,11 @@ def test_solve_AE():
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
+    methods = ["exactsolve", "custom_exactsolve", "lbfgs"] # custom exactsolve to check the backward implementation
     dtype = torch.float64
-    for abshape, eshape, method in itertools.product(shapes, shapes, methods):
-        ashape = abshape
-        bshape = abshape
-        print(abshape, eshape, method)
+    for ashape, bshape, eshape, method in itertools.product(shapes, shapes, shapes, methods):
+        print(ashape, bshape, eshape, method)
+        checkgrad = method.endswith("exactsolve")
 
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
@@ -322,30 +324,32 @@ def test_solve_AE():
         assert torch.allclose(ax - xe, bmat)
 
         # grad check only performed at AEM, to save time
-        # gradcheck(solvefcn, (amat, bmat, emat))
-        # gradgradcheck(solvefcn, (amat, bmat, emat))
+        # if checkgrad:
+        #     gradcheck(solvefcn, (amat, bmat, emat))
+        #     gradgradcheck(solvefcn, (amat, bmat, emat))
 
 def test_solve_AEM():
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
-    methods = ["exactsolve", "custom_exactsolve"]
+    methods = ["exactsolve", "custom_exactsolve", "lbfgs"]
     for abeshape, mshape, method in itertools.product(shapes, shapes, methods):
         ashape = abeshape
         bshape = abeshape
         eshape = abeshape
         print(abeshape, mshape, method)
+        checkgrad = method.endswith("exactsolve")
 
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
         eshape = [*eshape[:-2], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1], mshape[:-2])) + [na, ncols]
-        fwd_options = {"method": method}
+        fwd_options = {"method": method, "min_eps": 1e-9}
         bck_options = {"method": method} # exactsolve at backward just to test the forward solve
 
         amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
-        mmat = torch.rand(mshape, dtype=dtype) * 0.1 + torch.eye(mshape[-1], dtype=dtype)
+        mmat = torch.rand(mshape, dtype=dtype) * 0.1 + torch.eye(mshape[-1], dtype=dtype) * 0.5
         bmat = torch.rand(bshape, dtype=dtype)
         emat = torch.rand(eshape, dtype=dtype)
         mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
@@ -373,8 +377,9 @@ def test_solve_AEM():
         assert torch.allclose(y, bmat)
 
         # gradient checker
-        gradcheck(solvefcn, (amat, mmat, bmat, emat))
-        gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
+        if checkgrad:
+            gradcheck(solvefcn, (amat, mmat, bmat, emat))
+            gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
 
 if __name__ == "__main__":
     test_symeig_A_large()
