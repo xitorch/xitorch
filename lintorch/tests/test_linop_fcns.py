@@ -7,10 +7,11 @@ from lintorch.funcs.symeig import lsymeig, symeig
 from lintorch.funcs.solve import solve
 from lintorch.utils.bcast import get_bcasted_dims
 
-torch.manual_seed(12345)
+seed = 12345
 
 ############## lsymeig ##############
 def test_lsymeig_nonhermit_err():
+    torch.manual_seed(seed)
     mat = torch.rand((3,3))
     linop = LinearOperator.m(mat, False)
     linop2 = LinearOperator.m(mat+mat.transpose(-2,-1), True)
@@ -28,6 +29,7 @@ def test_lsymeig_nonhermit_err():
         pass
 
 def test_lsymeig_mismatch_err():
+    torch.manual_seed(seed)
     mat1 = torch.rand((3,3))
     mat2 = torch.rand((2,2))
     mat1 = mat1 + mat1.transpose(-2,-1)
@@ -42,6 +44,7 @@ def test_lsymeig_mismatch_err():
         pass
 
 def test_lsymeig_A():
+    torch.manual_seed(seed)
     shapes = [(4,4), (2,4,4), (2,3,4,4)]
     methods = ["exacteig", "davidson"]
     for shape, method in itertools.product(shapes, methods):
@@ -72,6 +75,7 @@ def test_lsymeig_A():
                 gradgradcheck(lsymeig_fcn, (mat1,))
 
 def test_lsymeig_AM():
+    torch.manual_seed(seed)
     shapes = [(3,3), (2,3,3), (2,1,3,3)]
     methods = ["exacteig", "davidson"]
     dtype = torch.float64
@@ -112,6 +116,7 @@ def test_lsymeig_AM():
                 gradgradcheck(lsymeig_fcn, (mata, matm))
 
 def test_symeig_A_large():
+    torch.manual_seed(seed)
     class ALarge(LinearOperator):
         def __init__(self, shape, dtype):
             super(ALarge, self).__init__(shape,
@@ -158,6 +163,7 @@ def test_symeig_A_large():
 
 ############## solve ##############
 def test_solve_nonsquare_err():
+    torch.manual_seed(seed)
     mat = torch.rand((3,2))
     mat2 = torch.rand((3,3))
     linop = LinearOperator.m(mat)
@@ -177,6 +183,7 @@ def test_solve_nonsquare_err():
         pass
 
 def test_solve_mismatch_err():
+    torch.manual_seed(seed)
     shapes = [
         #   A      B      M
         ([(3,3), (2,1), (3,3)], "the B shape does not match with A"),
@@ -199,24 +206,36 @@ def test_solve_mismatch_err():
             pass
 
 def test_solve_A():
-    na = 3
+    torch.manual_seed(seed)
+    na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
-    for ashape, bshape in itertools.product(shapes, shapes):
+    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
+    hermits = [True, False]
+    for ashape, bshape, method, hermit in itertools.product(shapes, shapes, methods, hermits):
+        print(ashape, bshape, method, hermit)
+
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
+        fwd_options = {"method": method}
+        bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
         bmat = torch.rand(bshape, dtype=dtype)
-        amat = amat + amat.transpose(-2,-1)
+        if hermit:
+            amat = (amat + amat.transpose(-2,-1)) * 0.5
 
         amat = amat.requires_grad_()
         bmat = bmat.requires_grad_()
 
         def solvefcn(amat, bmat):
+            if hermit:
+                amat = (amat + amat.transpose(-2,-1)) * 0.5
             alinop = LinearOperator.m(amat)
-            x = solve(A=alinop, B=bmat)
+            x = solve(A=alinop, B=bmat,
+                fwd_options=fwd_options,
+                bck_options=bck_options)
             return x
 
         x = solvefcn(amat, bmat)
@@ -225,12 +244,13 @@ def test_solve_A():
         ax = LinearOperator.m(amat).mm(x)
         assert torch.allclose(ax, bmat)
 
-        # gradcheck
+        # grad check only performed at AEM, to save time
         gradcheck(solvefcn, (amat, bmat))
         gradgradcheck(solvefcn, (amat, bmat))
 
 # TODO: use fixtures' params to iterate the methods
 def test_solve_A_gmres():
+    torch.manual_seed(seed)
     na = 3
     dtype = torch.float64
     ashape = (na, na)
@@ -263,55 +283,99 @@ def test_solve_A_gmres():
     gradgradcheck(solvefcn, (amat, bmat))
 
 def test_solve_AE():
-    na = 3
+    torch.manual_seed(seed)
+    na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
+    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
     dtype = torch.float64
-    for ashape, bshape, eshape in itertools.product(shapes, shapes, shapes):
+    for abshape, eshape, method in itertools.product(shapes, shapes, methods):
+        ashape = abshape
+        bshape = abshape
+        print(abshape, eshape, method)
+
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
         eshape = [*eshape[:-2], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1])) + [na, ncols]
+        fwd_options = {"method": method}
+        bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
         bmat = torch.rand(bshape, dtype=dtype)
         emat = torch.rand(eshape, dtype=dtype)
-        amat = amat + amat.transpose(-2,-1)
 
-        alinop = LinearOperator.m(amat)
+        amat = amat.requires_grad_()
+        bmat = bmat.requires_grad_()
+        emat = emat.requires_grad_()
 
-        x = solve(A=alinop, B=bmat, E=emat)
+        def solvefcn(amat, bmat, emat):
+            alinop = LinearOperator.m(amat)
+            x = solve(A=alinop, B=bmat, E=emat,
+                      fwd_options=fwd_options,
+                      bck_options=bck_options)
+            return x
+
+        x = solvefcn(amat, bmat, emat)
         assert list(x.shape) == xshape
 
-        ax = alinop.mm(x)
+        ax = LinearOperator.m(amat).mm(x)
         xe = torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2))
         assert torch.allclose(ax - xe, bmat)
 
+        # grad check only performed at AEM, to save time
+        # gradcheck(solvefcn, (amat, bmat, emat))
+        # gradgradcheck(solvefcn, (amat, bmat, emat))
+
 def test_solve_AEM():
-    na = 3
+    torch.manual_seed(seed)
+    na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
-    for ashape, bshape, eshape, mshape in itertools.product(shapes, shapes, shapes, shapes):
+    methods = ["exactsolve", "custom_exactsolve"]
+    for abeshape, mshape, method in itertools.product(shapes, shapes, methods):
+        ashape = abeshape
+        bshape = abeshape
+        eshape = abeshape
+        print(abeshape, mshape, method)
+
         ncols = bshape[-1]-1
         bshape = [*bshape[:-1], ncols]
         eshape = [*eshape[:-2], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1], mshape[:-2])) + [na, ncols]
+        fwd_options = {"method": method}
+        bck_options = {"method": method} # exactsolve at backward just to test the forward solve
 
-        amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
-        mmat = torch.rand(mshape, dtype=dtype) + torch.eye(mshape[-1], dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
+        mmat = torch.rand(mshape, dtype=dtype) * 0.1 + torch.eye(mshape[-1], dtype=dtype)
         bmat = torch.rand(bshape, dtype=dtype)
         emat = torch.rand(eshape, dtype=dtype)
-        amat = amat + amat.transpose(-2,-1)
-        mmat = mmat + mmat.transpose(-2,-1)
+        mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
 
-        alinop = LinearOperator.m(amat)
-        mlinop = LinearOperator.m(mmat)
+        amat = amat.requires_grad_()
+        mmat = mmat.requires_grad_()
+        bmat = bmat.requires_grad_()
+        emat = emat.requires_grad_()
 
-        x = solve(A=alinop, B=bmat, E=emat, M=mlinop)
+        def solvefcn(amat, mmat, bmat, emat):
+            mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+            alinop = LinearOperator.m(amat)
+            mlinop = LinearOperator.m(mmat)
+            x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
+                fwd_options=fwd_options,
+                bck_options=bck_options)
+            return x
+
+        x = solvefcn(amat, mmat, bmat, emat)
         assert list(x.shape) == xshape
 
-        ax = alinop.mm(x)
-        mxe = mlinop.mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
-        assert torch.allclose(ax - mxe, bmat)
+        ax = LinearOperator.m(amat).mm(x)
+        mxe = LinearOperator.m(mmat).mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
+        y = ax - mxe
+        assert torch.allclose(y, bmat)
+
+        # gradient checker
+        gradcheck(solvefcn, (amat, mmat, bmat, emat))
+        gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
 
 if __name__ == "__main__":
     test_symeig_A_large()

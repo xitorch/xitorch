@@ -4,7 +4,8 @@ from typing import Union, Any, Mapping
 import numpy as np
 from scipy.sparse.linalg import gmres
 from lintorch.core.linop import LinearOperator
-from lintorch.utils.bcast import normalize_bcast_dims
+from lintorch.maths.rootfinder import lbfgs, broyden
+from lintorch.utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from lintorch.utils.assertfuncs import assert_runtime
 from lintorch.utils.misc import set_default_option, dummy_context_manager
 from lintorch.utils.debugmodes import is_debug_enabled
@@ -33,6 +34,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     * M: lintorch.LinearOperator instance (*BM, na, na) or None
         The transformation on the E side. If E is None,
         then this argument is ignored. I E is not None and M is None, then M=I.
+        This LinearOperator must be Hermitian.
     * fwd_options: dict
         Options of the iterative solver in the forward calculation
     * bck_options: dict
@@ -43,6 +45,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     if M is not None:
         assert_runtime(M.shape[-1] == M.shape[-2], "The linear operator M must have a square shape")
         assert_runtime(M.shape[-1] == A.shape[-1], "The shape of A & M must match (A: %s, M: %s)" % (A.shape, M.shape))
+        assert_runtime(M.is_hermitian, "The linear operator M must be a Hermitian matrix")
     if E is not None:
         assert_runtime(E.shape[-1] == B.shape[-1], "The last dimension of E & B must match (E: %s, B: %s)" % (E.shape, B.shape))
     if E is None and M is not None:
@@ -85,12 +88,19 @@ class solve_torchfcn(torch.autograd.Function):
         config = set_default_option({
         }, fwd_options)
         ctx.bck_config = set_default_option({
-            "method": config["method"],
         }, bck_options)
 
         method = config["method"].lower()
-        if method == "gmres":
+
+        if torch.all(B == 0): # special case
+            dims = (*_get_batchdims(A, B, E, M), *B.shape[-2:])
+            x = torch.zeros(dims, dtype=B.dtype, device=B.device)
+        elif method == "custom_exactsolve":
+            x = custom_exactsolve(A, params, B, E=E, M=M, mparams=mparams, **config)
+        elif method == "gmres":
             x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
+        elif method in ["lbfgs", "broyden"]:
+            x = rootfinder_solve(method, A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
@@ -118,16 +128,6 @@ class solve_torchfcn(torch.autograd.Function):
                 fwd_options=ctx.bck_config, bck_options=ctx.bck_config) # (*BABEM, nr, ncols)
         grad_B = v
 
-        # calculate the biases gradient
-        grad_E = None
-        if ctx.E is not None:
-            if ctx.M is None:
-                Mx = ctx.x
-            else:
-                with ctx.M.uselinopparams(*ctx.mparams):
-                    Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
-            grad_E = (v * Mx).sum(dim=-2) # (*BABEM, ncols)
-
         # calculate the grad of matrices parameters
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
@@ -137,12 +137,22 @@ class solve_torchfcn(torch.autograd.Function):
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
             create_graph=torch.is_grad_enabled())
 
+        # calculate the biases gradient
+        grad_E = None
+        if ctx.E is not None:
+            if ctx.M is None:
+                Mx = ctx.x
+            else:
+                with ctx.M.uselinopparams(*ctx.mparams):
+                    Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
+            grad_E = torch.einsum('...rc,...rc->...c', v, Mx) # (*BABEM, ncols)
+
         # calculate the gradient to the biases matrices
         grad_mparams = []
-        if ctx.M is not None:
+        if ctx.M is not None and ctx.E is not None:
             with torch.enable_grad():
-                mparams = [p.clone() for p in ctx.mparams]
-                lmbdax = ctx.x * ctx.biases.unsqueeze(1)
+                mparams = [p.clone().requires_grad_() for p in ctx.mparams]
+                lmbdax = ctx.x * ctx.E.unsqueeze(-2)
                 with ctx.M.uselinopparams(*mparams):
                     mloss = ctx.M.mm(lmbdax)
 
@@ -198,6 +208,46 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[], posdef=False, **options
         res = res.transpose(-1,-2) # (nbatch, na, ncols)
         return res
 
+def rootfinder_solve(alg, A, params, B, E=None, M=None, mparams=[], **options):
+    # using rootfinder algorithm
+    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+        nr = A.shape[-1]
+        ncols = B.shape[-1]
+
+        # set up the function for the rootfinding
+        def fcn_rootfinder(xi):
+            # xi: (*BX, nr*ncols)
+            x = xi.reshape(*xi.shape[:-1], nr, ncols) # (*BX, nr, ncols)
+            y = A.mm(x) - B # (*BX, nr, ncols)
+            if E is not None:
+                MX = M.mm(x) if M is not None else x
+                MXE = MX * E.unsqueeze(-2)
+                y = y - MXE # (*BX, nr, ncols)
+            y = y.reshape(*xi.shape[:-1], -1) # (*BX, nr*ncols)
+            return y
+
+        # setup the initial guess (the batch dimension must be the largest)
+        batchdims = _get_batchdims(A, B, E, M)
+        x0 = torch.zeros((*batchdims, nr*ncols), dtype=A.dtype, device=A.device)
+
+        if alg == "lbfgs":
+            x = lbfgs(fcn_rootfinder, x0, **options)
+        elif alg == "broyden":
+            x = broyden(fcn_rootfinder, x0, **options)
+        else:
+            raise RuntimeError("Unknown method %s" % alg)
+        x = x.reshape(*x.shape[:-1], nr, ncols)
+        return x
+
+def custom_exactsolve(A, params, B, E=None,
+                M=None, mparams=[], **options):
+    # A: (*BA, na, na)
+    # B: (*BB, na, ncols)
+    # E: (*BE, ncols)
+    # M: (*BM, na, na)
+    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+        return exactsolve(A, B, E, M)
+
 def exactsolve(A:LinearOperator, B:torch.Tensor,
                E:Union[torch.Tensor,None],
                M:Union[LinearOperator,None]):
@@ -237,3 +287,11 @@ def _solve_ABE(A:torch.Tensor, B:torch.Tensor, E:torch.Tensor):
     r, _ = torch.solve(B, AE) # (ncols, *BAEM, na, 1)
     r = r.transpose(0,-1).squeeze(0) # (*BAEM, na, ncols)
     return r
+
+def _get_batchdims(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None], M:Union[LinearOperator,None]):
+    batchdims = [A.shape[:-2], B.shape[:-2]]
+    if E is not None:
+        batchdims.append(E.shape[:-1])
+        if M is not None:
+            batchdims.append(M.shape[:-2])
+    return get_bcasted_dims(*batchdims)

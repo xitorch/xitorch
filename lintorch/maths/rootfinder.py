@@ -394,7 +394,7 @@ def lbfgs(f, x0, jinv0=1.0, **options):
         # check the stopping condition
         if verbose:
             print("Iter %3d: %.3e" % (k+1, gk.abs().max()))
-        if torch.allclose(gk, torch.zeros_like(gk), atol=min_eps):
+        if maxgk < min_eps:
             stop_reason = "min_eps"
             break
 
