@@ -124,6 +124,8 @@ class symeig_torchfcn(torch.autograd.Function):
         method = config["method"].lower()
         if method == "davidson":
             evals, evecs = davidson(A, params, neig, mode, M, mparams, **config)
+        elif method == "custom_exacteig":
+            evals, evecs = custom_exacteig(A, params, neig, mode, M, mparams, **config)
         else:
             raise RuntimeError("Unknown eigen decomposition method: %s" % config["method"])
 
@@ -199,6 +201,10 @@ class symeig_torchfcn(torch.autograd.Function):
             )
 
         return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
+
+def custom_exacteig(A, params, neig, mode, M=None, mparams=[], **options):
+    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+        return exacteig(A, neig, mode, M)
 
 def davidson(A, params, neig, mode, M=None, mparams=[], **options):
     """
