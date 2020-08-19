@@ -235,7 +235,7 @@ class EditableModule(object):
 
         # run the method and see which one has the gradients
         output = method(*args, **kwargs).sum()
-        grad_tensors = torch.autograd.grad(output, copy_tensors0, allow_unused=True)
+        grad_tensors = torch.autograd.grad(output, copy_tensors0, retain_graph=True, allow_unused=True)
 
         # return the original tensor
         all_tensors_copy = copy.copy(all_tensors)
