@@ -15,7 +15,7 @@ from lintorch.utils.debug.modes import is_debug_enabled
 __all__ = ["equilibrium", "rootfinder"]
 
 def rootfinder(
-        fcn:Callable[[torch.Tensor],torch.Tensor],
+        fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         fwd_options:Mapping[str,Any]={},
@@ -64,7 +64,7 @@ def rootfinder(
     return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
 
 def equilibrium(
-        fcn:Callable[[torch.Tensor],torch.Tensor],
+        fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         fwd_options:Mapping[str,Any]={},
@@ -117,7 +117,7 @@ def equilibrium(
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, fcn:Callable[[torch.Tensor],torch.Tensor],
+    def forward(ctx, fcn:Callable[...,torch.Tensor],
             y0:torch.Tensor,
             options:Mapping[str,Any],
             bck_options:Mapping[str,Any], *params) -> torch.Tensor:
