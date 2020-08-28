@@ -10,7 +10,7 @@ from lintorch.funcs.solve import solve
 from lintorch.funcs.jac import jac
 from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import EditableModule, wrap_fcn
-from lintorch.utils.debugmodes import is_debug_enabled
+from lintorch.utils.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder"]
 

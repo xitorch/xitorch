@@ -5,7 +5,7 @@ from lintorch.core.editable_module import wrap_fcn
 from lintorch.core.linop import LinearOperator
 from lintorch.funcs.solve import solve
 from lintorch.utils.assertfuncs import assert_runtime
-from lintorch.utils.debugmodes import is_debug_enabled
+from lintorch.utils.debug.modes import is_debug_enabled
 from lintorch.utils.bcast import get_bcasted_dims
 from lintorch.utils.misc import set_default_option, dummy_context_manager
 from lintorch.utils.tensor import tallqr, to_fortran_order, ortho

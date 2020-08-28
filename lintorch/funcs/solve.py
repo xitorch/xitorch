@@ -8,7 +8,7 @@ from lintorch.maths.rootfinder import lbfgs, broyden
 from lintorch.utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from lintorch.utils.assertfuncs import assert_runtime
 from lintorch.utils.misc import set_default_option, dummy_context_manager
-from lintorch.utils.debugmodes import is_debug_enabled
+from lintorch.utils.debug.modes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None, posdef=False,

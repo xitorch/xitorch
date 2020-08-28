@@ -7,7 +7,7 @@ from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from lintorch.core.editable_module import EditableModule
-from lintorch.utils.debugmodes import is_debug_enabled
+from lintorch.utils.debug.modes import is_debug_enabled
 
 __all__ = ["LinearOperator"]
 
