@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import scipy.optimize
 import lintorch as lt
-from lintorch.utils.misc import set_default_option
+from lintorch.utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.funcs.solve import solve
 from lintorch.funcs.jac import jac
@@ -187,14 +187,23 @@ class _RootFinder(torch.autograd.Function):
             raise RuntimeError("Unknown method: %s" % config["method"])
 
         ctx.fcn = fcn
-        ctx.params = params
-        ctx.yout = y
+
+        # split tensors and non-tensors params
+        ctx.param_sep = TensorNonTensorSeparator(params)
+        tensor_params = ctx.param_sep.get_tensor_params()
+        ctx.save_for_backward(y, *tensor_params)
+
         return y
 
     @staticmethod
     def backward(ctx, grad_yout:torch.Tensor):
-        yout = ctx.yout # (*ny)
-        params = ctx.params
+        param_sep = ctx.param_sep
+        yout = ctx.saved_tensors[0]
+
+        # merge the tensor and nontensor parameters
+        tensor_params = ctx.saved_tensors[1:]
+        params = param_sep.reconstruct_params(tensor_params)
+
         # dL/df
         jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
         gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.unsqueeze(-1),
@@ -202,9 +211,12 @@ class _RootFinder(torch.autograd.Function):
 
         # get the grad for the params
         with torch.enable_grad():
-            params_copy = [p.clone().requires_grad_() for p in params]
+            tensor_params_copy = [p.clone().requires_grad_() for p in tensor_params]
+            params_copy = param_sep.reconstruct_params(tensor_params_copy)
             yfcn = ctx.fcn(yout, *params_copy)
-        grad_params = torch.autograd.grad(yfcn, params_copy, grad_outputs=gyfcn,
+        grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
             create_graph=torch.is_grad_enabled())
+        grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
+        grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
 
         return (None, None, None, None, *grad_params)

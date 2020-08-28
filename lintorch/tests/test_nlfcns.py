@@ -57,6 +57,26 @@ class DummyNNModule(torch.nn.Module):
             yr = yr + x.squeeze(-1)
         return yr
 
+class DummyModuleExplicit(lt.EditableModule):
+    def __init__(self, addx=True):
+        super(DummyModuleExplicit, self).__init__()
+        self.addx = addx
+        self.sigmoid = torch.nn.Sigmoid()
+
+    def forward(self, x, A, diag, bias):
+        nbatch, nr = x.shape
+        x = x.unsqueeze(-1)
+        A = A.unsqueeze(0).expand(nbatch, -1, -1)
+        A = A + torch.diag_embed(diag)
+        y = torch.bmm(A, x).squeeze(-1)
+        yr = self.sigmoid(2*y) + 2*bias
+        if self.addx:
+            yr = yr + x.squeeze(-1)
+        return yr
+
+    def getparamnames(self, methodname, prefix=""):
+        return []
+
 @device_dtype_float_test(only64=True)
 def test_rootfinder(dtype, device):
     torch.manual_seed(100)
@@ -102,20 +122,52 @@ def test_equil(dtype, device):
         bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
-        model = DummyModule(A, addx=False)
+        model = clss(A, addx=False)
         model.set_diag_bias(diag, bias)
         y = lt.equilibrium(model.forward, y0)
         f = model.forward(y)
         assert torch.allclose(y, f)
 
         def getloss(A, y0, diag, bias):
-            model = DummyModule(A, addx=False)
+            model = clss(A, addx=False)
             model.set_diag_bias(diag, bias)
             y = lt.equilibrium(model.forward, y0)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
         gradgradcheck(getloss, (A, y0, diag, bias))
+
+@device_dtype_float_test(only64=True)
+def test_rootfinder_with_params(dtype, device):
+    torch.manual_seed(100)
+    random.seed(100)
+    dtype = torch.float64
+
+    nr = 4
+    nbatch = 1
+
+    clss = DummyModuleExplicit
+    for bias_is_tensor in [True, False]:
+        A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+        diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
+        if bias_is_tensor:
+            bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
+        else:
+            bias = 0.0
+        y0 = torch.randn((nbatch, nr)).to(dtype)
+
+        model = clss(addx=True)
+        y = lt.rootfinder(model.forward, y0, (A, diag, bias))
+        f = model.forward(y, A, diag, bias)
+        assert torch.allclose(f*0, f)
+
+        def getloss(y0, A, diag, bias):
+            model = clss(addx=True)
+            y = lt.rootfinder(model.forward, y0, (A, diag, bias))
+            return y
+
+        gradcheck(getloss, (y0, A, diag, bias))
+        gradgradcheck(getloss, (y0, A, diag, bias))
 
 # @device_dtype_float_test(only64=True)
 # def test_optimize(dtype, device):
