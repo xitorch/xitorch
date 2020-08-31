@@ -2,7 +2,7 @@ import torch
 import pytest
 from typing import List
 from lintorch._core.editable_module import EditableModule, wrap_fcn
-from lintorch.utils.exceptions import GetSetParamsError
+from lintorch._utils.exceptions import GetSetParamsError
 
 ##############
 # test the assertion with methods with various problems

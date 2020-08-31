@@ -2,7 +2,7 @@ import torch
 import lintorch as lt
 import pytest
 import argparse
-from lintorch.utils.fd import finite_differences
+from lintorch._utils.fd import finite_differences
 
 __all__ = ["device_dtype_float_test", "get_diagonally_dominant_class"]
 

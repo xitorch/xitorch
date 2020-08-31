@@ -47,7 +47,7 @@ def _traverse_attr(obj, names, attrfcn, dictfcn, listfcn):
         return _applyfcn(_get_attr(obj, names[:-1]), names[-1], attrfcn, dictfcn, listfcn)
 
 def _applyfcn(obj, name, attrfcn, dictfcn, listfcn):
-    if name.startswith("["):
+    if name[0] == "[":
         key = ast.literal_eval(name[1:-1])
         if isinstance(obj, dict):
             return dictfcn(obj, key)

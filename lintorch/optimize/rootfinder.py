@@ -4,13 +4,13 @@ import torch
 import numpy as np
 import scipy.optimize
 import lintorch as lt
-from lintorch.utils.misc import set_default_option, TensorNonTensorSeparator
+from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch._core.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule, wrap_fcn
-from lintorch.utils.debug.modes import is_debug_enabled
+from lintorch._utils.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder"]
 
