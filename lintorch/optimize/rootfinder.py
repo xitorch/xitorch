@@ -10,7 +10,7 @@ from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch._core.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule, wrap_fcn
-from lintorch._utils.debug.modes import is_debug_enabled
+from lintorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
 
