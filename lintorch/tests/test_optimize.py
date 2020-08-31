@@ -2,6 +2,7 @@ import random
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
+from lintorch.optimize import rootfinder, equilibrium
 from lintorch.tests.utils import device_dtype_float_test
 
 class DummyModule(lt.EditableModule):
@@ -94,14 +95,14 @@ def test_rootfinder(dtype, device):
 
         model = clss(A, addx=True)
         model.set_diag_bias(diag, bias)
-        y = lt.rootfinder(model.forward, y0)
+        y = rootfinder(model.forward, y0)
         f = model.forward(y)
         assert torch.allclose(f*0, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=True)
             model.set_diag_bias(diag, bias)
-            y = lt.rootfinder(model.forward, y0)
+            y = rootfinder(model.forward, y0)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -124,14 +125,14 @@ def test_equil(dtype, device):
 
         model = clss(A, addx=False)
         model.set_diag_bias(diag, bias)
-        y = lt.equilibrium(model.forward, y0)
+        y = equilibrium(model.forward, y0)
         f = model.forward(y)
         assert torch.allclose(y, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=False)
             model.set_diag_bias(diag, bias)
-            y = lt.equilibrium(model.forward, y0)
+            y = equilibrium(model.forward, y0)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -157,13 +158,13 @@ def test_rootfinder_with_params(dtype, device):
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
         model = clss(addx=True)
-        y = lt.rootfinder(model.forward, y0, (A, diag, bias))
+        y = rootfinder(model.forward, y0, (A, diag, bias))
         f = model.forward(y, A, diag, bias)
         assert torch.allclose(f*0, f)
 
         def getloss(y0, A, diag, bias):
             model = clss(addx=True)
-            y = lt.rootfinder(model.forward, y0, (A, diag, bias))
+            y = rootfinder(model.forward, y0, (A, diag, bias))
             return y
 
         gradcheck(getloss, (y0, A, diag, bias))
