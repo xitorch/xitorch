@@ -5,6 +5,7 @@ import numpy as np
 import scipy.optimize
 import lintorch as lt
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from lintorch._utils.assertfuncs import assert_fcn_params
 from lintorch._maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
@@ -56,7 +57,7 @@ def rootfinder(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        _check_implementation(fcn, (y0, *params))
+        assert_fcn_params(fcn, (y0, *params))
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -104,7 +105,7 @@ def equilibrium(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        _check_implementation(fcn, (y0, *params))
+        assert_fcn_params(fcn, (y0, *params))
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -142,7 +143,7 @@ def minimize(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        _check_implementation(fcn, (y0, *params))
+        assert_fcn_params(fcn, (y0, *params))
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -159,10 +160,6 @@ def minimize(
         return grady
 
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)
-
-def _check_implementation(fcn, args):
-    if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
-        fcn.__self__.assertparams(fcn, *args)
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
