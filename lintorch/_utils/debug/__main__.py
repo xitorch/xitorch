@@ -1,6 +1,6 @@
 import sys
 import argparse
-from lintorch._utils.debugmodes import enable_debug
+from lintorch._utils.debug.modes import enable_debug
 
 def parse_args():
     # parse the argument
