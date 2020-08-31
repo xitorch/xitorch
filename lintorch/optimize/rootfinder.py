@@ -160,8 +160,8 @@ def minimize(
         with torch.enable_grad():
             y1 = y.clone().requires_grad_()
             z = wrapped_fcn(y1, *params)
-            grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
-                create_graph=torch.is_grad_enabled())
+        grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
+            create_graph=torch.is_grad_enabled())
         return grady
 
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)
