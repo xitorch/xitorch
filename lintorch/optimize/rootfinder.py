@@ -6,7 +6,7 @@ import scipy.optimize
 import lintorch as lt
 from lintorch.utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
-from lintorch.funcs.solve import solve
+from lintorch.linalg.solve import solve
 from lintorch.funcs.jac import jac
 from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import EditableModule, wrap_fcn
