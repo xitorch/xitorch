@@ -3,7 +3,7 @@ import torch
 from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
 from lintorch.optimize import rootfinder, equilibrium
-from lintorch.tests.utils import device_dtype_float_test
+from lintorch._tests.utils import device_dtype_float_test
 
 class DummyModule(lt.EditableModule):
     def __init__(self, A, addx=True):
