@@ -7,7 +7,7 @@ import lintorch as lt
 from lintorch.utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.linalg.solve import solve
-from lintorch.funcs.jac import jac
+from lintorch.grad.jachess import jac
 from lintorch.core.linop import LinearOperator, checklinop
 from lintorch.core.editable_module import EditableModule, wrap_fcn
 from lintorch.utils.debug.modes import is_debug_enabled
