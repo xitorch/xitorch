@@ -1,7 +1,7 @@
 import torch
 import pytest
 from typing import List
-from lintorch.core.editable_module import EditableModule, wrap_fcn
+from lintorch._core.editable_module import EditableModule, wrap_fcn
 from lintorch.utils.exceptions import GetSetParamsError
 
 ##############

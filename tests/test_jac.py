@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 from lintorch.grad.jachess import jac, hess
-from lintorch.core.editable_module import EditableModule, wrap_fcn
+from lintorch._core.editable_module import EditableModule, wrap_fcn
 
 dtype = torch.float64
 

@@ -1,8 +1,8 @@
 import torch
 from typing import Union, Mapping, Any
 import functools
-from lintorch.core.editable_module import wrap_fcn
-from lintorch.core.linop import LinearOperator
+from lintorch._core.editable_module import wrap_fcn
+from lintorch._core.linop import LinearOperator
 from lintorch.linalg.solve import solve
 from lintorch.utils.assertfuncs import assert_runtime
 from lintorch.utils.debug.modes import is_debug_enabled

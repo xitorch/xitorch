@@ -8,8 +8,8 @@ from lintorch.utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch.maths.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
-from lintorch.core.linop import LinearOperator, checklinop
-from lintorch.core.editable_module import EditableModule, wrap_fcn
+from lintorch._core.linop import LinearOperator, checklinop
+from lintorch._core.editable_module import EditableModule, wrap_fcn
 from lintorch.utils.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder"]

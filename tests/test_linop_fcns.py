@@ -2,7 +2,7 @@ import itertools
 import torch
 import pytest
 from torch.autograd import gradcheck, gradgradcheck
-from lintorch.core.linop import LinearOperator
+from lintorch._core.linop import LinearOperator
 from lintorch.linalg.symeig import lsymeig, symeig
 from lintorch.linalg.solve import solve
 from lintorch.utils.bcast import get_bcasted_dims
