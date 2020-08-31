@@ -2,19 +2,27 @@ import random
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 import lintorch as lt
-from lintorch.optimize import rootfinder, equilibrium
+from lintorch.grad.jachess import hess
+from lintorch.optimize import rootfinder, equilibrium, minimize
 from lintorch._tests.utils import device_dtype_float_test
 
 class DummyModule(lt.EditableModule):
-    def __init__(self, A, addx=True):
+    def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
         super(DummyModule, self).__init__()
         self.A = A # (nr, nr)
         self.addx = addx
-        self.sigmoid = torch.nn.Sigmoid()
+        self.activation = {
+            "sigmoid": torch.nn.Sigmoid(),
+            "cos": torch.cos,
+            "square": lambda x: x * x
+        }[activation]
+        self.sumoutput = sumoutput
+        self.biasdiff = True
 
     def set_diag_bias(self, diag, bias):
         self.diag = diag
         self.bias = bias
+        self.biasdiff = bias.requires_grad
 
     def forward(self, x):
         # x: (nbatch, nr)
@@ -25,24 +33,33 @@ class DummyModule(lt.EditableModule):
         A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
         A = A + torch.diag_embed(self.diag) # (nbatch, nr, nr)
         y = torch.bmm(A, x).squeeze(-1) # (nbatch, nr)
-        yr = self.sigmoid(2*y) + 2*self.bias
+        yr = self.activation(2*y) + 2*self.bias
         if self.addx:
             yr = yr + x.squeeze(-1)
+        if self.sumoutput:
+            yr = yr.sum()
         return yr
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"A", prefix+"diag", prefix+"bias"]
+        return [prefix+"A", prefix+"diag"] + ([prefix+"bias"] if self.biasdiff else [])
 
 class DummyNNModule(torch.nn.Module):
-    def __init__(self, A, addx=True):
+    def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
         super(DummyNNModule, self).__init__()
         self.A = A
         self.addx = addx
-        self.sigmoid = torch.nn.Sigmoid()
+        self.activation = {
+            "sigmoid": torch.nn.Sigmoid(),
+            "cos": torch.cos,
+            "square": lambda x: x * x
+        }[activation]
+        self.sumoutput = sumoutput
+        self.biasdiff = True
 
     def set_diag_bias(self, diag, bias):
         self.diag = diag
         self.bias = bias
+        self.biasdiff = bias.requires_grad
 
     def forward(self, x):
         # x: (nbatch, nr)
@@ -53,16 +70,18 @@ class DummyNNModule(torch.nn.Module):
         A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
         A = A + torch.diag_embed(self.diag) # (nbatch, nr, nr)
         y = torch.bmm(A, x).squeeze(-1) # (nbatch, nr)
-        yr = self.sigmoid(2*y) + 2*self.bias
+        yr = self.activation(2*y) + 2*self.bias
         if self.addx:
             yr = yr + x.squeeze(-1)
+        if self.sumoutput:
+            yr = yr.sum()
         return yr
 
 class DummyModuleExplicit(lt.EditableModule):
     def __init__(self, addx=True):
         super(DummyModuleExplicit, self).__init__()
         self.addx = addx
-        self.sigmoid = torch.nn.Sigmoid()
+        self.activation = torch.nn.Sigmoid()
 
     def forward(self, x, A, diag, bias):
         nbatch, nr = x.shape
@@ -70,7 +89,7 @@ class DummyModuleExplicit(lt.EditableModule):
         A = A.unsqueeze(0).expand(nbatch, -1, -1)
         A = A + torch.diag_embed(diag)
         y = torch.bmm(A, x).squeeze(-1)
-        yr = self.sigmoid(2*y) + 2*bias
+        yr = self.activation(2*y) + 2*bias
         if self.addx:
             yr = yr + x.squeeze(-1)
         return yr
@@ -170,29 +189,51 @@ def test_rootfinder_with_params(dtype, device):
         gradcheck(getloss, (y0, A, diag, bias))
         gradgradcheck(getloss, (y0, A, diag, bias))
 
-# @device_dtype_float_test(only64=True)
-# def test_optimize(dtype, device):
-#     torch.manual_seed(100)
-#     random.seed(100)
-#     dtype = torch.float64
-#
-#     nr = 3
-#     nbatch = 1
-#     x  = torch.tensor([-1, 1, 4]).unsqueeze(0).to(dtype).requires_grad_()
-#     y0 = torch.rand((nbatch, 1)).to(dtype)
-#     params = (y0, x)
-#
-#     model = PolynomialModule()
-#     zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
-#     z = model(yopt, x)
-#     zmin = x[:,0]-x[:,1]**2/(4*x[:,2])
-#     assert torch.allclose(zmin, z)
-#     assert torch.allclose(zmin, zopt)
-#
-#     def getloss(x, y0):
-#         model = PolynomialModule()
-#         zopt, (yopt,) = lt.optimize(model, (y0,), (x,))
-#         return zopt#, yopt
-#
-#     gradcheck(getloss, (x, y0))
-#     gradgradcheck(getloss, (x, y0))
+@device_dtype_float_test(only64=True)
+def test_minimize(dtype, device):
+    torch.manual_seed(400)
+    random.seed(100)
+    dtype = torch.float64
+
+    nr = 3
+    nbatch = 1
+
+    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+    # bias will be detached from the optimization line, so set it undifferentiable
+    bias = torch.zeros((nbatch, nr)).to(dtype)
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    fwd_options = {
+        "max_niter": 50,
+        "min_eps": 1e-9,
+    }
+    activation = "square" # square activation makes it easy to optimize
+
+    for clss in [DummyModule, DummyNNModule]:
+        model = clss(A, addx=False, activation=activation, sumoutput=True)
+        model.set_diag_bias(diag, bias)
+        y = minimize(model.forward, y0, fwd_options=fwd_options)
+
+        # check the grad (must be close to 1)
+        with torch.enable_grad():
+            y1 = y.clone().requires_grad_()
+            f = model.forward(y1)
+        grady, = torch.autograd.grad(f, (y1,))
+        assert torch.allclose(grady, grady*0)
+
+        # check the hessian (must be posdef)
+        h = hess(model.forward, (y1,), idxs=0).fullmatrix()
+        eigval, _ = torch.symeig(h)
+        assert torch.all(eigval >= 0)
+
+        def getloss(A, y0, diag, bias):
+            model = clss(A, addx=False, activation=activation, sumoutput=True)
+            model.set_diag_bias(diag, bias)
+            y = minimize(model.forward, y0, fwd_options=fwd_options)
+            return y
+
+        gradcheck(getloss, (A, y0, diag, bias))
+        gradgradcheck(getloss, (A, y0, diag, bias))
+
+if __name__ == "__main__":
+    test_minimize()

@@ -12,7 +12,7 @@ from lintorch._core.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule, wrap_fcn
 from lintorch._utils.debug.modes import is_debug_enabled
 
-__all__ = ["equilibrium", "rootfinder"]
+__all__ = ["equilibrium", "rootfinder", "minimize"]
 
 def rootfinder(
         fcn:Callable[...,torch.Tensor],
@@ -56,8 +56,7 @@ def rootfinder(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
-            fcn.__self__.assertparams(fcn, y0, *params)
+        _check_implementation(fcn, (y0, *params))
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -105,8 +104,7 @@ def equilibrium(
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
-        if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
-            fcn.__self__.assertparams(fcn, y0, *params)
+        _check_implementation(fcn, (y0, *params))
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
     all_params = all_params[1:] # to exclude y0
@@ -114,6 +112,57 @@ def equilibrium(
         return y - wrapped_fcn(y, *params)
 
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)#
+
+def minimize(
+        fcn:Callable[...,torch.Tensor],
+        y0:torch.Tensor,
+        params:Sequence[Any]=[],
+        fwd_options:Mapping[str,Any]={},
+        bck_options:Mapping[str,Any]={}):
+    """
+    Solve the minimization problem:
+
+        z = (argmin_y) fcn(y, *params)
+
+    to find the best `y` that minimizes the output of the function `fcn`.
+    The output of `fcn` must be a single element tensor.
+
+    Arguments
+    ---------
+    * fcn: callable with output tensor (numel=1)
+        The function
+    * y0: torch.tensor with shape (*ny)
+        Initial guess of the solution
+    * params: list
+        List of any other parameters to be put in fcn
+    * fwd_options: dict
+        Options for the minimizer method
+    * bck_options: dict
+        Options for the backward solve method
+    """
+    # perform implementation check if debug mode is enabled
+    if is_debug_enabled():
+        _check_implementation(fcn, (y0, *params))
+
+    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
+    all_params = all_params[1:] # to exclude y0
+
+    # the rootfinder algorithms are designed to move to the opposite direction
+    # of the output of the function, so the output of this function is just
+    # the grad of z w.r.t. y
+    def new_fcn(y, *params):
+        with torch.enable_grad():
+            y1 = y.clone().requires_grad_()
+            z = wrapped_fcn(y1, *params)
+            grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
+                create_graph=torch.is_grad_enabled())
+        return grady
+
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)
+
+def _check_implementation(fcn, args):
+    if inspect.ismethod(fcn) and isinstance(fcn.__self__, EditableModule):
+        fcn.__self__.assertparams(fcn, *args)
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
