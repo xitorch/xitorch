@@ -119,7 +119,7 @@ def minimize(
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         fwd_options:Mapping[str,Any]={},
-        bck_options:Mapping[str,Any]={}):
+        bck_options:Mapping[str,Any]={}) -> torch.Tensor:
     """
     Solve the minimization problem:
 
@@ -140,6 +140,11 @@ def minimize(
         Options for the minimizer method
     * bck_options: dict
         Options for the backward solve method
+
+    Returns
+    -------
+    * y: torch.tensor with shape (*ny)
+        The solution of the minimization
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
