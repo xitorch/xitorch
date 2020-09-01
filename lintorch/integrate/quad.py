@@ -1,9 +1,9 @@
 import torch
-import numpy as np
 from typing import Callable, Union, Mapping, Any, Sequence
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.editable_module import wrap_fcn
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from lintorch._impls.integrate.fixed_quad import leggaussquad
 from lintorch.debug.modes import is_debug_enabled
 
 __all__ = ["quad"]
@@ -41,8 +41,8 @@ def quad(
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
         assert_fcn_params(fcn, (xl, *params))
-    assert_runtime(xl.shape == xu.shape, "The shape of xl and xu must match")
-    assert_runtime(torch.numel(xl) == 1, "xl and xu must be 1-element tensors")
+    assert_runtime(torch.numel(xl) == 1, "xl must be a 1-element tensors")
+    assert_runtime(torch.numel(xu) == 1, "xu must be a 1-element tensors")
 
     wrapped_fcn, all_params = wrap_fcn(fcn, (xl, *params))
     all_params = all_params[1:] # to exclude x
@@ -129,18 +129,3 @@ class _Quadrature(torch.autograd.Function):
         grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
 
         return (None, grad_xl, grad_xu, None, None, *grad_params)
-
-# no gradient flowing in the following functions
-
-def leggaussquad(fcn, xl, xu, params, n, **unused):
-    xlg, wlg = np.polynomial.legendre.leggauss(n)
-    ndim = len(xu.shape)
-    xlg = torch.tensor(xlg, dtype=xu.dtype, device=xu.device)[(...,)+(None,)*ndim] # (n, *nx)
-    wlg = torch.tensor(wlg, dtype=xu.dtype, device=xu.device)[(...,)+(None,)*ndim] # (n, *nx)
-    wlg *= 0.5 * (xu - xl)
-    xs = xlg * (0.5 * (xu - xl)) + (0.5 * (xu + xl)) # (n, *nx)
-
-    res = wlg[0] * fcn(xs[0], *params)
-    for i in range(1,n):
-        res += wlg[i] * fcn(xs[i], *params)
-    return res
