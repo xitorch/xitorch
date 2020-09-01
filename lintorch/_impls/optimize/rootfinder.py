@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import warnings
 from lintorch._utils.misc import set_default_option
-from lintorch._maths.linesearch import line_search
+from lintorch._impls.optimize.linesearch import line_search
 
 def selfconsistent(f, x0, jinv0=1.0, **options):
     """
