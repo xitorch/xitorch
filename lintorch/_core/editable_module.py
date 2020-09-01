@@ -102,12 +102,15 @@ class EditableModule(object):
     def useuniqueparams(self, methodname:str, *params):
         try:
             _orig_params_ = self.getuniqueparams(methodname)
-            self.setuniqueparams(methodname, *params)
+            identical = _all_equal(_orig_params_, params)
+            if not identical:
+                self.setuniqueparams(methodname, *params)
             yield self
         except Exception as exc:
             raise exc
         finally:
-            self.setuniqueparams(methodname, *_orig_params_)
+            if not identical:
+                self.setuniqueparams(methodname, *_orig_params_)
 
     ############# debugging #############
     def assertparams(self, method, *args, **kwargs):
@@ -269,6 +272,12 @@ def setmethodparams(method, *params):
         return 0
     return obj.setparams(methodname, *params)
 
+def _all_equal(params1, params2):
+    for p1, p2 in zip(params1, params2):
+        if id(p1) != id(p2):
+            return False
+    return True
+
 ############################ functional ###############################
 def wrap_fcn(fcn, params):
     """
@@ -341,11 +350,13 @@ def NNModuleUseParams(nnmodule, names, params):
 
         # save the current state
         state_tensors = [get_attr(nnmodule, name) for name in names]
+        identical = _all_equal(state_tensors, params)
 
         # substitute the state with the given tensor
-        for (name, param) in zip(names, params):
-            del_attr(nnmodule, name) # delete require in case the param is not a torch.nn.Parameter
-            set_attr(nnmodule, name, param)
+        if not identical:
+            for (name, param) in zip(names, params):
+                del_attr(nnmodule, name) # delete require in case the param is not a torch.nn.Parameter
+                set_attr(nnmodule, name, param)
 
         yield nnmodule
 
@@ -354,8 +365,9 @@ def NNModuleUseParams(nnmodule, names, params):
         # tb.print_exc()
     finally:
         # restore back the saved tensors
-        for (name, param) in zip(names, state_tensors):
-            set_attr(nnmodule, name, param)
+        if not identical:
+            for (name, param) in zip(names, state_tensors):
+                set_attr(nnmodule, name, param)
 
 ############################ traversing functions ############################
 def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
