@@ -36,7 +36,7 @@ def test_quad(dtype, device):
     nr = 2
     fwd_options = {
         "method": "leggauss",
-        "n": 1000,
+        "n": 100,
     }
 
     a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
@@ -57,8 +57,8 @@ def test_quad(dtype, device):
             y = quad(module.forward, xl, xu, params=(c,), fwd_options=fwd_options)
             return y
 
-        # gradcheck(getloss, (a, b, c, xl, xu))
-        # gradgradcheck(getloss, (a, b, c, xl, xu))
+        gradcheck(getloss, (a, b, c, xl, xu))
+        gradgradcheck(getloss, (a, b, c, xl, xu))
 
 if __name__ == "__main__":
     test_quad()
