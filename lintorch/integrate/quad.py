@@ -1,5 +1,5 @@
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence
+from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.editable_module import wrap_fcn
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
@@ -9,7 +9,7 @@ from lintorch.debug.modes import is_debug_enabled
 __all__ = ["quad"]
 
 def quad(
-        fcn:Callable[...,torch.Tensor],
+        fcn:Union[Callable[...,torch.Tensor], Callable[...,List[torch.Tensor]]],
         xl:Union[float,int,torch.Tensor],
         xu:Union[float,int,torch.Tensor],
         params:Sequence[Any]=[],
@@ -22,7 +22,7 @@ def quad(
 
     Arguments
     ---------
-    * fcn: callable with output tensor with shape (*nout)
+    * fcn: callable with output tensor with shape (*nout) or list of tensors
         The function to be integrated.
     * xl, xu: float, int, or 1-element torch.Tensor
         The lower and upper bound of the integration.
@@ -35,8 +35,8 @@ def quad(
 
     Returns
     -------
-    * y: torch.tensor with shape (*nout)
-        The quadrature result.
+    * y: torch.tensor with shape (*nout) or list of tensors
+        The quadrature results.
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
@@ -44,9 +44,16 @@ def quad(
     assert_runtime(torch.numel(xl) == 1, "xl must be a 1-element tensors")
     assert_runtime(torch.numel(xu) == 1, "xu must be a 1-element tensors")
 
+    out = fcn(xl, *params)
+    is_tuple_out = not isinstance(out, torch.Tensor)
+
     wrapped_fcn, all_params = wrap_fcn(fcn, (xl, *params))
     all_params = all_params[1:] # to exclude x
-    return _Quadrature.apply(wrapped_fcn, xl, xu, fwd_options, bck_options, *all_params)
+    if not is_tuple_out:
+        wrapped_fcn2 = lambda x,*params: (wrapped_fcn(x,*params),)
+        return _Quadrature.apply(wrapped_fcn2, xl, xu, fwd_options, bck_options, *all_params)[0]
+    else:
+        return _Quadrature.apply(wrapped_fcn , xl, xu, fwd_options, bck_options, *all_params)
 
 class _Quadrature(torch.autograd.Function):
     @staticmethod
@@ -74,15 +81,17 @@ class _Quadrature(torch.autograd.Function):
                              ([xu] if not ctx.xutensor else [])
         ctx.save_for_backward(*xlxu_tensor, *tensor_params)
         ctx.fcn = fcn
-        return y
+
+        return tuple(y)
 
     @staticmethod
-    def backward(ctx, grad_y):
+    def backward(ctx, *grad_ys):
         # retrieve the params
         nparams = ctx.param_sep.ntensors()
         tensor_params = ctx.saved_tensors[-nparams:]
         params = ctx.param_sep.reconstruct_params(tensor_params)
         fcn = ctx.fcn
+        ngrady = len(grad_ys)
 
         # restore xl, and xu
         xlxu_tensor = ctx.saved_tensors[:-nparams]
@@ -98,33 +107,25 @@ class _Quadrature(torch.autograd.Function):
             xl, xu = ctx.xlxu_nontensor
 
         # calculate the gradient for the boundaries
-        grad_xl = -torch.sum(grad_y * fcn(xl, *params)).reshape(xl.shape) if ctx.xltensor else None
-        grad_xu =  torch.sum(grad_y * fcn(xu, *params)).reshape(xu.shape) if ctx.xutensor else None
+        grad_xl = -sum([torch.sum(gy * f).reshape(xl.shape) for (gy,f) in zip(grad_ys, fcn(xl, *params))]) if ctx.xltensor else None
+        grad_xu =  sum([torch.sum(gy * f).reshape(xu.shape) for (gy,f) in zip(grad_ys, fcn(xu, *params))]) if ctx.xutensor else None
 
         # calculate the gradients for the integrands
-        def new_fcn(x, grad_y, *tensor_params):
+        def new_fcn(x, *grad_y_params):
+            grad_ys = grad_y_params[:ngrady]
+            tensor_params = grad_y_params[ngrady:]
             params = ctx.param_sep.reconstruct_params(tensor_params)
             with torch.enable_grad():
                 f = fcn(x, *params)
             dfdts = torch.autograd.grad(f, tensor_params,
-                grad_outputs=grad_y,
+                grad_outputs=grad_ys,
                 retain_graph=True,
                 create_graph=torch.is_grad_enabled())
-            dfdt = torch.cat([g.reshape(-1) for g in dfdts])
-            return dfdt
-
-        dydtparams = quad(new_fcn, xl, xu, params=(grad_y, *tensor_params),
-            fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
-
-        # reshape dydtparams into each tensor param
-        icount = 0
-        dydts = []
-        for p in tensor_params:
-            numel = torch.numel(p)
-            dydts.append(dydtparams[icount:icount+numel].reshape(p.shape))
-            icount += numel
+            return dfdts
 
         # reconstruct grad_params
+        dydts = quad(new_fcn, xl, xu, params=(*grad_ys, *tensor_params),
+                     fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         dydns = [None for _ in range(ctx.param_sep.nnontensors())]
         grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
 
