@@ -122,7 +122,7 @@ class FunctionPureFunction(PureFunction):
         try: yield
         finally: pass
 
-def pure_function_decor(pfunc):
+def make_pure_function_sibling(pfunc):
     def decor(fcn):
         new_pfunc = get_pure_function(pfunc.fcn, fcntocall=fcn)
         return new_pfunc
