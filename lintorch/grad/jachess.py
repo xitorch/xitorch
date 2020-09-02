@@ -3,6 +3,7 @@ from typing import Callable, List, Any, Union, Sequence
 from lintorch.linalg.linop import LinearOperator
 from lintorch._core.pure_function import wrap_fcn
 from lintorch._utils.assertfuncs import assert_type
+from lintorch._utils.misc import TensorNonTensorSeparator
 
 __all__ = ["jac", "hess"]
 
@@ -110,12 +111,12 @@ class _Jac(LinearOperator):
         self.nout = nout
 
         # params tensor is the LinearOperator's parameters
-        self.params_tensor_idx, params_tensor = zip(*[(i,param) for i,param in enumerate(params) if isinstance(param, torch.Tensor)])
-        self.params_tensor = {i:p for i,p in enumerate(params_tensor)} # convert to dictionary
-        self.id_params_tensor = [id(param) for param in self.params_tensor.values()]
+        self.param_sep = TensorNonTensorSeparator(params)
+        self.params_tensor = self.param_sep.get_tensor_params()
+        self.id_params_tensor = [id(param) for param in self.params_tensor]
 
     def _getparamnames(self) -> Sequence[str]:
-        return ["yparam"] + ["params_tensor[%d]"%i for i in self.params_tensor]
+        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nin)
@@ -144,7 +145,7 @@ class _Jac(LinearOperator):
         dfdyfs = torch.cat(dfdyfs, dim=0) # (nbatch, *nout)
 
         res = dfdyfs.reshape(*gy.shape[:-1], self.nout) # (..., nout)
-        res = connect_graph(res, self.params_tensor.values())
+        res = connect_graph(res, self.params_tensor)
         return res
 
     def _rmv(self, gout:torch.Tensor) -> torch.Tensor:
@@ -169,15 +170,14 @@ class _Jac(LinearOperator):
         dfdy = torch.cat(dfdy, dim=0) # (nbatch, *nin)
 
         res = dfdy.reshape(*gout.shape[:-1], self.nin) # (..., nin)
-        res = connect_graph(res, self.params_tensor.values())
+        res = connect_graph(res, self.params_tensor)
         return res # (..., nin)
 
     def __param_tensors_unchanged(self):
-        return [id(param) for param in self.params_tensor.values()] == self.id_params_tensor
+        return [id(param) for param in self.params_tensor] == self.id_params_tensor
 
     def __update_params(self):
-        for i,idx in enumerate(self.params_tensor_idx):
-            self.params[idx] = self.params_tensor[i]
+        self.params = self.param_sep.reconstruct_params(self.params_tensor)
 
 class _Hess(LinearOperator):
     def __init__(self, fcn:Callable[...,torch.Tensor],
@@ -197,6 +197,7 @@ class _Hess(LinearOperator):
             dtype=yparam.dtype,
             device=yparam.device)
 
+        self.idx = idx
         self.fcn = fcn
         self.dfdy = dfdy
         self.yparam = yparam
@@ -205,9 +206,9 @@ class _Hess(LinearOperator):
         self.inshape = yparam.shape
 
         # params tensor is the LinearOperator's parameters
-        self.params_tensor_idx, params_tensor = zip(*[(i,param) for i,param in enumerate(params) if isinstance(param, torch.Tensor)])
-        self.params_tensor = {i:p for i,p in enumerate(params_tensor)} # convert to dictionary
-        self.id_params_tensor = [id(param) for param in self.params_tensor.values()]
+        self.param_sep = TensorNonTensorSeparator(params)
+        self.params_tensor = self.param_sep.get_tensor_params()
+        self.id_params_tensor = [id(param) for param in self.params_tensor]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., *nin)
@@ -232,15 +233,17 @@ class _Hess(LinearOperator):
         d2fdy2s = torch.cat(d2fdy2s, dim=0) # (nbatch, *nin)
 
         res = d2fdy2s.reshape(*gy.shape[:-1], self.nin) # (..., nin)
-        res = connect_graph(res, self.params_tensor.values())
+        res = connect_graph(res, self.params_tensor)
         return res
 
+    def _getparamnames(self) -> Sequence[str]:
+        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))]
+
     def __param_tensors_unchanged(self):
-        return [id(param) for param in self.params_tensor.values()] == self.id_params_tensor
+        return [id(param) for param in self.params_tensor] == self.id_params_tensor
 
     def __update_params(self):
-        for i,idx in enumerate(self.params_tensor_idx):
-            self.params[idx] = self.params_tensor[i]
+        self.params = self.param_sep.reconstruct_params(self.params_tensor)
 
 def connect_graph(out, params):
     # just to have a dummy graph, in case there is a parameter that

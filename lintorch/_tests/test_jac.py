@@ -197,14 +197,22 @@ def test_hess_func():
 def test_hess_grad():
     na = 3
     params = getfnparams(na)
-    # params2 = [torch.rand(1, dtype=dtype).requires_grad_() for p in params]
+    params2 = [torch.rand(1, dtype=dtype).requires_grad_() for p in params]
     hs = hess(hfunc1, params)
 
     def fcnl(i, v, *params):
         hs = hess(hfunc1, params)
         return hs[i].mv(v.view(-1))
 
+    def fcnl2(i, v, *params2):
+        fmv, vparams = wrap_fcn(hs[i].mv, (v.view(-1),))
+        params1 = vparams[1:]
+        params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
+        return fmv(vparams[0], *params12)
+
     w = [torch.rand_like(p).requires_grad_() for p in params]
     for i in range(len(hs)):
         gradcheck    (fcnl, (i, w[i], *params))
         gradgradcheck(fcnl, (i, w[i], *params))
+        gradcheck    (fcnl2, (i, w[i], *params2))
+        gradgradcheck(fcnl2, (i, w[i], *params2))
