@@ -24,15 +24,15 @@ class PureFunction(object):
     def allparams(self, params):
         return [*params, *self._objparams]
 
-    def __call__(self, *all_params, sameobj=False):
+    def __call__(self, *allparams, sameobj=False):
         if self._savekwargs:
             self.sameobj = sameobj
-        nparams = len(all_params) - self._nobjparams
-        params = all_params[:nparams]
+        nparams = len(allparams) - self._nobjparams
+        params = allparams[:nparams]
         if sameobj:
             return self._fcn(*params)
         else:
-            objparams = all_params[nparams:]
+            objparams = allparams[nparams:]
             with self.useobjparams(objparams):
                 return self._fcn(*params)
 
