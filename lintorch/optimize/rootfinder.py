@@ -11,7 +11,7 @@ from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch.linalg.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.pure_function import wrap_fcn, get_pure_function, pure_function_decor
 from lintorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
@@ -60,9 +60,8 @@ def rootfinder(
     if is_debug_enabled():
         assert_fcn_params(fcn, (y0, *params))
 
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
-    all_params = all_params[1:] # to exclude y0
-    return _RootFinder.apply(wrapped_fcn, y0, fwd_options, bck_options, *all_params)#, *model_params)
+    pfunc = get_pure_function(fcn)
+    return _RootFinder.apply(pfunc, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 def equilibrium(
         fcn:Callable[...,torch.Tensor],
@@ -108,12 +107,13 @@ def equilibrium(
     if is_debug_enabled():
         assert_fcn_params(fcn, (y0, *params))
 
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
-    all_params = all_params[1:] # to exclude y0
-    def new_fcn(y, *params):
-        return y - wrapped_fcn(y, *params)
+    pfunc = get_pure_function(fcn)
 
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)#
+    @pure_function_decor(pfunc)
+    def new_fcn(y, *params):
+        return y - pfunc(y, *params)
+
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.getobjparams())
 
 def minimize(
         fcn:Callable[...,torch.Tensor],
@@ -151,28 +151,31 @@ def minimize(
     if is_debug_enabled():
         assert_fcn_params(fcn, (y0, *params))
 
-    wrapped_fcn, all_params = wrap_fcn(fcn, (y0, *params))
-    all_params = all_params[1:] # to exclude y0
+    pfunc = get_pure_function(fcn)
 
     # the rootfinder algorithms are designed to move to the opposite direction
     # of the output of the function, so the output of this function is just
     # the grad of z w.r.t. y
+    @pure_function_decor(pfunc)
     def new_fcn(y, *params):
         with torch.enable_grad():
             y1 = y.clone().requires_grad_()
-            z = wrapped_fcn(y1, *params)
+            z = pfunc(y1, *params)
         grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
             create_graph=torch.is_grad_enabled())
         return grady
 
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, *all_params)
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
     def forward(ctx, fcn:Callable[...,torch.Tensor],
             y0:torch.Tensor,
             options:Mapping[str,Any],
-            bck_options:Mapping[str,Any], *params) -> torch.Tensor:
+            bck_options:Mapping[str,Any],
+            nparams:int,
+            *allparams) -> torch.Tensor:
+
         # set default options
         config = set_default_option({
             "min_eps": 1e-9,
@@ -185,63 +188,69 @@ class _RootFinder(torch.autograd.Function):
             "method": "exactsolve"
         }, bck_options)
 
-        def loss(y):
-            yfcn = fcn(y, *params)
-            return yfcn
+        params = allparams[:nparams]
+        objparams = allparams[nparams:]
 
-        jinv0 = config["jinv0"]
-        method = config["method"].lower()
-        if method == "lbfgs":
-            y = lbfgs(loss, y0, **config)
-        elif method == "selfconsistent":
-            y = selfconsistent(loss, y0, **config)
-        elif method == "broyden":
-            y = broyden(loss, y0, **config)
-        elif method == "diis":
-            y = diis(loss, y0, **config)
-        elif method == "gradrca":
-            y = gradrca(loss, y0, **config)
-        elif method.startswith("np_"):
-            nbatch = y0.shape[0]
+        with fcn.useobjparams(objparams):
 
-            def loss_np(y):
-                yt = torch.tensor(y, dtype=y0.dtype, device=y0.device).view(nbatch,-1)
-                yfcn = fcn(yt, *params)
-                return yfcn.reshape(-1).cpu().detach().numpy()
+            def loss(y):
+                yfcn = fcn(y, *params)
+                return yfcn
 
-            y0_np = y0.squeeze(0).cpu().detach().numpy()
-            if method == "np_broyden1":
-                opt = set_default_option({
-                    "verbose": False,
-                    "max_niter": None,
-                    "min_eps": None,
-                    "linesearch": "armijo",
-                }, config)
-                y_np = scipy.optimize.broyden1(loss_np, y0_np,
-                    verbose=opt["verbose"],
-                    maxiter=opt["max_niter"],
-                    alpha=-config["jinv0"],
-                    f_tol=opt["min_eps"],
-                    line_search=opt["linesearch"])
-            elif method == "np_fsolve":
-                opt = set_default_option({
-                    "max_niter": 0,
-                }, config)
-                y_np, info, ier, msg = scipy.optimize.fsolve(loss_np, y0_np,
-                    maxfev=opt["max_niter"])
-                if ier != 1:
-                    warnings.warn(msg)
+            jinv0 = config["jinv0"]
+            method = config["method"].lower()
+            if method == "lbfgs":
+                y = lbfgs(loss, y0, **config)
+            elif method == "selfconsistent":
+                y = selfconsistent(loss, y0, **config)
+            elif method == "broyden":
+                y = broyden(loss, y0, **config)
+            elif method == "diis":
+                y = diis(loss, y0, **config)
+            elif method == "gradrca":
+                y = gradrca(loss, y0, **config)
+            elif method.startswith("np_"):
+                nbatch = y0.shape[0]
+
+                def loss_np(y):
+                    yt = torch.tensor(y, dtype=y0.dtype, device=y0.device).view(nbatch,-1)
+                    yfcn = fcn(yt, *params)
+                    return yfcn.reshape(-1).cpu().detach().numpy()
+
+                y0_np = y0.squeeze(0).cpu().detach().numpy()
+                if method == "np_broyden1":
+                    opt = set_default_option({
+                        "verbose": False,
+                        "max_niter": None,
+                        "min_eps": None,
+                        "linesearch": "armijo",
+                    }, config)
+                    y_np = scipy.optimize.broyden1(loss_np, y0_np,
+                        verbose=opt["verbose"],
+                        maxiter=opt["max_niter"],
+                        alpha=-config["jinv0"],
+                        f_tol=opt["min_eps"],
+                        line_search=opt["linesearch"])
+                elif method == "np_fsolve":
+                    opt = set_default_option({
+                        "max_niter": 0,
+                    }, config)
+                    y_np, info, ier, msg = scipy.optimize.fsolve(loss_np, y0_np,
+                        maxfev=opt["max_niter"])
+                    if ier != 1:
+                        warnings.warn(msg)
+                else:
+                    raise RuntimeError("Unknown method: %s" % config["method"])
+
+                y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device).unsqueeze(0)
             else:
                 raise RuntimeError("Unknown method: %s" % config["method"])
-
-            y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device).unsqueeze(0)
-        else:
-            raise RuntimeError("Unknown method: %s" % config["method"])
 
         ctx.fcn = fcn
 
         # split tensors and non-tensors params
-        ctx.param_sep = TensorNonTensorSeparator(params)
+        ctx.nparams = nparams
+        ctx.param_sep = TensorNonTensorSeparator(allparams)
         tensor_params = ctx.param_sep.get_tensor_params()
         ctx.save_for_backward(y, *tensor_params)
 
@@ -251,24 +260,34 @@ class _RootFinder(torch.autograd.Function):
     def backward(ctx, grad_yout:torch.Tensor):
         param_sep = ctx.param_sep
         yout = ctx.saved_tensors[0]
+        nparams = ctx.nparams
+        fcn = ctx.fcn
 
         # merge the tensor and nontensor parameters
         tensor_params = ctx.saved_tensors[1:]
-        params = param_sep.reconstruct_params(tensor_params)
+        allparams = param_sep.reconstruct_params(tensor_params)
+        params = allparams[:nparams]
+        objparams = allparams[nparams:]
 
         # dL/df
-        jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
-        gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.unsqueeze(-1),
-            fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
+        with fcn.useobjparams(objparams):
 
-        # get the grad for the params
-        with torch.enable_grad():
-            tensor_params_copy = [p.clone().requires_grad_() for p in tensor_params]
-            params_copy = param_sep.reconstruct_params(tensor_params_copy)
-            yfcn = ctx.fcn(yout, *params_copy)
-        grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
-            create_graph=torch.is_grad_enabled())
-        grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
-        grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
+            jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
+            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.unsqueeze(-1),
+                fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
 
-        return (None, None, None, None, *grad_params)
+            # get the grad for the params
+            with torch.enable_grad():
+                tensor_params_copy = [p.clone().requires_grad_() for p in tensor_params]
+                allparams_copy = param_sep.reconstruct_params(tensor_params_copy)
+                params_copy = allparams_copy[:nparams]
+                objparams_copy = allparams_copy[nparams:]
+                with fcn.useobjparams(objparams_copy):
+                    yfcn = fcn(yout, *params_copy)
+
+            grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
+                create_graph=torch.is_grad_enabled())
+            grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
+            grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
+
+        return (None, None, None, None, None, *grad_params)
