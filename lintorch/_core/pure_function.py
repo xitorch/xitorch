@@ -123,6 +123,23 @@ class FunctionPureFunction(PureFunction):
         finally: pass
 
 def make_pure_function_sibling(pfunc):
+    """
+    Used as a decor to mark the decorated function as a sibling method of the
+    input `pfunc`.
+    Sibling method is a method that is virtually belong to the same object, but
+    behaves differently.
+    Changing the state of the decorated function will also change the state of
+    `pfunc` and its other siblings.
+
+    Example
+    -------
+    @make_pure_function_sibling(pfunc)
+    def newpfunc(x, *params):
+        return x - pfunc(x, *params)
+
+    with newpfunc.useobjparams(objparams): # changes the state of pfunc as well
+        ...
+    """
     def decor(fcn):
         new_pfunc = get_pure_function(pfunc.fcn, fcntocall=fcn)
         return new_pfunc
