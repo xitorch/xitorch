@@ -9,7 +9,7 @@ from lintorch._utils.assertfuncs import assert_fcn_params
 from lintorch._impls.optimize.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
-from lintorch._core.linop import LinearOperator, checklinop
+from lintorch.linalg.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule, wrap_fcn
 from lintorch.debug.modes import is_debug_enabled
 

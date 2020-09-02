@@ -2,7 +2,7 @@ import torch
 from typing import Union, Mapping, Any
 import functools
 from lintorch._core.editable_module import wrap_fcn
-from lintorch._core.linop import LinearOperator
+from lintorch.linalg.linop import LinearOperator
 from lintorch.linalg.solve import solve
 from lintorch.debug.modes import is_debug_enabled
 from lintorch._utils.assertfuncs import assert_runtime

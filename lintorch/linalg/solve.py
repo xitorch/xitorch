@@ -3,7 +3,7 @@ import warnings
 from typing import Union, Any, Mapping
 import numpy as np
 from scipy.sparse.linalg import gmres
-from lintorch._core.linop import LinearOperator
+from lintorch.linalg.linop import LinearOperator
 from lintorch._impls.optimize.rootfinder import lbfgs, broyden
 from lintorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from lintorch._utils.assertfuncs import assert_runtime
