@@ -5,7 +5,7 @@ from lintorch._core.editable_module import EditableModule
 from contextlib import contextmanager
 from abc import abstractmethod
 
-__all__ = ["wrap_fcn", "get_pure_function"]
+__all__ = ["get_pure_function", "make_pure_function_sibling"]
 
 ############################ functional ###############################
 class PureFunction(object):
@@ -15,12 +15,11 @@ class PureFunction(object):
     states (`objparams`).
     For functions, this class only acts as a thin wrapper.
     """
-    def __init__(self, fcn, fcntocall=None, newmode=False):
+    def __init__(self, fcn, fcntocall=None):
         self._fcn = fcn
         self._fcntocall = fcn if fcntocall is None else fcntocall
         self._objparams = self.getobjparams()
         self._nobjparams = len(self._objparams)
-        self._newmode = newmode
         self._state_change_allowed = True
 
     def objparams(self):
@@ -29,18 +28,8 @@ class PureFunction(object):
     def allparams(self, params):
         return [*params, *self._objparams]
 
-    def __call__(self, *allparams, sameobj=False):
-        if not self._newmode:
-            nparams = len(allparams) - self._nobjparams
-            params = allparams[:nparams]
-            if sameobj:
-                return self._fcntocall(*params)
-            else:
-                objparams = allparams[nparams:]
-                with self.useobjparams(objparams):
-                    return self._fcntocall(*params)
-        else:
-            return self._fcntocall(*allparams)
+    def __call__(self, *params):
+        return self._fcntocall(*params)
 
     @property
     def fcn(self):
@@ -162,44 +151,6 @@ def make_pure_function_sibling(pfunc):
         return new_pfunc
     return decor
 
-def wrap_fcn(fcn, params):
-    """
-    Wrap function to include the object's parameters as well
-    """
-
-    # if the fcn is an object that has __call__ attribute, then assign it to fcn
-    # to make fcn a method
-    if isinstance(params, torch.Tensor):
-        params = [params]
-
-    if not inspect.ismethod(fcn) and not inspect.isfunction(fcn) and not isinstance(fcn, PureFunction):
-        if hasattr(fcn, "__call__"):
-            fcn = fcn.__call__
-        else:
-            raise RuntimeError("The function must be callable")
-
-    if isinstance(fcn, PureFunction):
-        pfunc = FunctionPureFunction(fcn.__call__)
-
-    elif inspect.isfunction(fcn):
-        pfunc = FunctionPureFunction(fcn)
-
-    # if it is a method from an object, unroll the parameters and add
-    # the object's parameters as well
-    elif isinstance(fcn.__self__, EditableModule):
-        pfunc = EditableModulePureFunction(fcn)
-
-    # do the similar thing as EditableModule for torch.nn.Module, but using
-    # obj.parameters() as the substitute as .getparams()
-    elif isinstance(fcn.__self__, torch.nn.Module):
-        pfunc = TorchNNPureFunction(fcn)
-
-    # return as it is if fcn is just a function and params all are tensors
-    else:
-        raise RuntimeError("The fcn must be a method of torch.nn.Module or lintorch.EditableModule")
-
-    return pfunc, pfunc.allparams(params)
-
 def get_pure_function(fcn, fcntocall=None):
     """
     Get the pure function form of the fcn
@@ -215,17 +166,17 @@ def get_pure_function(fcn, fcntocall=None):
         pfunc = fcn
 
     elif inspect.isfunction(fcn):
-        pfunc = FunctionPureFunction(fcn, fcntocall=fcntocall, newmode=True)
+        pfunc = FunctionPureFunction(fcn, fcntocall=fcntocall)
 
     # if it is a method from an object, unroll the parameters and add
     # the object's parameters as well
     elif isinstance(fcn.__self__, EditableModule):
-        pfunc = EditableModulePureFunction(fcn, fcntocall=fcntocall, newmode=True)
+        pfunc = EditableModulePureFunction(fcn, fcntocall=fcntocall)
 
     # do the similar thing as EditableModule for torch.nn.Module, but using
     # obj.parameters() as the substitute as .getparams()
     elif isinstance(fcn.__self__, torch.nn.Module):
-        pfunc = TorchNNPureFunction(fcn, fcntocall=fcntocall, newmode=True)
+        pfunc = TorchNNPureFunction(fcn, fcntocall=fcntocall)
 
     # return as it is if fcn is just a function and params all are tensors
     else:
