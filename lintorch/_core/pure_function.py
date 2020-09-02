@@ -9,6 +9,12 @@ __all__ = ["wrap_fcn"]
 
 ############################ functional ###############################
 class PureFunction(object):
+    """
+    PureFunction class wraps methods to make it stateless and expose the pure
+    function to take inputs of the original inputs (`params`) and the object's
+    states (`objparams`).
+    For functions, this class only acts as a thin wrapper.
+    """
     def __init__(self, fcn, params):
         self._nparams = len(params)
         self._fcn = fcn
@@ -100,8 +106,6 @@ class FunctionPureFunction(PureFunction):
 
     @contextmanager
     def useobjparams(self, objparams):
-        if len(objparams) > 0:
-            raise RuntimeError("A function should have no object params")
         try: yield
         finally: pass
 
