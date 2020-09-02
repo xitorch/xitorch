@@ -1,7 +1,8 @@
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.editable_module import EditableModule
+from lintorch._core.pure_function import wrap_fcn, get_pure_function, pure_function_decor
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._impls.integrate.fixed_quad import leggaussquad
 from lintorch.debug.modes import is_debug_enabled
@@ -47,26 +48,35 @@ def quad(
     out = fcn(xl, *params)
     is_tuple_out = not isinstance(out, torch.Tensor)
 
-    wrapped_fcn, all_params = wrap_fcn(fcn, (xl, *params))
-    all_params = all_params[1:] # to exclude x
+    pfunc = get_pure_function(fcn)
+    nparams = len(params)
     if not is_tuple_out:
-        wrapped_fcn2 = lambda x,*params: (wrapped_fcn(x,*params),)
-        return _Quadrature.apply(wrapped_fcn2, xl, xu, fwd_options, bck_options, *all_params)[0]
+        @pure_function_decor(pfunc)
+        def pfunc2(x, *params):
+            return (pfunc(x,*params),)
+        return _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams, *params, *pfunc.objparams())[0]
     else:
-        return _Quadrature.apply(wrapped_fcn , xl, xu, fwd_options, bck_options, *all_params)
+        return _Quadrature.apply(pfunc , xl, xu, fwd_options, bck_options, nparams, *params, *pfunc.objparams())
 
 class _Quadrature(torch.autograd.Function):
+    # NOTE: _Quadrature method do not involve changing the state (objparams) of
+    # fcn, so there is no need in using `with fcn.useobjparams(objparams)`
+    # statements
+
     @staticmethod
-    def forward(ctx, fcn, xl, xu, fwd_options, bck_options, *all_params):
+    def forward(ctx, fcn, xl, xu, fwd_options, bck_options, nparams, *all_params):
         config = set_default_option({
             "method": "leggauss",
             "n": 100,
         }, fwd_options)
         ctx.bck_config = set_default_option(config, bck_options)
 
+        params = all_params[:nparams]
+        objparams = all_params[nparams:]
+
         method = config["method"].lower()
         if method == "leggauss":
-            y = leggaussquad(fcn, xl, xu, all_params, **config)
+            y = leggaussquad(fcn, xl, xu, params, **config)
         else:
             raise RuntimeError("Unknown quad method: %s" % config["method"])
 
@@ -81,20 +91,23 @@ class _Quadrature(torch.autograd.Function):
                              ([xu] if not ctx.xutensor else [])
         ctx.save_for_backward(*xlxu_tensor, *tensor_params)
         ctx.fcn = fcn
+        ctx.nparams = nparams
 
         return tuple(y)
 
     @staticmethod
     def backward(ctx, *grad_ys):
         # retrieve the params
-        nparams = ctx.param_sep.ntensors()
-        tensor_params = ctx.saved_tensors[-nparams:]
-        params = ctx.param_sep.reconstruct_params(tensor_params)
+        ntensor_params = ctx.param_sep.ntensors()
+        tensor_params = ctx.saved_tensors[-ntensor_params:]
+        allparams = ctx.param_sep.reconstruct_params(tensor_params)
+        nparams = ctx.nparams
+        params = allparams[:nparams]
         fcn = ctx.fcn
         ngrady = len(grad_ys)
 
         # restore xl, and xu
-        xlxu_tensor = ctx.saved_tensors[:-nparams]
+        xlxu_tensor = ctx.saved_tensors[:-ntensor_params]
         if ctx.xltensor and ctx.xutensor:
             xl, xu = xlxu_tensor
         elif ctx.xltensor:
@@ -110,11 +123,10 @@ class _Quadrature(torch.autograd.Function):
         grad_xl = -sum([torch.sum(gy * f).reshape(xl.shape) for (gy,f) in zip(grad_ys, fcn(xl, *params))]) if ctx.xltensor else None
         grad_xu =  sum([torch.sum(gy * f).reshape(xu.shape) for (gy,f) in zip(grad_ys, fcn(xu, *params))]) if ctx.xutensor else None
 
-        # calculate the gradients for the integrands
         def new_fcn(x, *grad_y_params):
             grad_ys = grad_y_params[:ngrady]
-            tensor_params = grad_y_params[ngrady:]
-            params = ctx.param_sep.reconstruct_params(tensor_params)
+            # not setting objparams and params because the params and objparams
+            # are still the same objects as the objects outside
             with torch.enable_grad():
                 f = fcn(x, *params)
             dfdts = torch.autograd.grad(f, tensor_params,
@@ -124,9 +136,11 @@ class _Quadrature(torch.autograd.Function):
             return dfdts
 
         # reconstruct grad_params
+        # listing tensor_params in the params of quad to make sure it gets
+        # the gradient calculated
         dydts = quad(new_fcn, xl, xu, params=(*grad_ys, *tensor_params),
                      fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
         dydns = [None for _ in range(ctx.param_sep.nnontensors())]
         grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
 
-        return (None, grad_xl, grad_xu, None, None, *grad_params)
+        return (None, grad_xl, grad_xu, None, None, None, *grad_params)

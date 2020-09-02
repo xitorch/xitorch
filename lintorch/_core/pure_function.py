@@ -5,7 +5,7 @@ from lintorch._core.editable_module import EditableModule
 from contextlib import contextmanager
 from abc import abstractmethod
 
-__all__ = ["wrap_fcn", "get_pure_function", "nestedpurefunc"]
+__all__ = ["wrap_fcn", "get_pure_function"]
 
 ############################ functional ###############################
 class PureFunction(object):
@@ -15,8 +15,9 @@ class PureFunction(object):
     states (`objparams`).
     For functions, this class only acts as a thin wrapper.
     """
-    def __init__(self, fcn, savekwargs=False, newmode=False):
+    def __init__(self, fcn, fcntocall=None, savekwargs=False, newmode=False):
         self._fcn = fcn
+        self._fcntocall = fcn if fcntocall is None else fcntocall
         self._objparams = self.getobjparams()
         self._nobjparams = len(self._objparams)
         self._savekwargs = savekwargs
@@ -35,13 +36,13 @@ class PureFunction(object):
             nparams = len(allparams) - self._nobjparams
             params = allparams[:nparams]
             if sameobj:
-                return self._fcn(*params)
+                return self._fcntocall(*params)
             else:
                 objparams = allparams[nparams:]
                 with self.useobjparams(objparams):
-                    return self._fcn(*params)
+                    return self._fcntocall(*params)
         else:
-            return self._fcn(*allparams)
+            return self._fcntocall(*allparams)
 
     @property
     def fcn(self):
@@ -121,8 +122,11 @@ class FunctionPureFunction(PureFunction):
         try: yield
         finally: pass
 
-def nestedpurefunc(fcn):
-    return FunctionPureFunction(fcn, savekwargs=True)
+def pure_function_decor(pfunc):
+    def decor(fcn):
+        new_pfunc = get_pure_function(pfunc.fcn, fcntocall=fcn)
+        return new_pfunc
+    return decor
 
 def wrap_fcn(fcn, params):
     """
@@ -162,7 +166,7 @@ def wrap_fcn(fcn, params):
 
     return pfunc, pfunc.allparams(params)
 
-def get_pure_function(fcn):
+def get_pure_function(fcn, fcntocall=None):
     """
     Get the pure function form of the fcn
     """
@@ -177,17 +181,17 @@ def get_pure_function(fcn):
         pfunc = fcn
 
     elif inspect.isfunction(fcn):
-        pfunc = FunctionPureFunction(fcn, newmode=True)
+        pfunc = FunctionPureFunction(fcn, fcntocall=fcntocall, newmode=True)
 
     # if it is a method from an object, unroll the parameters and add
     # the object's parameters as well
     elif isinstance(fcn.__self__, EditableModule):
-        pfunc = EditableModulePureFunction(fcn, newmode=True)
+        pfunc = EditableModulePureFunction(fcn, fcntocall=fcntocall, newmode=True)
 
     # do the similar thing as EditableModule for torch.nn.Module, but using
     # obj.parameters() as the substitute as .getparams()
     elif isinstance(fcn.__self__, torch.nn.Module):
-        pfunc = TorchNNPureFunction(fcn, newmode=True)
+        pfunc = TorchNNPureFunction(fcn, fcntocall=fcntocall, newmode=True)
 
     # return as it is if fcn is just a function and params all are tensors
     else:
