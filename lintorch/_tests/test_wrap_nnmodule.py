@@ -1,5 +1,5 @@
 import torch
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.pure_function import get_pure_function
 
 class NNModule(torch.nn.Module):
     def __init__(self, a):
@@ -27,8 +27,8 @@ def test_wrap_nnmodule():
 
     for i in range(len(modules)):
         module = modules[i]
-        fcn, params = wrap_fcn(module, (x,))
-        assert len(params) == nparams[i]
-        assert params[0] is x
-        if len(params) == 2:
-            assert params[1] is a
+        pfcn = get_pure_function(module)
+        objparams = pfcn.objparams()
+        assert len(objparams) == nparams[i]-1 # 1 for the parameter x
+        if len(objparams) == 1:
+            assert objparams[0] is a

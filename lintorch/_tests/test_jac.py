@@ -2,7 +2,7 @@ import torch
 from torch.autograd import gradcheck, gradgradcheck
 from lintorch.grad.jachess import jac, hess
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.pure_function import get_pure_function
 
 dtype = torch.float64
 
@@ -111,16 +111,20 @@ def test_jac_grad():
         return jacs[i].mv(w.view(-1))
 
     def fcnr2(i, v, *params2):
-        fmv, vparams = wrap_fcn(jacs[i].rmv, (v.view(-1),))
-        params1 = vparams[1:]
-        params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
-        return fmv(vparams[0], *params12)
+        fmv = get_pure_function(jacs[i].rmv)
+        params0 = v.view(-1)
+        params1 = fmv.objparams()
+        params12 = [p1*p2 for p1,p2 in zip(params1, params2)]
+        with fmv.useobjparams(params12):
+            return fmv(params0)
 
     def fcnl2(i, w, *params2):
-        fmv, vparams = wrap_fcn(jacs[i].mv, (w.view(-1),))
-        params1 = vparams[1:]
+        fmv = get_pure_function(jacs[i].mv)
+        params0 = w.view(-1)
+        params1 = fmv.objparams()
         params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
-        return fmv(vparams[0], *params12)
+        with fmv.useobjparams(params12):
+            return fmv(params0)
 
     v = torch.rand((na,), dtype=dtype, requires_grad=True)
     w = [torch.rand_like(p).requires_grad_() for p in params]
@@ -205,10 +209,12 @@ def test_hess_grad():
         return hs[i].mv(v.view(-1))
 
     def fcnl2(i, v, *params2):
-        fmv, vparams = wrap_fcn(hs[i].mv, (v.view(-1),))
-        params1 = vparams[1:]
+        fmv = get_pure_function(hs[i].mv)
+        params0 = v.view(-1)
+        params1 = fmv.objparams()
         params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
-        return fmv(vparams[0], *params12)
+        with fmv.useobjparams(params12):
+            return fmv(params0)
 
     w = [torch.rand_like(p).requires_grad_() for p in params]
     for i in range(len(hs)):

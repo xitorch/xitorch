@@ -2,7 +2,7 @@ import torch
 import pytest
 from typing import List
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.pure_function import get_pure_function
 from lintorch._utils.exceptions import GetSetParamsError
 
 ##############
@@ -169,49 +169,56 @@ def test_warning_getsetparams():
 ##############
 # test the wrap function to make it a functional
 def test_edit_simple():
-    fcn, params = wrap_fcn(model.method_correct_getsetparams, (b,))
-    assert len(params) == 5 # 4 obj params + 1 method param
-    assert params[0] is b
-    assert params[1] is not b
-    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
-    f = fcn(*newparams)
+    pfcn = get_pure_function(model.method_correct_getsetparams)
+    objparams = pfcn.objparams()
+    assert len(objparams) == 4
+    newb = torch.tensor([1.])
+    newobjparams = [torch.tensor(1.0*i+2) for i in range(len(objparams))]
+    with pfcn.useobjparams(newobjparams):
+        f = pfcn(newb)
     assert torch.allclose(f, f*0+16) # (1+2+3+4+5+1)
 
-    fcn2, params2 = wrap_fcn(model.method_correct_getsetparams2, (b, b))
-    assert len(params2) == 6 # 4 obj params + 2 method param
-    assert params2[0] is b
-    assert params2[1] is b
-    assert params2[2] is not b
-    newparams2 = [torch.tensor([1.0*i+1]) for i in range(len(params2))]
-    f2 = fcn2(*newparams2)
+    pfcn2 = get_pure_function(model.method_correct_getsetparams2)
+    objparams2 = pfcn2.objparams()
+    assert len(objparams2) == 4
+    newparams2 = [torch.tensor(1.0*i+1) for i in range(2)]
+    newobjparams2 = [torch.tensor(1.0*i+3) for i in range(len(objparams2))]
+    with pfcn2.useobjparams(newobjparams2):
+        f2 = pfcn2(*newparams2)
     assert torch.allclose(f2, f2*0+41) # (1+3+4+5+6+1) + (2+3+4+5+6+1)
 
 def test_edit_duplicate():
-    fcn, params = wrap_fcn(model.method_duplicate_correct, (b,))
-    assert len(params) == 5 # aa is a duplicate, so not included here
-    assert params[0] is b
-    assert params[1] is model.a
-    assert params[1] is model.aa
-    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
-    f = fcn(*newparams)
+    pfcn = get_pure_function(model.method_duplicate_correct)
+    objparams = pfcn.objparams()
+    assert len(objparams) == 4
+    assert objparams[0] is model.a
+    assert objparams[0] is model.aa # aa is a duplicate of a
+    newparams = [torch.tensor(1.0*i+1) for i in range(1)]
+    newobjparams = [torch.tensor(1.0*i+2) for i in range(len(objparams))]
+    with pfcn.useobjparams(newobjparams):
+        f = pfcn(*newparams)
     assert torch.allclose(f, f*0+18) # (1+2+3+4+5+1) + 2
 
 def test_edit_dict():
-    fcn, params = wrap_fcn(model.method_dict_correct, (b,))
-    assert len(params) == 7
-    assert params[0] is b
-    assert params[-1] is model.dctparams[2]
-    assert params[-2] is model.dctparams[0]
-    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
-    f = fcn(*newparams)
+    pfcn = get_pure_function(model.method_dict_correct)
+    objparams = pfcn.objparams()
+    assert len(objparams) == 6
+    assert objparams[-1] is model.dctparams[2]
+    assert objparams[-2] is model.dctparams[0]
+    newparams = [torch.tensor(1.0*i+1) for i in range(1)]
+    newobjparams = [torch.tensor(1.0*i+2) for i in range(len(objparams))]
+    with pfcn.useobjparams(newobjparams):
+        f = pfcn(*newparams)
     assert torch.allclose(f, f*0+29) # (1+2+3+4+5+1) + 6+7
 
 def test_edit_list():
-    fcn, params = wrap_fcn(model.method_list_correct, (b,))
-    assert len(params) == 7
-    assert params[0] is b
-    assert params[-1] is model.listparams[2]
-    assert params[-2] is model.listparams[0]
-    newparams = [torch.tensor([1.0*i+1]) for i in range(len(params))]
-    f = fcn(*newparams)
+    pfcn = get_pure_function(model.method_list_correct)
+    objparams = pfcn.objparams()
+    assert len(objparams) == 6
+    assert objparams[-1] is model.listparams[2]
+    assert objparams[-2] is model.listparams[0]
+    newparams = [torch.tensor(1.0*i+1) for i in range(1)]
+    newobjparams = [torch.tensor(1.0*i+2) for i in range(len(objparams))]
+    with pfcn.useobjparams(newobjparams):
+        f = pfcn(*newparams)
     assert torch.allclose(f, f*0+29) # (1+2+3+4+5+1) + 6+7
