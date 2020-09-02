@@ -61,39 +61,45 @@ def quad(
 class _Quadrature(torch.autograd.Function):
     # NOTE: _Quadrature method do not involve changing the state (objparams) of
     # fcn, so there is no need in using `with fcn.useobjparams(objparams)`
-    # statements
+    # statements.
+    # The function `disable_state_change()` is used to disable state change of
+    # the pure function during the execution of the forward and backward
+    # calculations
 
     @staticmethod
     def forward(ctx, fcn, xl, xu, fwd_options, bck_options, nparams, *all_params):
-        config = set_default_option({
-            "method": "leggauss",
-            "n": 100,
-        }, fwd_options)
-        ctx.bck_config = set_default_option(config, bck_options)
 
-        params = all_params[:nparams]
-        objparams = all_params[nparams:]
+        with fcn.disable_state_change():
 
-        method = config["method"].lower()
-        if method == "leggauss":
-            y = leggaussquad(fcn, xl, xu, params, **config)
-        else:
-            raise RuntimeError("Unknown quad method: %s" % config["method"])
+            config = set_default_option({
+                "method": "leggauss",
+                "n": 100,
+            }, fwd_options)
+            ctx.bck_config = set_default_option(config, bck_options)
 
-        # save the parameters for backward
-        ctx.param_sep = TensorNonTensorSeparator(all_params)
-        tensor_params = ctx.param_sep.get_tensor_params()
-        ctx.xltensor = isinstance(xl, torch.Tensor)
-        ctx.xutensor = isinstance(xu, torch.Tensor)
-        xlxu_tensor = ([xl] if ctx.xltensor else []) + \
-                      ([xu] if ctx.xutensor else [])
-        ctx.xlxu_nontensor = ([xl] if not ctx.xltensor else []) + \
-                             ([xu] if not ctx.xutensor else [])
-        ctx.save_for_backward(*xlxu_tensor, *tensor_params)
-        ctx.fcn = fcn
-        ctx.nparams = nparams
+            params = all_params[:nparams]
+            objparams = all_params[nparams:]
 
-        return tuple(y)
+            method = config["method"].lower()
+            if method == "leggauss":
+                y = leggaussquad(fcn, xl, xu, params, **config)
+            else:
+                raise RuntimeError("Unknown quad method: %s" % config["method"])
+
+            # save the parameters for backward
+            ctx.param_sep = TensorNonTensorSeparator(all_params)
+            tensor_params = ctx.param_sep.get_tensor_params()
+            ctx.xltensor = isinstance(xl, torch.Tensor)
+            ctx.xutensor = isinstance(xu, torch.Tensor)
+            xlxu_tensor = ([xl] if ctx.xltensor else []) + \
+                          ([xu] if ctx.xutensor else [])
+            ctx.xlxu_nontensor = ([xl] if not ctx.xltensor else []) + \
+                                 ([xu] if not ctx.xutensor else [])
+            ctx.save_for_backward(*xlxu_tensor, *tensor_params)
+            ctx.fcn = fcn
+            ctx.nparams = nparams
+
+            return tuple(y)
 
     @staticmethod
     def backward(ctx, *grad_ys):
@@ -106,41 +112,43 @@ class _Quadrature(torch.autograd.Function):
         fcn = ctx.fcn
         ngrady = len(grad_ys)
 
-        # restore xl, and xu
-        xlxu_tensor = ctx.saved_tensors[:-ntensor_params]
-        if ctx.xltensor and ctx.xutensor:
-            xl, xu = xlxu_tensor
-        elif ctx.xltensor:
-            xl = xlxu_tensor[0]
-            xu = ctx.xlxu_nontensor[0]
-        elif ctx.xutensor:
-            xu = xlxu_tensor[0]
-            xl = ctx.xlxu_nontensor[0]
-        else:
-            xl, xu = ctx.xlxu_nontensor
+        with fcn.disable_state_change():
 
-        # calculate the gradient for the boundaries
-        grad_xl = -sum([torch.sum(gy * f).reshape(xl.shape) for (gy,f) in zip(grad_ys, fcn(xl, *params))]) if ctx.xltensor else None
-        grad_xu =  sum([torch.sum(gy * f).reshape(xu.shape) for (gy,f) in zip(grad_ys, fcn(xu, *params))]) if ctx.xutensor else None
+            # restore xl, and xu
+            xlxu_tensor = ctx.saved_tensors[:-ntensor_params]
+            if ctx.xltensor and ctx.xutensor:
+                xl, xu = xlxu_tensor
+            elif ctx.xltensor:
+                xl = xlxu_tensor[0]
+                xu = ctx.xlxu_nontensor[0]
+            elif ctx.xutensor:
+                xu = xlxu_tensor[0]
+                xl = ctx.xlxu_nontensor[0]
+            else:
+                xl, xu = ctx.xlxu_nontensor
 
-        def new_fcn(x, *grad_y_params):
-            grad_ys = grad_y_params[:ngrady]
-            # not setting objparams and params because the params and objparams
-            # are still the same objects as the objects outside
-            with torch.enable_grad():
-                f = fcn(x, *params)
-            dfdts = torch.autograd.grad(f, tensor_params,
-                grad_outputs=grad_ys,
-                retain_graph=True,
-                create_graph=torch.is_grad_enabled())
-            return dfdts
+            # calculate the gradient for the boundaries
+            grad_xl = -sum([torch.sum(gy * f).reshape(xl.shape) for (gy,f) in zip(grad_ys, fcn(xl, *params))]) if ctx.xltensor else None
+            grad_xu =  sum([torch.sum(gy * f).reshape(xu.shape) for (gy,f) in zip(grad_ys, fcn(xu, *params))]) if ctx.xutensor else None
 
-        # reconstruct grad_params
-        # listing tensor_params in the params of quad to make sure it gets
-        # the gradient calculated
-        dydts = quad(new_fcn, xl, xu, params=(*grad_ys, *tensor_params),
-                     fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
-        dydns = [None for _ in range(ctx.param_sep.nnontensors())]
-        grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
+            def new_fcn(x, *grad_y_params):
+                grad_ys = grad_y_params[:ngrady]
+                # not setting objparams and params because the params and objparams
+                # are still the same objects as the objects outside
+                with torch.enable_grad():
+                    f = fcn(x, *params)
+                dfdts = torch.autograd.grad(f, tensor_params,
+                    grad_outputs=grad_ys,
+                    retain_graph=True,
+                    create_graph=torch.is_grad_enabled())
+                return dfdts
 
-        return (None, grad_xl, grad_xu, None, None, None, *grad_params)
+            # reconstruct grad_params
+            # listing tensor_params in the params of quad to make sure it gets
+            # the gradient calculated
+            dydts = quad(new_fcn, xl, xu, params=(*grad_ys, *tensor_params),
+                         fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
+            dydns = [None for _ in range(ctx.param_sep.nnontensors())]
+            grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
+
+            return (None, grad_xl, grad_xu, None, None, None, *grad_params)

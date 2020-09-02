@@ -15,13 +15,13 @@ class PureFunction(object):
     states (`objparams`).
     For functions, this class only acts as a thin wrapper.
     """
-    def __init__(self, fcn, fcntocall=None, savekwargs=False, newmode=False):
+    def __init__(self, fcn, fcntocall=None, newmode=False):
         self._fcn = fcn
         self._fcntocall = fcn if fcntocall is None else fcntocall
         self._objparams = self.getobjparams()
         self._nobjparams = len(self._objparams)
-        self._savekwargs = savekwargs
         self._newmode = newmode
+        self._state_change_allowed = True
 
     def objparams(self):
         return self._objparams
@@ -31,8 +31,6 @@ class PureFunction(object):
 
     def __call__(self, *allparams, sameobj=False):
         if not self._newmode:
-            if self._savekwargs:
-                self.sameobj = sameobj
             nparams = len(allparams) - self._nobjparams
             params = allparams[:nparams]
             if sameobj:
@@ -54,8 +52,29 @@ class PureFunction(object):
 
     @contextmanager
     @abstractmethod
-    def useobjparams(self, objparams):
+    def _useobjparams(self, objparams):
         pass
+
+    @contextmanager
+    def useobjparams(self, objparams):
+        if not self._state_change_allowed:
+            raise RuntimeError("The state change is disabled")
+        with self._useobjparams(objparams):
+            try: yield
+            finally: pass
+
+    @contextmanager
+    def disable_state_change(self):
+        try:
+            prev_status = self._state_change_allowed
+            self._state_change_allowed = False
+            yield
+        finally:
+            self._state_change_allowed = prev_status
+
+    # NOTE: please refrain from implementing enable_state_change.
+    # If you want to enable state change, then just remove
+    # `with obj.disable_state_change()` statement in your code
 
 class EditableModulePureFunction(PureFunction):
     def getobjparams(self):
@@ -66,12 +85,10 @@ class EditableModulePureFunction(PureFunction):
         return objparams
 
     @contextmanager
-    def useobjparams(self, objparams):
+    def _useobjparams(self, objparams):
         with self.obj.useuniqueparams(self.methodname, *objparams):
-            try:
-                yield
-            finally:
-                pass
+            try: yield
+            finally: pass
 
 class TorchNNPureFunction(PureFunction):
     def getobjparams(self):
@@ -90,7 +107,7 @@ class TorchNNPureFunction(PureFunction):
         return obj_params
 
     @contextmanager
-    def useobjparams(self, objparams):
+    def _useobjparams(self, objparams):
         nnmodule = self.obj
         names = self.names
         try:
@@ -118,7 +135,7 @@ class FunctionPureFunction(PureFunction):
         return []
 
     @contextmanager
-    def useobjparams(self, objparams):
+    def _useobjparams(self, objparams):
         try: yield
         finally: pass
 
