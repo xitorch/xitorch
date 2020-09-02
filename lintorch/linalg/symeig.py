@@ -1,7 +1,6 @@
 import torch
 from typing import Union, Mapping, Any
 import functools
-from lintorch._core.pure_function import wrap_fcn
 from lintorch.linalg.linop import LinearOperator
 from lintorch.linalg.solve import solve
 from lintorch.debug.modes import is_debug_enabled

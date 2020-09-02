@@ -2,7 +2,7 @@ import torch
 from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import wrap_fcn, get_pure_function, make_pure_function_sibling
+from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._impls.integrate.fixed_quad import leggaussquad
 from lintorch.debug.modes import is_debug_enabled
