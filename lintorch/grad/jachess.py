@@ -1,7 +1,7 @@
 import torch
 from typing import Callable, List, Any, Union, Sequence
 from lintorch.linalg.linop import LinearOperator
-from lintorch._core.pure_function import wrap_fcn
+from lintorch._core.pure_function import get_pure_function
 from lintorch._utils.assertfuncs import assert_type
 from lintorch._utils.misc import TensorNonTensorSeparator
 
@@ -35,8 +35,8 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     idxs_list = _setup_idxs(idxs, params)
 
     # make the function a functional (depends on all parameters in the object)
-    fcn, params = wrap_fcn(fcn, params)
-    res = [_Jac(fcn, params, idx) for idx in idxs_list]
+    pfcn = get_pure_function(fcn)
+    res = [_Jac(pfcn, params, idx) for idx in idxs_list]
     if isinstance(idxs, int):
         res = res[0]
     return res
@@ -69,8 +69,8 @@ def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     idxs_list = _setup_idxs(idxs, params)
 
     # make the function a functional (depends on all parameters in the object)
-    fcn, params = wrap_fcn(fcn, params)
-    res = [_Hess(fcn, params, idx) for idx in idxs_list]
+    pfcn = get_pure_function(fcn)
+    res = [_Hess(pfcn, params, idx) for idx in idxs_list]
     if isinstance(idxs, int):
         res = res[0]
     return res
@@ -101,6 +101,7 @@ class _Jac(LinearOperator):
         self.fcn = fcn
         self.yparam = yparam
         self.params = list(params)
+        self.objparams = fcn.objparams()
         self.yout = yout
         self.v = v
         self.idx = idx
@@ -114,9 +115,11 @@ class _Jac(LinearOperator):
         self.param_sep = TensorNonTensorSeparator(params)
         self.params_tensor = self.param_sep.get_tensor_params()
         self.id_params_tensor = [id(param) for param in self.params_tensor]
+        self.id_objparams_tensor = [id(param) for param in self.objparams]
 
     def _getparamnames(self) -> Sequence[str]:
-        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))]
+        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))] + \
+               ["objparams[%d]"%i for i in range(len(self.objparams))]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nin)
@@ -128,7 +131,7 @@ class _Jac(LinearOperator):
             dfdy = self.dfdy
         # otherwise, reevaluate by replacing the parameters with the new tensor params
         else:
-            with torch.enable_grad():
+            with torch.enable_grad(), self.fcn.useobjparams(self.objparams):
                 self.__update_params()
                 yparam = self.params[self.idx]
                 yout = self.fcn(*self.params) # (*nout)
@@ -155,7 +158,7 @@ class _Jac(LinearOperator):
             yout = self.yout
             yparam = self.yparam
         else:
-            with torch.enable_grad():
+            with torch.enable_grad(), self.fcn.useobjparams(self.objparams):
                 self.__update_params()
                 yparam = self.params[self.idx]
                 yout = self.fcn(*self.params) # (*nout)
@@ -174,7 +177,8 @@ class _Jac(LinearOperator):
         return res # (..., nin)
 
     def __param_tensors_unchanged(self):
-        return [id(param) for param in self.params_tensor] == self.id_params_tensor
+        return [id(param) for param in self.params_tensor] == self.id_params_tensor and \
+               [id(param) for param in self.objparams] == self.id_objparams_tensor
 
     def __update_params(self):
         self.params = self.param_sep.reconstruct_params(self.params_tensor)
@@ -202,6 +206,7 @@ class _Hess(LinearOperator):
         self.dfdy = dfdy
         self.yparam = yparam
         self.params = list(params)
+        self.objparams = fcn.objparams()
         self.nin = nin
         self.inshape = yparam.shape
 
@@ -209,6 +214,7 @@ class _Hess(LinearOperator):
         self.param_sep = TensorNonTensorSeparator(params)
         self.params_tensor = self.param_sep.get_tensor_params()
         self.id_params_tensor = [id(param) for param in self.params_tensor]
+        self.id_objparams_tensor = [id(param) for param in self.objparams]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., *nin)
@@ -216,7 +222,7 @@ class _Hess(LinearOperator):
             dfdy = self.dfdy
             yparam = self.yparam
         else:
-            with torch.enable_grad():
+            with torch.enable_grad(), self.fcn.useobjparams(self.objparams):
                 self.__update_params()
                 yparam = self.params[self.idx]
                 yout = self.fcn(*self.params)
@@ -237,10 +243,12 @@ class _Hess(LinearOperator):
         return res
 
     def _getparamnames(self) -> Sequence[str]:
-        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))]
+        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))] + \
+               ["objparams[%d]"%i for i in range(len(self.objparams))]
 
     def __param_tensors_unchanged(self):
-        return [id(param) for param in self.params_tensor] == self.id_params_tensor
+        return [id(param) for param in self.params_tensor] == self.id_params_tensor and \
+               [id(param) for param in self.objparams] == self.id_objparams_tensor
 
     def __update_params(self):
         self.params = self.param_sep.reconstruct_params(self.params_tensor)
