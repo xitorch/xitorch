@@ -5,7 +5,7 @@ from lintorch._core.editable_module import EditableModule
 from contextlib import contextmanager
 from abc import abstractmethod
 
-__all__ = ["wrap_fcn"]
+__all__ = ["wrap_fcn", "nestedpurefunc"]
 
 ############################ functional ###############################
 class PureFunction(object):
@@ -15,21 +15,24 @@ class PureFunction(object):
     states (`objparams`).
     For functions, this class only acts as a thin wrapper.
     """
-    def __init__(self, fcn, params):
-        self._nparams = len(params)
+    def __init__(self, fcn, savekwargs=False):
         self._fcn = fcn
         self._objparams = self.getobjparams(fcn)
-        self._params = params
+        self._nobjparams = len(self._objparams)
+        self._savekwargs = savekwargs
 
-    def allparams(self):
-        return [*self._params, *self._objparams]
+    def allparams(self, params):
+        return [*params, *self._objparams]
 
     def __call__(self, *all_params, sameobj=False):
-        params = all_params[:self._nparams]
+        if self._savekwargs:
+            self.sameobj = sameobj
+        nparams = len(all_params) - self._nobjparams
+        params = all_params[:nparams]
         if sameobj:
             return self._fcn(*params)
         else:
-            objparams = all_params[self._nparams:]
+            objparams = all_params[nparams:]
             with self.useobjparams(objparams):
                 return self._fcn(*params)
 
@@ -109,6 +112,9 @@ class FunctionPureFunction(PureFunction):
         try: yield
         finally: pass
 
+def nestedpurefunc(fcn):
+    return FunctionPureFunction(fcn, savekwargs=True)
+
 def wrap_fcn(fcn, params):
     """
     Wrap function to include the object's parameters as well
@@ -126,23 +132,23 @@ def wrap_fcn(fcn, params):
             raise RuntimeError("The function must be callable")
 
     if isinstance(fcn, PureFunction):
-        pfunc = FunctionPureFunction(fcn.__call__, params)
+        pfunc = FunctionPureFunction(fcn.__call__)
 
     elif inspect.isfunction(fcn):
-        pfunc = FunctionPureFunction(fcn, params)
+        pfunc = FunctionPureFunction(fcn)
 
     # if it is a method from an object, unroll the parameters and add
     # the object's parameters as well
     elif isinstance(fcn.__self__, EditableModule):
-        pfunc = EditableModulePureFunction(fcn, params)
+        pfunc = EditableModulePureFunction(fcn)
 
     # do the similar thing as EditableModule for torch.nn.Module, but using
     # obj.parameters() as the substitute as .getparams()
     elif isinstance(fcn.__self__, torch.nn.Module):
-        pfunc = TorchNNPureFunction(fcn, params)
+        pfunc = TorchNNPureFunction(fcn)
 
     # return as it is if fcn is just a function and params all are tensors
     else:
         raise RuntimeError("The fcn must be a method of torch.nn.Module or lintorch.EditableModule")
 
-    return pfunc, pfunc.allparams()
+    return pfunc, pfunc.allparams(params)
