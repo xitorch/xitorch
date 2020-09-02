@@ -1,7 +1,7 @@
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
-from lintorch._core.editable_module import wrap_fcn
+from lintorch._core.pure_function import wrap_fcn
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch.debug.modes import is_debug_enabled
 

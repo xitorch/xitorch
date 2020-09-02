@@ -10,7 +10,8 @@ from lintorch._impls.optimize.rootfinder import lbfgs, selfconsistent, broyden, 
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch.linalg.linop import LinearOperator, checklinop
-from lintorch._core.editable_module import EditableModule, wrap_fcn
+from lintorch._core.editable_module import EditableModule
+from lintorch._core.pure_function import wrap_fcn
 from lintorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]

@@ -1,5 +1,5 @@
 import torch
-from lintorch._core.editable_module import wrap_fcn
+from lintorch._core.pure_function import wrap_fcn
 
 class NNModule(torch.nn.Module):
     def __init__(self, a):
