@@ -141,17 +141,19 @@ class _SolveIVP(torch.autograd.Function):
                     f = pfcn(tcopy, ycopy, *params_copy)
                 return f, tcopy, ycopy, tensor_params_copy
 
-        # slices definitions
+        # slices and indices definitions on the augmented states
         y_slice = slice(None, ny, None) # [:ny]
         dLdy_slice = slice(ny, 2*ny, None) # [ny:2*ny]
-        dLdt_slice = slice(2*ny, 2*ny+1, None) # [2*ny:2*ny+1]
-        dLdparams_slice = slice(-ntensor_params, None, None) # [-ntensor_params:]
-        augstate_size = 2*ny+1 + ntensor_params
+        dLdt_index = 2*ny
+        dLdt_slice = slice(dLdt_index, dLdt_index+1, None) # [2*ny:2*ny+1]
+        dLdp_slice = slice(-ntensor_params, None, None) # [-ntensor_params:]
+        state_size = 2*ny+1 + ntensor_params
+        states = [None for _ in range(state_size)]
 
-        def new_pfunc(t, inps, *tensor_params):
+        def new_pfunc(t, states, *tensor_params):
             # t: single-element
-            y = inps[:ny] # list of (*ny)
-            dLdy = [-fi for fi in inps[ny:2*ny]] # list of (*ny)
+            y = states[:ny] # list of (*ny)
+            dLdy = [-fi for fi in states[ny:2*ny]] # list of (*ny)
             with torch.enable_grad():
                 f, t2, y2, tensor_params2 = pfunc2(t, y, tensor_params)
             allgradinputs = (list(y2) + [t2] + list(tensor_params2))
@@ -175,41 +177,36 @@ class _SolveIVP(torch.autograd.Function):
 
         ts_flip = ts.flip(0)
         t_flip_idx = -1
-        inps = [
-            *[yyt[t_flip_idx] for yyt in yt], # y
-            *[gyt[t_flip_idx] for gyt in grad_yt], # dL/dy
-            *[torch.zeros_like(ts[0])], # dL/dt
-            *[torch.zeros_like(tp) for tp in tensor_params],
-        ]
-        grad_ts = torch.empty_like(ts) if ts_requires_grad else None
+        states[y_slice   ] = [yyt[t_flip_idx] for yyt in yt]
+        states[dLdy_slice] = [gyt[t_flip_idx] for gyt in grad_yt]
+        states[dLdt_slice] = [torch.zeros_like(ts[0])]
+        states[dLdp_slice] = [torch.zeros_like(tp) for tp in tensor_params]
+        grad_ts = [None for _ in range(len(ts))] if ts_requires_grad else None
+
         for i in range(len(ts_flip)-1):
             if ts_requires_grad:
-                fevals = pfunc2(ts_flip[i], inps[:ny], tensor_params)[0]
+                fevals = pfunc2(ts_flip[i], states[y_slice], tensor_params)[0]
                 dLdt1 = sum([torch.dot(feval.reshape(-1), gyt[t_flip_idx])  for feval,gyt in zip(fevals, grad_yt)])
-                inps[2*ny] -= dLdt1
-                grad_ts[t_flip_idx] = dLdt1
+                states[dLdt_index] -= dLdt1
+                grad_ts[t_flip_idx] = dLdt1.view(-1)
 
             t_flip_idx -= 1
-            outs = solve_ivp(new_pfunc, ts_flip[i:i+2], inps, tensor_params,
+            outs = solve_ivp(new_pfunc, ts_flip[i:i+2], states, tensor_params,
                 fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
             # only take the output for the earliest time
-            outs = [out[-1] for out in outs]
-            inps = [
-                *[yyt[t_flip_idx] for yyt in yt], # y
-                # gyt is the contribution from the input grad_y
-                # gy0 is the propagated gradients from the later time step,
-                #  but here we only take [-1] to get the gradient at the
-                #  earlier time step (remember, time flips)
-                *[gyt[t_flip_idx] + gy0 for (gyt,gy0) in zip(grad_yt, outs[ny:2*ny])], # dL/dy
-                 outs[2*ny], # dL/dt
-                *outs[-ntensor_params:],
-            ]
+            states = [out[-1] for out in outs]
+            states[   y_slice] = [yyt[t_flip_idx] for yyt in yt]
+            # gyt is the contribution from the input grad_y
+            # gy0 is the propagated gradients from the later time step
+            states[dLdy_slice] = [gyt[t_flip_idx] + gy0 for (gyt,gy0) in zip(grad_yt, states[dLdy_slice])]
 
         if ts_requires_grad:
-            grad_ts[0] = inps[2*ny]
+            grad_ts[0] = states[dLdt_index].view(-1)
 
-        grad_y0 = inps[ny:2*ny] # dL/dy0, list of (*ny)
-        grad_tensor_params = inps[-ntensor_params:]
+        grad_y0 = states[dLdy_slice] # dL/dy0, list of (*ny)
+        if ts_requires_grad:
+            grad_ts = torch.cat(grad_ts).view(*ts.shape)
+        grad_tensor_params = states[dLdp_slice]
         grad_ntensor_params = [None for _ in range(len(allparams)-ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
         return (None, grad_ts, None, None, None, None, *grad_y0, *grad_params)
