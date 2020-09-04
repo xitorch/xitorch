@@ -139,7 +139,7 @@ def test_ivp(dtype, device):
     nr = 2
     nt = 5
     t0 = 0.0
-    t1 = 0.05
+    t1 = 0.2
     fwd_options = {
         "method": "rk4",
     }
@@ -161,7 +161,7 @@ def test_ivp(dtype, device):
         yt_true = y0 * torch.exp(-(0.5 * a * (ts1 + t0) + b + c) * (ts1 - t0))
         assert torch.allclose(yt, yt_true)
 
-        gradcheck(getoutput, (a, b, c, ts.detach(), y0), rtol=3e-2)
+        gradcheck(getoutput, (a, b, c, ts.detach(), y0))
         gradgradcheck(getoutput, (a, b, c, ts.detach(), y0))
 
 if __name__ == "__main__":

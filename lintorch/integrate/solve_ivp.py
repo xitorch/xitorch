@@ -2,7 +2,7 @@ import torch
 from typing import Callable, Union, Mapping, Any, Sequence
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
-from lintorch._impls.integrate.ivp import rk4_ivp
+from lintorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._utils.tensor import convert_none_grads_to_zeros
 from lintorch.debug.modes import is_debug_enabled
@@ -81,6 +81,8 @@ class _SolveIVP(torch.autograd.Function):
         method = config["method"].lower()
         if method == "rk4":
             yt = rk4_ivp(pfcn, ts, y0, params, **config)
+        elif method == "rk38":
+            yt = rk38_ivp(pfcn, ts, y0, params, **config)
         else:
             raise RuntimeError("Unknown solve_ivp method: %s" % config["method"])
 
