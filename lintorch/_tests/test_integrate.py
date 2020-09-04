@@ -162,8 +162,8 @@ def test_ivp(dtype, device):
         assert torch.allclose(yt, yt_true)
 
         gradcheck(getoutput, (a, b, c, ts, y0))
-        # gradgradcheck(getoutput, (a, b, c, ts, y0))
+        gradgradcheck(getoutput, (a, b, c, ts, y0))
 
 if __name__ == "__main__":
     with torch.autograd.detect_anomaly():
-        test_quad()
+        test_ivp()

@@ -186,7 +186,7 @@ class _SolveIVP(torch.autograd.Function):
         for i in range(len(ts_flip)-1):
             if ts_requires_grad:
                 fevals = pfunc2(ts_flip[i], states[y_slice], tensor_params)[0]
-                dLdt1 = sum([torch.dot(feval.reshape(-1), gyt[t_flip_idx])  for feval,gyt in zip(fevals, grad_yt)])
+                dLdt1 = sum([torch.dot(feval.reshape(-1), gyt[t_flip_idx].reshape(-1))  for feval,gyt in zip(fevals, grad_yt)])
                 states[dLdt_index] -= dLdt1
                 grad_ts[t_flip_idx] = dLdt1.view(-1)
 
