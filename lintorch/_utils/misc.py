@@ -27,7 +27,7 @@ class TensorNonTensorSeparator(object):
     Class that provides function to separate/combine tensors and nontensors
     parameters.
     """
-    def __init__(self, params):
+    def __init__(self, params, varonly=True):
         """
         Params is a list of tensor or non-tensor to be splitted into
         tensor/non-tensor
@@ -38,7 +38,7 @@ class TensorNonTensorSeparator(object):
         self.nontensor_params = []
         self.nparams = len(params)
         for (i,p) in enumerate(params):
-            if isinstance(p, torch.Tensor):
+            if isinstance(p, torch.Tensor) and ((varonly and p.requires_grad) or (not varonly)):
                 self.tensor_idxs.append(i)
                 self.tensor_params.append(p)
             else:

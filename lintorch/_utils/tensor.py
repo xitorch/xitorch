@@ -42,3 +42,15 @@ def ortho(A, B, dim=-2, M=None, mright=True):
         return A - (M.mm(A) * B).sum(dim=dim, keepdim=True) * B
     else:
         return A - M.mm((A * B).sum(dim=dim, keepdim=True) * B)
+
+def convert_none_grads_to_zeros(grads, inputs):
+    is_tuple = isinstance(grads, tuple)
+    if is_tuple:
+        grads = list(grads)
+    for i in range(len(grads)):
+        g = grads[i]
+        if g is None:
+            grads[i] = torch.zeros_like(inputs[i])
+    if is_tuple:
+        grads = tuple(grads)
+    return grads
