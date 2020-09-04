@@ -152,8 +152,8 @@ class _SolveIVP(torch.autograd.Function):
 
         def new_pfunc(t, states, *tensor_params):
             # t: single-element
-            y = states[:ny] # list of (*ny)
-            dLdy = [-fi for fi in states[ny:2*ny]] # list of (*ny)
+            y = states[y_slice] # list of (*ny)
+            dLdy = [-fi for fi in states[dLdy_slice]] # list of (*ny)
             with torch.enable_grad():
                 f, t2, y2, tensor_params2 = pfunc2(t, y, tensor_params)
             allgradinputs = (list(y2) + [t2] + list(tensor_params2))
@@ -164,14 +164,9 @@ class _SolveIVP(torch.autograd.Function):
                 allow_unused=True,
                 create_graph=torch.is_grad_enabled()) # list of (*ny)
             allgrads = convert_none_grads_to_zeros(allgrads, allgradinputs)
-            dadt = allgrads[:ny]
-            datdt = allgrads[ny:ny+1]
-            datheta_dt = allgrads[-ntensor_params:]
             outs = (
                 *f, # dydt
-                *dadt, # d/dt (dL/dy)
-                *datdt, # d/dt (dL/dt)
-                *datheta_dt, # d/dt (dL/dtheta)
+                *allgrads,
             )
             return outs
 
