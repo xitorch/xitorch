@@ -242,7 +242,7 @@ class _RootFinder(torch.autograd.Function):
                 else:
                     raise RuntimeError("Unknown method: %s" % config["method"])
 
-                y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device).unsqueeze(0)
+                y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device)
             else:
                 raise RuntimeError("Unknown method: %s" % config["method"])
 
@@ -273,8 +273,8 @@ class _RootFinder(torch.autograd.Function):
         with fcn.useobjparams(objparams):
 
             jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
-            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.unsqueeze(-1),
-                fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1)
+            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1).unsqueeze(-1),
+                fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1).reshape(grad_yout.shape)
 
             # get the grad for the params
             with torch.enable_grad():

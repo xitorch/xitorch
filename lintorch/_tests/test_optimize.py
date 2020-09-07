@@ -103,8 +103,11 @@ def test_rootfinder(dtype, device):
     random.seed(100)
     dtype = torch.float64
 
-    nr = 4
-    nbatch = 1
+    nr = 3
+    nbatch = 2
+    fwd_options = {
+        "min_eps": 1e-9
+    }
 
     for clss in [DummyModule, DummyNNModule]:
         A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -114,14 +117,14 @@ def test_rootfinder(dtype, device):
 
         model = clss(A, addx=True)
         model.set_diag_bias(diag, bias)
-        y = rootfinder(model.forward, y0)
+        y = rootfinder(model.forward, y0, fwd_options=fwd_options)
         f = model.forward(y)
         assert torch.allclose(f*0, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=True)
             model.set_diag_bias(diag, bias)
-            y = rootfinder(model.forward, y0)
+            y = rootfinder(model.forward, y0, fwd_options=fwd_options)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -133,8 +136,11 @@ def test_equil(dtype, device):
     random.seed(100)
     dtype = torch.float64
 
-    nr = 4
-    nbatch = 1
+    nr = 3
+    nbatch = 2
+    fwd_options = {
+        "min_eps": 1e-9
+    }
 
     for clss in [DummyModule, DummyNNModule]:
         A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -144,14 +150,14 @@ def test_equil(dtype, device):
 
         model = clss(A, addx=False)
         model.set_diag_bias(diag, bias)
-        y = equilibrium(model.forward, y0)
+        y = equilibrium(model.forward, y0, fwd_options=fwd_options)
         f = model.forward(y)
         assert torch.allclose(y, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=False)
             model.set_diag_bias(diag, bias)
-            y = equilibrium(model.forward, y0)
+            y = equilibrium(model.forward, y0, fwd_options=fwd_options)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -163,8 +169,11 @@ def test_rootfinder_with_params(dtype, device):
     random.seed(100)
     dtype = torch.float64
 
-    nr = 4
-    nbatch = 1
+    nr = 3
+    nbatch = 2
+    fwd_options = {
+        "min_eps": 1e-9
+    }
 
     clss = DummyModuleExplicit
     for bias_is_tensor in [True, False]:
@@ -177,13 +186,13 @@ def test_rootfinder_with_params(dtype, device):
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
         model = clss(addx=True)
-        y = rootfinder(model.forward, y0, (A, diag, bias))
+        y = rootfinder(model.forward, y0, (A, diag, bias), fwd_options=fwd_options)
         f = model.forward(y, A, diag, bias)
         assert torch.allclose(f*0, f)
 
         def getloss(y0, A, diag, bias):
             model = clss(addx=True)
-            y = rootfinder(model.forward, y0, (A, diag, bias))
+            y = rootfinder(model.forward, y0, (A, diag, bias), fwd_options=fwd_options)
             return y
 
         gradcheck(getloss, (y0, A, diag, bias))
@@ -196,7 +205,7 @@ def test_minimize(dtype, device):
     dtype = torch.float64
 
     nr = 3
-    nbatch = 1
+    nbatch = 2
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
