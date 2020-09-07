@@ -11,7 +11,7 @@ from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch.linalg.linop import LinearOperator, checklinop
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
+from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
@@ -109,7 +109,7 @@ def equilibrium(
 
     pfunc = get_pure_function(fcn)
 
-    @make_pure_function_sibling(pfunc)
+    @make_sibling(pfunc)
     def new_fcn(y, *params):
         return y - pfunc(y, *params)
 
@@ -156,7 +156,7 @@ def minimize(
     # the rootfinder algorithms are designed to move to the opposite direction
     # of the output of the function, so the output of this function is just
     # the grad of z w.r.t. y
-    @make_pure_function_sibling(pfunc)
+    @make_sibling(pfunc)
     def new_fcn(y, *params):
         with torch.enable_grad():
             y1 = y.clone().requires_grad_()

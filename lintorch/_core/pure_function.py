@@ -5,7 +5,7 @@ from lintorch._core.editable_module import EditableModule
 from contextlib import contextmanager
 from abc import abstractmethod
 
-__all__ = ["get_pure_function", "make_pure_function_sibling"]
+__all__ = ["get_pure_function", "make_sibling"]
 
 ############################ functional ###############################
 class PureFunction(object):
@@ -128,7 +128,7 @@ class FunctionPureFunction(PureFunction):
         try: yield
         finally: pass
 
-def make_pure_function_sibling(pfunc):
+def make_sibling(pfunc):
     """
     Used as a decor to mark the decorated function as a sibling method of the
     input `pfunc`.
@@ -139,13 +139,15 @@ def make_pure_function_sibling(pfunc):
 
     Example
     -------
-    @make_pure_function_sibling(pfunc)
+    @make_sibling(pfunc)
     def newpfunc(x, *params):
         return x - pfunc(x, *params)
 
     with newpfunc.useobjparams(objparams): # changes the state of pfunc as well
         ...
     """
+    if not isinstance(pfunc, PureFunction):
+        pfunc = get_pure_function(pfunc)
     def decor(fcn):
         new_pfunc = get_pure_function(pfunc.fcn, fcntocall=fcn)
         return new_pfunc

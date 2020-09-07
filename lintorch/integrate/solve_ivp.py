@@ -1,7 +1,7 @@
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
-from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
+from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._utils.tensor import convert_none_grads_to_zeros
@@ -57,7 +57,7 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
     pfcn = get_pure_function(fcn)
     if not is_y0_list:
         # make it a tuple
-        @make_pure_function_sibling(pfcn)
+        @make_sibling(pfcn)
         def pfcn2(t, y, *params):
             return (pfcn(t, y[0], *params),)
         y0 = (y0,)

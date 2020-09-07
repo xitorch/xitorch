@@ -2,7 +2,7 @@ import torch
 from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
+from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._impls.integrate.fixed_quad import leggaussquad
 from lintorch.debug.modes import is_debug_enabled
@@ -51,7 +51,7 @@ def quad(
     pfunc = get_pure_function(fcn)
     nparams = len(params)
     if not is_tuple_out:
-        @make_pure_function_sibling(pfunc)
+        @make_sibling(pfunc)
         def pfunc2(x, *params):
             return (pfunc(x,*params),)
         return _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams, *params, *pfunc.objparams())[0]

@@ -2,7 +2,7 @@ import torch
 import warnings
 from typing import Callable, List, Any, Union, Sequence
 from lintorch.linalg.linop import LinearOperator
-from lintorch._core.pure_function import get_pure_function, make_pure_function_sibling
+from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch._utils.assertfuncs import assert_type
 from lintorch._utils.misc import TensorNonTensorSeparator
 
@@ -74,7 +74,7 @@ def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
 
     res = []
     def gen_pfcn2(idx):
-        @make_pure_function_sibling(pfcn)
+        @make_sibling(pfcn)
         def pfcn2(*params):
             with torch.enable_grad():
                 z = pfcn(*params)
