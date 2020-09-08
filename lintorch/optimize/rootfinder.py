@@ -273,8 +273,8 @@ class _RootFinder(torch.autograd.Function):
         with fcn.useobjparams(objparams):
 
             jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
-            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1).unsqueeze(-1),
-                fwd_options=ctx.bck_options, bck_options=ctx.bck_options).squeeze(-1).reshape(grad_yout.shape)
+            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1,1),
+                fwd_options=ctx.bck_options, bck_options=ctx.bck_options).reshape(grad_yout.shape)
 
             # get the grad for the params
             with torch.enable_grad():
