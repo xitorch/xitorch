@@ -146,7 +146,7 @@ class _SolveIVP(torch.autograd.Function):
         dLdy_slice = slice(ny, 2*ny, None) # [ny:2*ny]
         dLdt_index = 2*ny
         dLdt_slice = slice(dLdt_index, dLdt_index+1, None) # [2*ny:2*ny+1]
-        dLdp_slice = slice(-ntensor_params, None, None) # [-ntensor_params:]
+        dLdp_slice = slice(-ntensor_params, None, None) if ntensor_params > 0 else slice(0,0,None) # [-ntensor_params:]
         state_size = 2*ny+1 + ntensor_params
         states = [None for _ in range(state_size)]
 
