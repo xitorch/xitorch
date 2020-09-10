@@ -145,38 +145,51 @@ class _MCQuad(torch.autograd.Function):
         ffcn = ctx.ffcn
         log_pfcn = ctx.log_pfcn
         xsamples = ctx.xsamples
+        grad_enabled = torch.is_grad_enabled()
 
         def function_wrap(fcn, param_sep, nparams, x, tensor_params):
-            tensor_params_copy = tensor_params
-            all_params_copy = param_sep.reconstruct_params(tensor_params_copy)
-            params_copy = all_params_copy[:nparams]
-            objparams_copy = all_params_copy[nparams:]
-            with fcn.useobjparams(objparams_copy):
-                f = fcn(x, *params_copy)
+            all_params = param_sep.reconstruct_params(tensor_params)
+            params = all_params[:nparams]
+            objparams = all_params[nparams:]
+            with fcn.useobjparams(objparams):
+                f = fcn(x, *params)
             return f
 
         def aug_function(x, *grad_and_fptensor_params):
-            grad_enabled = torch.is_grad_enabled()
+            local_grad_enabled = torch.is_grad_enabled()
             grad_epfs = grad_and_fptensor_params[:nout]
             epfs = grad_and_fptensor_params[nout:2*nout]
             fptensor_params = grad_and_fptensor_params[2*nout:]
             ftensor_params = fptensor_params[:nftensorparams]
             ptensor_params = fptensor_params[nftensorparams:]
             with torch.enable_grad():
-                fout = function_wrap(ffcn, ctx.fparam_sep, nfparams, x, ftensor_params)
-                pout = function_wrap(log_pfcn, ctx.pparam_sep, npparams, x, ptensor_params)
+                # if graph is constructed, then fptensor_params is a clone of
+                # fptensor_params from outside, therefore, it needs to be put
+                # in the pure function's objects (that's what function_wrap does)
+                if grad_enabled:
+                    fout = function_wrap(ffcn, ctx.fparam_sep, nfparams, x, ftensor_params)
+                    pout = function_wrap(log_pfcn, ctx.pparam_sep, npparams, x, ptensor_params)
+                # if graph is not constructed, then fptensor_params in this
+                # function *is* fptensor_params in the outside, so we can
+                # just use fparams and pparams from the outside
+                else:
+                    fout = ffcn(x, *fparams)
+                    pout = log_pfcn(x, *pparams)
             # derivative of fparams
-            dLdthetaf = torch.autograd.grad(fout, ftensor_params,
-                grad_outputs=grad_epfs,
-                retain_graph=True,
-                create_graph=grad_enabled)
+            dLdthetaf = []
+            if len(ftensor_params) > 0:
+                dLdthetaf = torch.autograd.grad(fout, ftensor_params,
+                    grad_outputs=grad_epfs,
+                    retain_graph=True,
+                    create_graph=local_grad_enabled)
             # derivative of pparams
-            dLdef = sum([torch.dot((f-y).reshape(-1), grad_epf.reshape(-1)) for (f, y, grad_epf) in zip(fout, epfs, grad_epfs)])
-            dLdthetap = torch.autograd.grad(pout, ptensor_params,
-                # grad_outputs=dLdef.reshape(pout.shape),
-                retain_graph=True,
-                create_graph=grad_enabled)
-            dLdthetap = [dLdef * dltp for dltp in dLdthetap]
+            dLdthetap = []
+            if len(ptensor_params) > 0:
+                dLdef = sum([torch.dot((f-y).reshape(-1), grad_epf.reshape(-1)) for (f, y, grad_epf) in zip(fout, epfs, grad_epfs)])
+                dLdthetap = torch.autograd.grad(pout, ptensor_params,
+                    grad_outputs=dLdef.reshape(pout.shape),
+                    retain_graph=True,
+                    create_graph=local_grad_enabled)
             # combine the states needed for backward
             outs = (
                 *dLdthetaf,
@@ -184,23 +197,23 @@ class _MCQuad(torch.autograd.Function):
             )
             return outs
 
-        fptensor_params_copy = [y.clone().requires_grad_() for y in fptensor_params]
-        epfs_copy = [y.clone().requires_grad_() for y in epfs]
+        if grad_enabled:
+            fptensor_params_copy = [y.clone().requires_grad_() for y in fptensor_params]
+            epfs_copy = [y.clone().requires_grad_() for y in epfs]
+        else:
+            fptensor_params_copy = fptensor_params
+            epfs_copy = epfs
+
         aug_epfs = _mcquad(aug_function, log_pfcn,
             x0=xsamples[0], # unused because xsamples is set
             xsamples=xsamples,
             fparams=(*grad_epfs, *epfs_copy, *fptensor_params_copy),
-            # fparams=(*grad_epfs, x*fptensor_params),
             pparams=pparams,
             fwd_options=ctx.bck_config,
             bck_options=ctx.bck_config)
 
         dLdthetaf = aug_epfs[:nftensorparams]
         dLdthetap = aug_epfs[nftensorparams:]
-        # dLdef_dlogpdthetap = aug_epfs[nftensorparams:nftensorparams+nptensorparams]
-        # dLdef = aug_epfs[nftensorparams+nptensorparams]
-        # dlogpdthetap = aug_epfs[nftensorparams+nptensorparams+1:]
-        # dLdthetap = tuple_axpy1(-dLdef, dlogpdthetap, dLdef_dlogpdthetap)
 
         # combine the gradient for all fparams
         dLdfnontensor = [None for _ in range(ctx.fparam_sep.nnontensors())]
