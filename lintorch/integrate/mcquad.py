@@ -199,19 +199,16 @@ class _MCQuad(torch.autograd.Function):
 
         if grad_enabled:
             fptensor_params_copy = [y.clone().requires_grad_() for y in fptensor_params]
-            epfs_copy = [y.clone().requires_grad_() for y in epfs]
         else:
             fptensor_params_copy = fptensor_params
-            epfs_copy = epfs
 
         aug_epfs = _mcquad(aug_function, log_pfcn,
             x0=xsamples[0], # unused because xsamples is set
             xsamples=xsamples,
-            fparams=(*grad_epfs, *epfs_copy, *fptensor_params_copy),
+            fparams=(*grad_epfs, *epfs, *fptensor_params_copy),
             pparams=pparams,
             fwd_options=ctx.bck_config,
             bck_options=ctx.bck_config)
-
         dLdthetaf = aug_epfs[:nftensorparams]
         dLdthetap = aug_epfs[nftensorparams:]
 
