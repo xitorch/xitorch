@@ -4,20 +4,19 @@ import numpy as np
 
 ################### metropolis hastings ###################
 def mh(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, step_size=1.0, **unused):
-    dtype = x0.dtype
-    device = x0.device
-
-    x = _mh_sample(logpfcn, x0, pparams, nburnout, step_size, False, dtype, device)
-    samples = _mh_sample(logpfcn, x, pparams, nsamples, step_size, True, dtype, device)
+    x, dtype, device = _mh_sample(logpfcn, x0, pparams, nburnout, step_size, False)
+    samples = _mh_sample(logpfcn, x, pparams, nsamples, step_size, True)
     weights = torch.zeros((samples.shape[0],), dtype=dtype, device=device) + (1./samples.shape[0])
     return samples, weights
 
-def _mh_sample(logpfcn, x0, pparams, nsamples, step_size, collect_samples, dtype, device):
+def _mh_sample(logpfcn, x0, pparams, nsamples, step_size, collect_samples):
     x = x0
     logpx = logpfcn(x0, *pparams)
+    dtype = logpx.dtype
+    device = logpx.device
     log_rand = torch.log(torch.rand((nsamples,), dtype=dtype, device=device))
     if collect_samples:
-        samples = torch.empty((nsamples, *x0.shape), dtype=dtype, device=device)
+        samples = torch.empty((nsamples, *x0.shape), dtype=x.dtype, device=x.device)
 
     for i in range(nsamples):
         xnext = x + step_size * torch.randn_like(x)
@@ -41,7 +40,49 @@ def _mh_sample(logpfcn, x0, pparams, nsamples, step_size, collect_samples, dtype
     if collect_samples:
         return samples
     else:
-        return x
+        return x, dtype, device
+
+def mhcustom(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, custom_step=None, **unused):
+    """
+    Perform Metropolis sampling using custom_step
+
+    Options
+    -------
+    * nsamples: int
+        The number of samples to be collected
+    * nburnout: int
+        The number of initial steps to be performed before collecting samples
+    * custom_step: callable
+        Callable with call signature `custom_step(x, *pparams)` to produce the
+        next samples (already decided whether to accept or not)
+    """
+    if custom_step is None:
+        raise RuntimeError("custom_step must be specified for mhcustom method")
+    if not hasattr(custom_step, "__call__"):
+        raise RuntimeError("custom_step option for mhcustom must be callable")
+
+    x, dtype, device = _mhcustom_sample(logpfcn, x0, pparams, nburnout, custom_step, False)
+    xsamples = _mhcustom_sample(logpfcn, x0, pparams, nburnout, custom_step, True)
+    wsamples = torch.zeros((xsamples.shape[0],), dtype=dtype, device=device) + (1./xsamples.shape[0])
+    return xsamples, wsamples
+
+def _mhcustom_sample(logpfcn, x0, pparams, nsamples, custom_step, collect_samples):
+    x = x0
+    logpx = logpfcn(x0, *pparams)
+    dtype = logpx.dtype
+    device = logpx.device
+    if collect_samples:
+        samples = torch.empty((nsamples, *x0.shape), dtype=x.dtype, device=x.device)
+        samples[0] = x
+
+    for i in range(1,nsamples):
+        x = custom_step(x, *pparams)
+        if collect_samples:
+            samples[i] = x
+    if collect_samples:
+        return samples
+    else:
+        return x, dtype, device
 
 ################### dummy sampler just for 1D ###################
 def dummy1d(logpfcn, x0, pparams, nsamples=100, lb=-np.inf, ub=np.inf, **unused):
