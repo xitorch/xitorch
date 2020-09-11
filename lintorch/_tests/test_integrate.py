@@ -238,50 +238,65 @@ def test_mcquad(dtype, device):
     w = torch.nn.Parameter(torch.tensor(1.2, dtype=dtype, device=device))
     a = torch.tensor(0.3, dtype=dtype, device=device).requires_grad_()
     x0 = torch.tensor(0.0, dtype=dtype, device=device)
-    fwd_options = {
-        "method": "mh",
-        "step_size": 0.6,
-        "nsamples": 10000,
-        "nburnout": 2,
-    }
 
-    def getoutput(w, a, x0):
-        logp = MCQuadLogProbNNModule(w)
-        fcn = MCQuadFcnModule(a)
-        res = mcquad(fcn.forward, logp.forward, x0, fparams=[], pparams=[], fwd_options=fwd_options)
-        return res
+    for method in ["mh", "_dummy1d"]:
+        if method == "mh":
+            fwd_options = {
+                "method": "mh",
+                "step_size": 0.6,
+                "nsamples": 10000,
+                "nburnout": 2,
+            }
+        else:
+            # using deterministic forward method just to check the backward operation
+            fwd_options = {
+                "method": "_dummy1d",
+                "nsamples": 100,
+                "lb": -float("inf"),
+                "ub":  float("inf"),
+            }
 
-    rtol = 15e-2 # relatively large error is acceptable because of the stochasticity
-    epf = getoutput(w, a, x0)
-    epf_true = get_true_output(w, a)
-    assert torch.allclose(epf, epf_true, rtol=rtol)
+        def getoutput(w, a, x0):
+            logp = MCQuadLogProbNNModule(w)
+            fcn = MCQuadFcnModule(a)
+            res = mcquad(fcn.forward, logp.forward, x0, fparams=[], pparams=[], fwd_options=fwd_options)
+            return res
 
-    # manually check the gradient
-    g = torch.tensor(0.7, dtype=dtype, device=device).reshape(epf.shape).requires_grad_()
-    ga     , gw      = torch.autograd.grad(epf     , (a, w), grad_outputs=g, create_graph=True)
-    # different implementation
-    ga2    , gw2     = torch.autograd.grad(epf     , (a, w), grad_outputs=g, retain_graph=True, create_graph=False)
-    ga_true, gw_true = torch.autograd.grad(epf_true, (a, w), grad_outputs=g, create_graph=True)
-    assert torch.allclose(gw, gw_true, rtol=rtol)
-    assert torch.allclose(ga, ga_true, rtol=rtol)
-    assert torch.allclose(gw2, gw_true, rtol=rtol)
-    assert torch.allclose(ga2, ga_true, rtol=rtol)
+        rtol = 2e-2 if method != "_dummy1d" else 1e-3
+        epf = getoutput(w, a, x0)
+        epf_true = get_true_output(w, a)
+        assert torch.allclose(epf, epf_true, rtol=rtol)
 
-    ggaw     , ggaa     , ggag      = torch.autograd.grad(ga     , (w, a, g), retain_graph=True, allow_unused=True)
-    ggaw_true, ggaa_true, ggag_true = torch.autograd.grad(ga_true, (w, a, g), retain_graph=True, allow_unused=True)
-    print("ggaw", ggaw, ggaw_true, (ggaw - ggaw_true) / ggaw_true)
-    print("ggaa", ggaa, ggaa_true, (ggaa - ggaa_true) / ggaa_true)
-    print("ggag", ggag, ggag_true, (ggag - ggag_true) / ggag_true)
-    assert torch.allclose(ggaa, ggaa_true, rtol=rtol)
-    assert torch.allclose(ggag, ggag_true, rtol=rtol)
-    ggww     , ggwa     , ggwg      = torch.autograd.grad(gw     , (w, a, g), allow_unused=True)
-    ggww_true, ggwa_true, ggwg_true = torch.autograd.grad(gw_true, (w, a, g), allow_unused=True)
-    print("ggwa", ggwa, ggwa_true, (ggwa - ggwa_true) / ggwa_true)
-    print("ggwg", ggwg, ggwg_true, (ggwg - ggwg_true) / ggwg_true)
-    print("ggww", ggww, ggww_true, (ggww - ggww_true) / ggww_true)
-    assert torch.allclose(ggwa, ggwa_true, rtol=rtol)
-    assert torch.allclose(ggwg, ggwg_true, rtol=rtol)
-    assert torch.allclose(ggww, ggww_true, rtol=rtol)
+        # skip gradient check if it is not the deterministic method
+        if method != "_dummy1d":
+            continue
+
+        # manually check the gradient
+        g = torch.tensor(0.7, dtype=dtype, device=device).reshape(epf.shape).requires_grad_()
+        ga     , gw      = torch.autograd.grad(epf     , (a, w), grad_outputs=g, create_graph=True)
+        # different implementation
+        ga2    , gw2     = torch.autograd.grad(epf     , (a, w), grad_outputs=g, retain_graph=True, create_graph=False)
+        ga_true, gw_true = torch.autograd.grad(epf_true, (a, w), grad_outputs=g, create_graph=True)
+        assert torch.allclose(gw, gw_true)
+        assert torch.allclose(ga, ga_true)
+        assert torch.allclose(gw2, gw_true)
+        assert torch.allclose(ga2, ga_true)
+
+        ggaw     , ggaa     , ggag      = torch.autograd.grad(ga     , (w, a, g), retain_graph=True, allow_unused=True)
+        ggaw_true, ggaa_true, ggag_true = torch.autograd.grad(ga_true, (w, a, g), retain_graph=True, allow_unused=True)
+        print("ggaw", ggaw, ggaw_true, (ggaw - ggaw_true) / ggaw_true)
+        print("ggaa", ggaa, ggaa_true, (ggaa - ggaa_true) / ggaa_true)
+        print("ggag", ggag, ggag_true, (ggag - ggag_true) / ggag_true)
+        assert torch.allclose(ggaa, ggaa_true)
+        assert torch.allclose(ggag, ggag_true)
+        ggww     , ggwa     , ggwg      = torch.autograd.grad(gw     , (w, a, g), allow_unused=True)
+        ggww_true, ggwa_true, ggwg_true = torch.autograd.grad(gw_true, (w, a, g), allow_unused=True)
+        print("ggwa", ggwa, ggwa_true, (ggwa - ggwa_true) / ggwa_true)
+        print("ggwg", ggwg, ggwg_true, (ggwg - ggwg_true) / ggwg_true)
+        print("ggww", ggww, ggww_true, (ggww - ggww_true) / ggww_true)
+        assert torch.allclose(ggwa, ggwa_true)
+        assert torch.allclose(ggwg, ggwg_true)
+        assert torch.allclose(ggww, ggww_true)
 
 if __name__ == "__main__":
     # with torch.autograd.detect_anomaly():
