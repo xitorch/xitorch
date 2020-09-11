@@ -1,8 +1,6 @@
 import os
 import torch
 import numpy as np
-from torch.autograd.functional import jvp
-import lintorch as lt
 from lintorch.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
