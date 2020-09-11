@@ -1,3 +1,4 @@
+import math
 from abc import abstractmethod
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence, List
@@ -43,11 +44,21 @@ def quad(
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
         assert_fcn_params(fcn, (xl, *params))
-    assert_runtime(torch.numel(xl) == 1, "xl must be a 1-element tensors")
-    assert_runtime(torch.numel(xu) == 1, "xu must be a 1-element tensors")
+    if isinstance(xl, torch.Tensor):
+        assert_runtime(torch.numel(xl) == 1, "xl must be a 1-element tensors")
+    if isinstance(xu, torch.Tensor):
+        assert_runtime(torch.numel(xu) == 1, "xu must be a 1-element tensors")
 
     out = fcn(xl, *params)
     is_tuple_out = not isinstance(out, torch.Tensor)
+    if not is_tuple_out:
+        dtype = out.dtype
+        device = out.device
+    elif len(out) > 0:
+        dtype = out[0].dtype
+        device = out[0].device
+    else:
+        raise RuntimeError("The output of the fcn must be non-empty")
 
     pfunc = get_pure_function(fcn)
     nparams = len(params)
@@ -55,9 +66,11 @@ def quad(
         @make_sibling(pfunc)
         def pfunc2(x, *params):
             return (pfunc(x,*params),)
-        return _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams, *params, *pfunc.objparams())[0]
+        return _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams,
+            dtype, device, *params, *pfunc.objparams())[0]
     else:
-        return _Quadrature.apply(pfunc , xl, xu, fwd_options, bck_options, nparams, *params, *pfunc.objparams())
+        return _Quadrature.apply(pfunc , xl, xu, fwd_options, bck_options, nparams,
+            dtype, device, *params, *pfunc.objparams())
 
 class _Quadrature(torch.autograd.Function):
     # NOTE: _Quadrature method do not involve changing the state (objparams) of
@@ -68,7 +81,8 @@ class _Quadrature(torch.autograd.Function):
     # calculations
 
     @staticmethod
-    def forward(ctx, fcn, xl, xu, fwd_options, bck_options, nparams, *all_params):
+    def forward(ctx, fcn, xl, xu, fwd_options, bck_options, nparams,
+            dtype, device, *all_params):
 
         with fcn.disable_state_change():
 
@@ -81,8 +95,12 @@ class _Quadrature(torch.autograd.Function):
             params = all_params[:nparams]
             objparams = all_params[nparams:]
 
+            # convert to tensor
+            xl = torch.as_tensor(xl, dtype=dtype, device=device)
+            xu = torch.as_tensor(xu, dtype=dtype, device=device)
+
             # apply transformation if the boundaries contain inf
-            if torch.any(torch.isinf(xl)) or torch.any(torch.isinf(xu)):
+            if _isinf(xl) or _isinf(xu):
                 tfm = _TanInfTransform()
                 @make_sibling(fcn)
                 def fcn2(t, *params):
@@ -167,7 +185,10 @@ class _Quadrature(torch.autograd.Function):
             dydns = [None for _ in range(ctx.param_sep.nnontensors())]
             grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
 
-            return (None, grad_xl, grad_xu, None, None, None, *grad_params)
+            return (None, grad_xl, grad_xu, None, None, None, None, None, *grad_params)
+
+def _isinf(x):
+    return torch.any(torch.isinf(x))
 
 class _BaseInfTransform(object):
     @abstractmethod

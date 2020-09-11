@@ -128,18 +128,27 @@ def test_quad_inf(dtype, device):
         "n": 100,
     }
     w = torch.nn.Parameter(torch.abs(torch.randn((nr,), dtype=dtype, device=device)).requires_grad_())
-    xl = torch.tensor(-float("inf"), dtype=dtype, device=device)
-    xu = torch.tensor( float("inf"), dtype=dtype, device=device)
+    i = 0
+    for totensor in [True, False]:
+        if totensor:
+            xl = torch.tensor(-float("inf"), dtype=dtype, device=device)
+            xu = torch.tensor( float("inf"), dtype=dtype, device=device)
+        else:
+            xl = -float("inf")
+            xu =  float("inf")
 
-    def get_loss(w):
-        module = IntegrationInfModule(w)
-        y = quad(module.forward, xl, xu, params=[], fwd_options=fwd_options)
-        return y
-    y = get_loss(w)
-    ytrue = w * np.sqrt(2*np.pi)
-    assert torch.allclose(y, ytrue)
-    gradcheck(get_loss, (w,))
-    gradgradcheck(get_loss, (w,))
+        def get_loss(w):
+            module = IntegrationInfModule(w)
+            y = quad(module.forward, xl, xu, params=[], fwd_options=fwd_options)
+            return y
+
+        y = get_loss(w)
+        ytrue = w * np.sqrt(2*np.pi)
+        assert torch.allclose(y, ytrue)
+        if i == 0:
+            gradcheck(get_loss, (w,))
+            gradgradcheck(get_loss, (w,))
+        i += 1
 
 ################################## ivp ##################################
 class IVPNNModule(torch.nn.Module):
