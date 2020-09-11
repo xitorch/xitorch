@@ -180,15 +180,15 @@ class MCQuadFcnModule(lt.EditableModule):
         self.a = a
 
     def forward(self, x):
-        return self.a*self.a * x * x
-        # return torch.exp(-x*x/(2*self.a*self.a))
+        # return self.a*self.a * x * x
+        return torch.exp(-x*x/(2*self.a*self.a))
 
     def getparamnames(self, methodname, prefix=""):
         return [prefix+"a"]
 
 def get_true_output(w, a):
-    return a*a*w*w
-    # return 1.0 / torch.sqrt(1 + w * w / (a * a))
+    # return a*a*w*w
+    return 1.0 / torch.sqrt(1 + w * w / (a * a))
 
 @device_dtype_float_test(only64=True)
 def test_mcquad(dtype, device):
@@ -196,12 +196,12 @@ def test_mcquad(dtype, device):
     random.seed(100)
 
     w = torch.nn.Parameter(torch.tensor(1.2, dtype=dtype, device=device))
-    a = torch.tensor(1.1, dtype=dtype, device=device).requires_grad_()
+    a = torch.tensor(0.3, dtype=dtype, device=device).requires_grad_()
     x0 = torch.tensor(0.0, dtype=dtype, device=device)
     fwd_options = {
         "method": "mh",
         "step_size": 0.6,
-        "nsamples": 20000,
+        "nsamples": 10000,
         "nburnout": 2,
     }
 
@@ -211,7 +211,7 @@ def test_mcquad(dtype, device):
         res = mcquad(fcn.forward, logp.forward, x0, fparams=[], pparams=[], fwd_options=fwd_options)
         return res
 
-    rtol = 10e-2 # relatively large error is acceptable because of the stochasticity
+    rtol = 15e-2 # relatively large error is acceptable because of the stochasticity
     epf = getoutput(w, a, x0)
     epf_true = get_true_output(w, a)
     assert torch.allclose(epf, epf_true, rtol=rtol)
@@ -219,23 +219,26 @@ def test_mcquad(dtype, device):
     # manually check the gradient
     g = torch.tensor(0.7, dtype=dtype, device=device).reshape(epf.shape).requires_grad_()
     ga     , gw      = torch.autograd.grad(epf     , (a, w), grad_outputs=g, create_graph=True)
+    # different implementation
+    ga2    , gw2     = torch.autograd.grad(epf     , (a, w), grad_outputs=g, retain_graph=True, create_graph=False)
     ga_true, gw_true = torch.autograd.grad(epf_true, (a, w), grad_outputs=g, create_graph=True)
     assert torch.allclose(gw, gw_true, rtol=rtol)
     assert torch.allclose(ga, ga_true, rtol=rtol)
+    assert torch.allclose(gw2, gw_true, rtol=rtol)
+    assert torch.allclose(ga2, ga_true, rtol=rtol)
 
     ggaw     , ggaa     , ggag      = torch.autograd.grad(ga     , (w, a, g), retain_graph=True, allow_unused=True)
     ggaw_true, ggaa_true, ggag_true = torch.autograd.grad(ga_true, (w, a, g), retain_graph=True, allow_unused=True)
-    print(ggaw, ggaw_true, (ggaw - ggaw_true) / ggaw_true)
-    print(ggaa, ggaa_true, (ggaa - ggaa_true) / ggaa_true)
-    print(ggag, ggag_true, (ggag - ggag_true) / ggag_true)
-    # assert torch.allclose(ggaw, ggaw_true, rtol=rtol)
+    print("ggaw", ggaw, ggaw_true, (ggaw - ggaw_true) / ggaw_true)
+    print("ggaa", ggaa, ggaa_true, (ggaa - ggaa_true) / ggaa_true)
+    print("ggag", ggag, ggag_true, (ggag - ggag_true) / ggag_true)
     assert torch.allclose(ggaa, ggaa_true, rtol=rtol)
     assert torch.allclose(ggag, ggag_true, rtol=rtol)
     ggww     , ggwa     , ggwg      = torch.autograd.grad(gw     , (w, a, g), allow_unused=True)
     ggww_true, ggwa_true, ggwg_true = torch.autograd.grad(gw_true, (w, a, g), allow_unused=True)
-    print(ggwa, ggwa_true, (ggwa - ggwa_true) / ggwa_true)
-    print(ggwg, ggwg_true, (ggwg - ggwg_true) / ggwg_true)
-    print(ggww, ggww_true, (ggww - ggww_true) / ggww_true)
+    print("ggwa", ggwa, ggwa_true, (ggwa - ggwa_true) / ggwa_true)
+    print("ggwg", ggwg, ggwg_true, (ggwg - ggwg_true) / ggwg_true)
+    print("ggww", ggww, ggww_true, (ggww - ggww_true) / ggww_true)
     assert torch.allclose(ggwa, ggwa_true, rtol=rtol)
     assert torch.allclose(ggwg, ggwg_true, rtol=rtol)
     assert torch.allclose(ggww, ggww_true, rtol=rtol)
