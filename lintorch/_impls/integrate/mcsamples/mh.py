@@ -8,7 +8,8 @@ def mh(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, step_size=1.0, **unu
 
     x = _mh_sample(logpfcn, x0, pparams, nburnout, step_size, False, dtype, device)
     samples = _mh_sample(logpfcn, x, pparams, nsamples, step_size, True, dtype, device)
-    return samples
+    weights = torch.zeros((samples.shape[0],), dtype=dtype, device=device) + (1./samples.shape[0])
+    return samples, weights
 
 def _mh_sample(logpfcn, x0, pparams, nsamples, step_size, collect_samples, dtype, device):
     x = x0

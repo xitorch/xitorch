@@ -39,9 +39,9 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams, fwd_options={}, bck_options={})
         The expectation values of the function `ffcn` over the space of `x`.
         If the output of `ffcn` is a list, then this is also a list
     """
-    return _mcquad(ffcn, log_pfcn, x0, None, fparams, pparams, fwd_options, bck_options)
+    return _mcquad(ffcn, log_pfcn, x0, None, None, fparams, pparams, fwd_options, bck_options)
 
-def _mcquad(ffcn, log_pfcn, x0, xsamples, fparams, pparams, fwd_options, bck_options):
+def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, fwd_options, bck_options):
     # this is mcquad with an additional xsamples argument, to prevent xsamples being set by users
 
     if is_debug_enabled():
@@ -65,16 +65,16 @@ def _mcquad(ffcn, log_pfcn, x0, xsamples, fparams, pparams, fwd_options, bck_opt
         @make_sibling(pure_ffcn)
         def pure_ffcn2(x, *fparams):
             return (pure_ffcn(x, *fparams),)
-        return _MCQuad.apply(pure_ffcn2, pure_logpfcn, 1, x0, None, fwd_options, bck_options,
+        return _MCQuad.apply(pure_ffcn2, pure_logpfcn, 1, x0, None, None, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)[0]
     else:
         nf = len(out)
-        return _MCQuad.apply(pure_ffcn, pure_logpfcn, nf, x0, None, fwd_options, bck_options,
+        return _MCQuad.apply(pure_ffcn, pure_logpfcn, nf, x0, None, None, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
 
 class _MCQuad(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, ffcn, log_pfcn, nf, x0, xsamples, fwd_options, bck_options,
+    def forward(ctx, ffcn, log_pfcn, nf, x0, xsamples, wsamples, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *all_fpparams):
         # set up the default options
         config = set_default_option({
@@ -97,11 +97,12 @@ class _MCQuad(torch.autograd.Function):
             }
             if method not in method_fcn:
                 raise RuntimeError("Unknown mcquad method: %s" % config["method"])
-            xsamples = method_fcn[method](log_pfcn, x0, pparams, **config)
-        epfs = _integrate(ffcn, xsamples, fparams, nf)
+            xsamples, wsamples = method_fcn[method](log_pfcn, x0, pparams, **config)
+        epfs = _integrate(ffcn, xsamples, wsamples, fparams, nf)
 
         # save parameters for backward calculations
         ctx.xsamples = xsamples
+        ctx.wsamples = wsamples
         ctx.ffcn = ffcn
         ctx.log_pfcn = log_pfcn
         ctx.fparam_sep = TensorNonTensorSeparator((*fparams, *fobjparams))
@@ -145,6 +146,7 @@ class _MCQuad(torch.autograd.Function):
         ffcn = ctx.ffcn
         log_pfcn = ctx.log_pfcn
         xsamples = ctx.xsamples
+        wsamples = ctx.wsamples
         grad_enabled = torch.is_grad_enabled()
 
         def function_wrap(fcn, param_sep, nparams, x, tensor_params):
@@ -205,6 +207,7 @@ class _MCQuad(torch.autograd.Function):
         aug_epfs = _mcquad(aug_function, log_pfcn,
             x0=xsamples[0], # unused because xsamples is set
             xsamples=xsamples,
+            wsamples=wsamples,
             fparams=(*grad_epfs, *epfs, *fptensor_params_copy),
             pparams=pparams,
             fwd_options=ctx.bck_config,
@@ -217,13 +220,12 @@ class _MCQuad(torch.autograd.Function):
         dLdpnontensor = [None for _ in range(ctx.pparam_sep.nnontensors())]
         dLdtf = ctx.fparam_sep.reconstruct_params(dLdthetaf, dLdfnontensor)
         dLdtp = ctx.pparam_sep.reconstruct_params(dLdthetap, dLdpnontensor)
-        return (None, None, None, None, None, None, None, None, None, None,
+        return (None, None, None, None, None, None, None, None, None, None, None,
                 *dLdtf, *dLdtp)
 
-def _integrate(ffcn, xsamples, fparams, nf):
+def _integrate(ffcn, xsamples, wsamples, fparams, nf):
     nsamples = len(xsamples)
     sumfs = [0.0 for _ in range(nf)]
-    for x in xsamples:
-        sumfs = [s + f for s,f in zip(sumfs, ffcn(x, *fparams))]
-    meanfs = [sumf / nsamples for sumf in sumfs]
-    return meanfs
+    for x,w in zip(xsamples, wsamples):
+        sumfs = [s + f*w for s,f in zip(sumfs, ffcn(x, *fparams))]
+    return sumfs
