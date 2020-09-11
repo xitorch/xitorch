@@ -182,6 +182,6 @@ def get_pure_function(fcn, fcntocall=None):
 
     # return as it is if fcn is just a function and params all are tensors
     else:
-        raise RuntimeError("The fcn must be a method of torch.nn.Module or lintorch.EditableModule")
+        raise RuntimeError("The fcn must be a Python function or a method of torch.nn.Module or lintorch.EditableModule")
 
     return pfunc
