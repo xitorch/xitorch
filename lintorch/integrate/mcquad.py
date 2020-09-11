@@ -3,7 +3,7 @@ from lintorch.debug.modes import is_debug_enabled
 from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._utils.tupleops import tuple_axpy1
-from lintorch._impls.integrate.mcsamples.mh import mh
+from lintorch._impls.integrate.mcsamples.mcmc import mh
 
 __all__ = ["mcquad"]
 
