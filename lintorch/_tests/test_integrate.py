@@ -52,6 +52,14 @@ class IntegrationMultiModule(lt.EditableModule):
     def getparamnames(self, methodname, prefix=""):
         return [prefix+"a", prefix+"b"]
 
+class IntegrationInfModule(torch.nn.Module):
+    def __init__(self, w):
+        super(IntegrationInfModule, self).__init__()
+        self.w = w
+
+    def forward(self, x):
+        return torch.exp(-x*x/(2*self.w*self.w))
+
 @device_dtype_float_test(only64=True)
 def test_quad(dtype, device):
     torch.manual_seed(100)
@@ -109,6 +117,29 @@ def test_quad_multi(dtype, device):
         assert len(y) == 2
         assert torch.allclose(y[0], ytrue0)
         assert torch.allclose(y[1], ytrue1)
+
+@device_dtype_float_test(only64=True)
+def test_quad_inf(dtype, device):
+    torch.manual_seed(100)
+    random.seed(100)
+    nr = 4
+    fwd_options = {
+        "method": "leggauss",
+        "n": 100,
+    }
+    w = torch.nn.Parameter(torch.abs(torch.randn((nr,), dtype=dtype, device=device)).requires_grad_())
+    xl = torch.tensor(-float("inf"), dtype=dtype, device=device)
+    xu = torch.tensor( float("inf"), dtype=dtype, device=device)
+
+    def get_loss(w):
+        module = IntegrationInfModule(w)
+        y = quad(module.forward, xl, xu, params=[], fwd_options=fwd_options)
+        return y
+    y = get_loss(w)
+    ytrue = w * np.sqrt(2*np.pi)
+    assert torch.allclose(y, ytrue)
+    gradcheck(get_loss, (w,))
+    gradgradcheck(get_loss, (w,))
 
 ################################## ivp ##################################
 class IVPNNModule(torch.nn.Module):

@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
@@ -80,9 +81,24 @@ class _Quadrature(torch.autograd.Function):
             params = all_params[:nparams]
             objparams = all_params[nparams:]
 
+            # apply transformation if the boundaries contain inf
+            if torch.any(torch.isinf(xl)) or torch.any(torch.isinf(xu)):
+                tfm = _TanInfTransform()
+                @make_sibling(fcn)
+                def fcn2(t, *params):
+                    ys = fcn(tfm.forward(t), *params)
+                    dxdt = tfm.dxdt(t)
+                    return [y * dxdt for y in ys]
+                tl = tfm.x2t(xl)
+                tu = tfm.x2t(xu)
+            else:
+                fcn2 = fcn
+                tl = xl
+                tu = xu
+
             method = config["method"].lower()
             if method == "leggauss":
-                y = leggaussquad(fcn, xl, xu, params, **config)
+                y = leggaussquad(fcn2, tl, tu, params, **config)
             else:
                 raise RuntimeError("Unknown quad method: %s" % config["method"])
 
@@ -152,3 +168,27 @@ class _Quadrature(torch.autograd.Function):
             grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
 
             return (None, grad_xl, grad_xu, None, None, None, *grad_params)
+
+class _BaseInfTransform(object):
+    @abstractmethod
+    def forward(self, t):
+        pass
+
+    @abstractmethod
+    def dxdt(self, t):
+        pass
+
+    @abstractmethod
+    def x2t(self, x):
+        pass
+
+class _TanInfTransform(_BaseInfTransform):
+    def forward(self, t):
+        return torch.tan(t)
+
+    def dxdt(self, t):
+        sec = 1./torch.cos(t)
+        return sec*sec
+
+    def x2t(self, x):
+        return torch.atan(x)
