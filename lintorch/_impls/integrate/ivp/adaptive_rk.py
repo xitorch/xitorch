@@ -25,9 +25,9 @@ class RKAdaptiveStepSolver(object):
     n_stages = None
     error_estimator_order = None
 
-    def __init__(self, atol=1e-8, rtol=1e-5):
-        self.atol = atol
-        self.rtol = rtol
+    def __init__(self, atol=None, rtol=None):
+        self.atol = atol if atol is not None else 1e-8
+        self.rtol = rtol if rtol is not None else 1e-5
         self.max_factor = 10
         self.min_factor = 0.2
         self.step_mult = 0.9
@@ -56,6 +56,7 @@ class RKAdaptiveStepSolver(object):
 
     def solve(self):
         t0 = self.ts[0]
+        ts = self.ts
         f0 = self.func(t0, self.y0)
         h0 = self.ts[1] - self.ts[0] # ??? perform more intelligent guess
 
@@ -66,7 +67,7 @@ class RKAdaptiveStepSolver(object):
 
         rk_state = (f0, t0, self.y0, h0)
         for i in range(1,len(ts)):
-            rk_state = self.step(rk_state, ts[i])
+            rk_state = self._step(rk_state, ts[i])
             yt[i] = rk_state[2]
         return yt
 
@@ -88,13 +89,14 @@ class RKAdaptiveStepSolver(object):
             # check if the current step exceeds the target
             t1_achieved = t0 + h > t1
             hstep = t1 - t0 if t1_achieved else h
+            tnew = t0 + hstep
 
             # perform the RK-step to t0+h
             abck = (self.A, self.B, self.C, self.K)
             ynew, fnew = rk_step(self.func, t0, y0, f0, hstep, abck)
 
             # estimate the error norm
-            scale = self.atol + torch.max(y.norm(), ynew.norm()) * self.rtol
+            scale = self.atol + torch.max(y0.norm(), ynew.norm()) * self.rtol
             errnorm = self._error_norm(self.K, hstep) / scale
             accepted = errnorm < 1
 
@@ -146,10 +148,13 @@ class RK45(RKAdaptiveStepSolver):
     E = torch.tensor([-71/57600, 0, 71/16695, -71/1920, 17253/339200, -22/525,
                       1/40], dtype=torch.float64)
 
-def _rk_adaptive(fcn, ts, y0, params, cls, atol, rtol, **unused):
+def _rk_adaptive(fcn, ts, y0, params, cls, atol=None, rtol=None, **unused):
     solver = cls(atol=atol, rtol=rtol)
     solver.setup(fcn, ts, y0, params)
     return solver.solve()
 
 def rk23_adaptive(fcn, ts, y0, params, **kwargs):
     return _rk_adaptive(fcn, ts, y0, params, RK23, **kwargs)
+
+def rk45_adaptive(fcn, ts, y0, params, **kwargs):
+    return _rk_adaptive(fcn, ts, y0, params, RK45, **kwargs)

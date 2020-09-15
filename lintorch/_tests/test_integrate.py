@@ -205,6 +205,44 @@ def test_ivp(dtype, device):
         gradcheck(getoutput, (a, b, c, ts, y0))
         gradgradcheck(getoutput, (a, b, c, ts, y0))
 
+@device_dtype_float_test(only64=True)
+def test_ivp_methods(dtype, device):
+    torch.manual_seed(100)
+    random.seed(100)
+    nr = 2
+    nt = 5
+    t0 = 0.0
+    t1 = 0.2
+    a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
+    b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
+    c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
+    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device).requires_grad_()
+    y0 = torch.rand((nr,), dtype=dtype, device=device).requires_grad_()
+    ts1 = ts.unsqueeze(-1)
+
+    methods = [
+        ("rk4" , (1e-8, 1e-5)),
+        ("rk38", (1e-8, 1e-5)),
+        ("rk45", (1e-8, 1e-5)),
+        ("rk23", (1e-6, 1e-4)),
+    ]
+    for method, (rtol, atol) in methods:
+        print(method)  # to inform which method fails
+
+        fwd_options = {
+            "method": method,
+        }
+
+        for clss in [IVPModule, IVPNNModule]:
+            def getoutput(a, b, c, ts, y0):
+                module = clss(a, b)
+                yt = solve_ivp(module.forward, ts, y0, params=(c,), fwd_options=fwd_options)
+                return yt
+
+            yt = getoutput(a, b, c, ts, y0)
+            yt_true = y0 * torch.exp(-(0.5 * a * (ts1 + t0) + b + c) * (ts1 - t0))
+            assert torch.allclose(yt, yt_true, rtol=rtol, atol=atol)
+
 ################################## mcquad ##################################
 class MCQuadLogProbNNModule(torch.nn.Module):
     def __init__(self, w):
