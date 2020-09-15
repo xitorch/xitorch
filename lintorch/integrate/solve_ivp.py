@@ -77,7 +77,7 @@ class _SolveIVP(torch.autograd.Function):
     @staticmethod
     def forward(ctx, pfcn, ts, fwd_options, bck_options, nparams, y0, *allparams):
         config = set_default_option({
-            "method": "rk4",
+            "method": "rk45",
         }, fwd_options)
         ctx.bck_config = set_default_option(config, bck_options)
 
