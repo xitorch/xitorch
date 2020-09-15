@@ -23,6 +23,8 @@ import torch
 # The operations are done in grad-disabled environment and **not** expected to
 # be able to propagate gradients.
 
+__all__ = ["rk4_ivp", "rk38_ivp"]
+
 def explicit_rk(tableau, fcn, t, y0, params):
     c = tableau["c"]
     a = tableau["a"]
