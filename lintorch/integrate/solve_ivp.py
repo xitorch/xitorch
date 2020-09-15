@@ -3,6 +3,7 @@ from typing import Callable, Union, Mapping, Any, Sequence
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.pure_function import get_pure_function, make_sibling
 from lintorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
+from lintorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
 from lintorch._utils.tensor import convert_none_grads_to_zeros
 from lintorch.debug.modes import is_debug_enabled
@@ -83,13 +84,18 @@ class _SolveIVP(torch.autograd.Function):
         params = allparams[:nparams]
         objparams = allparams[nparams:]
 
-        method = config["method"].lower()
-        if method == "rk4":
-            yt = rk4_ivp(pfcn, ts, y0, params, **config)
-        elif method == "rk38":
-            yt = rk38_ivp(pfcn, ts, y0, params, **config)
-        else:
+        orig_method = config.pop("method")
+        method = orig_method.lower()
+        try:
+            solver = {
+                "rk4": rk4_ivp,
+                "rk38": rk38_ivp,
+                "rk23": rk23_adaptive,
+                "rk45": rk45_adaptive,
+            }[method]
+        except KeyError:
             raise RuntimeError("Unknown solve_ivp method: %s" % config["method"])
+        yt = solver(pfcn, ts, y0, params, **config)
 
         # save the parameters for backward
         ctx.param_sep = TensorNonTensorSeparator(allparams, varonly=True)
