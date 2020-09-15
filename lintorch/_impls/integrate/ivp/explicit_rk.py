@@ -57,8 +57,7 @@ def explicit_rk(tableau, fcn, t, y0, params):
             ks.append(k)
             ksum += b[j] * k
         y = h * ksum + y
-        for j in range(ny):
-            yt[j][i+1] = y[j]
+        yt[i+1] = y
     return yt
 
 ############################# list of tableaus #############################
