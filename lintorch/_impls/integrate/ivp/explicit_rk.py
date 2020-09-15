@@ -30,7 +30,6 @@ def explicit_rk(tableau, fcn, t, y0, params):
     a = tableau["a"]
     b = tableau["b"]
     s = len(c)
-    ny = len(y0)
     nt = len(t)
     dtype = t.dtype
     device = t.device
@@ -47,12 +46,12 @@ def explicit_rk(tableau, fcn, t, y0, params):
         t1 = t[i+1]
         h = t1 - t0
         ks = []
-        ksum = [0.0 for _ in range(ny)]
+        ksum = 0.0
         for j in range(s):
             if j == 0:
                 k = fcn(t0, y, *params)
             else:
-                ak = [0.0 for _ in range(ny)]
+                ak = 0.0
                 for m in range(j):
                     ak = a[j][m] * ks[m] + ak
                 k = fcn(t0 + c[j] * h, h * ak + y, *params)
