@@ -11,11 +11,7 @@ def leggaussquad(fcn, xl, xu, params, n, **unused):
     wlg *= 0.5 * (xu - xl)
     xs = xlg * (0.5 * (xu - xl)) + (0.5 * (xu + xl)) # (n, *nx)
 
-    res = [wlg[0] * f for f in fcn(xs[0], *params)]
-    nres = len(res)
+    res = wlg[0] * fcn(xs[0], *params)
     for i in range(1,n):
-        w = wlg[i]
-        f = fcn(xs[i], *params)
-        for j in range(nres):
-            res[j] += w * f[j]
+        res += wlg[i] * fcn(xs[i], *params)
     return res

@@ -5,7 +5,7 @@ from typing import Callable, Union, Mapping, Any, Sequence, List
 from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from lintorch._core.editable_module import EditableModule
 from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
 from lintorch._impls.integrate.fixed_quad import leggaussquad
 from lintorch.debug.modes import is_debug_enabled
 
@@ -62,14 +62,19 @@ def quad(
 
     pfunc = get_pure_function(fcn)
     nparams = len(params)
-    if not is_tuple_out:
+    if is_tuple_out:
+        packer = TensorPacker(out)
+
         @make_sibling(pfunc)
         def pfunc2(x, *params):
-            return (pfunc(x,*params),)
-        return _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams,
-            dtype, device, *params, *pfunc.objparams())[0]
+            y = fcn(x, *params)
+            return packer.flatten(y)
+
+        res = _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams,
+            dtype, device, *params, *pfunc.objparams())
+        return packer.pack(res)
     else:
-        return _Quadrature.apply(pfunc , xl, xu, fwd_options, bck_options, nparams,
+        return _Quadrature.apply(pfunc, xl, xu, fwd_options, bck_options, nparams,
             dtype, device, *params, *pfunc.objparams())
 
 class _Quadrature(torch.autograd.Function):
@@ -106,7 +111,8 @@ class _Quadrature(torch.autograd.Function):
                 def fcn2(t, *params):
                     ys = fcn(tfm.forward(t), *params)
                     dxdt = tfm.dxdt(t)
-                    return [y * dxdt for y in ys]
+                    return ys * dxdt
+
                 tl = tfm.x2t(xl)
                 tu = tfm.x2t(xu)
             else:
@@ -132,11 +138,10 @@ class _Quadrature(torch.autograd.Function):
             ctx.save_for_backward(*xlxu_tensor, *tensor_params)
             ctx.fcn = fcn
             ctx.nparams = nparams
-
-            return tuple(y)
+            return y
 
     @staticmethod
-    def backward(ctx, *grad_ys):
+    def backward(ctx, grad_ys):
         # retrieve the params
         ntensor_params = ctx.param_sep.ntensors()
         tensor_params = ctx.saved_tensors[-ntensor_params:]
@@ -144,7 +149,6 @@ class _Quadrature(torch.autograd.Function):
         nparams = ctx.nparams
         params = allparams[:nparams]
         fcn = ctx.fcn
-        ngrady = len(grad_ys)
 
         with fcn.disable_state_change():
 
@@ -162,11 +166,11 @@ class _Quadrature(torch.autograd.Function):
                 xl, xu = ctx.xlxu_nontensor
 
             # calculate the gradient for the boundaries
-            grad_xl = -sum([torch.sum(gy * f).reshape(xl.shape) for (gy,f) in zip(grad_ys, fcn(xl, *params))]) if ctx.xltensor else None
-            grad_xu =  sum([torch.sum(gy * f).reshape(xu.shape) for (gy,f) in zip(grad_ys, fcn(xu, *params))]) if ctx.xutensor else None
+            grad_xl = -torch.dot(grad_ys.reshape(-1), fcn(xl, *params).reshape(-1)).reshape(xl.shape) if ctx.xltensor else None
+            grad_xu =  torch.dot(grad_ys.reshape(-1), fcn(xu, *params).reshape(-1)).reshape(xu.shape) if ctx.xutensor else None
 
             def new_fcn(x, *grad_y_params):
-                grad_ys = grad_y_params[:ngrady]
+                grad_ys = grad_y_params[0]
                 # not setting objparams and params because the params and objparams
                 # are still the same objects as the objects outside
                 with torch.enable_grad():
@@ -180,7 +184,7 @@ class _Quadrature(torch.autograd.Function):
             # reconstruct grad_params
             # listing tensor_params in the params of quad to make sure it gets
             # the gradient calculated
-            dydts = quad(new_fcn, xl, xu, params=(*grad_ys, *tensor_params),
+            dydts = quad(new_fcn, xl, xu, params=(grad_ys, *tensor_params),
                          fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
             dydns = [None for _ in range(ctx.param_sep.nnontensors())]
             grad_params = ctx.param_sep.reconstruct_params(dydts, dydns)
