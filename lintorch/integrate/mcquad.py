@@ -1,7 +1,7 @@
 import torch
 from lintorch.debug.modes import is_debug_enabled
 from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
 from lintorch._utils.tupleops import tuple_axpy1
 from lintorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
 
@@ -61,20 +61,22 @@ def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, fwd_option
     pobjparams = pure_logpfcn.objparams()
     nf_objparams = len(fobjparams)
 
-    if not is_tuple_out:
+    if is_tuple_out:
+        packer = TensorPacker(out)
         @make_sibling(pure_ffcn)
         def pure_ffcn2(x, *fparams):
-            return (pure_ffcn(x, *fparams),)
-        return _MCQuad.apply(pure_ffcn2, pure_logpfcn, 1, x0, None, None, fwd_options, bck_options,
-            nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)[0]
+            y = pure_ffcn(x, *fparams)
+            return packer.flatten(y)
+        res = _MCQuad.apply(pure_ffcn2, pure_logpfcn, x0, None, None, fwd_options, bck_options,
+            nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
+        return packer.pack(res)
     else:
-        nf = len(out)
-        return _MCQuad.apply(pure_ffcn, pure_logpfcn, nf, x0, None, None, fwd_options, bck_options,
+        return _MCQuad.apply(pure_ffcn, pure_logpfcn, x0, None, None, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
 
 class _MCQuad(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, ffcn, log_pfcn, nf, x0, xsamples, wsamples, fwd_options, bck_options,
+    def forward(ctx, ffcn, log_pfcn, x0, xsamples, wsamples, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *all_fpparams):
         # set up the default options
         config = set_default_option({
@@ -99,7 +101,7 @@ class _MCQuad(torch.autograd.Function):
             if method not in method_fcn:
                 raise RuntimeError("Unknown mcquad method: %s" % config["method"])
             xsamples, wsamples = method_fcn[method](log_pfcn, x0, pparams, **config)
-        epfs = _integrate(ffcn, xsamples, wsamples, fparams, nf)
+        epf = _integrate(ffcn, xsamples, wsamples, fparams)
 
         # save parameters for backward calculations
         ctx.xsamples = xsamples
@@ -116,22 +118,20 @@ class _MCQuad(torch.autograd.Function):
         ptensor_params = ctx.pparam_sep.get_tensor_params()
         ctx.nftensorparams = len(ftensor_params)
         ctx.nptensorparams = len(ptensor_params)
-        ctx.nout = len(epfs)
-        ctx.save_for_backward(*epfs, *ftensor_params, *ptensor_params)
+        ctx.save_for_backward(epf, *ftensor_params, *ptensor_params)
 
-        return tuple(epfs)
+        return epf
 
     @staticmethod
-    def backward(ctx, *grad_epfs):
+    def backward(ctx, grad_epf):
         # restore the parameters
         alltensors = ctx.saved_tensors
-        nout = ctx.nout
         nftensorparams = ctx.nftensorparams
         nptensorparams = ctx.nptensorparams
-        epfs = alltensors[:nout]
-        ftensor_params = alltensors[nout:nout+nftensorparams]
-        ptensor_params = alltensors[nout+nftensorparams:]
-        fptensor_params = alltensors[nout:]
+        epf = alltensors[0]
+        ftensor_params = alltensors[1:1+nftensorparams]
+        ptensor_params = alltensors[1+nftensorparams:]
+        fptensor_params = alltensors[1:]
 
         # get the parameters and the object parameters
         nfparams = ctx.nfparams
@@ -160,9 +160,9 @@ class _MCQuad(torch.autograd.Function):
 
         def aug_function(x, *grad_and_fptensor_params):
             local_grad_enabled = torch.is_grad_enabled()
-            grad_epfs = grad_and_fptensor_params[:nout]
-            epfs = grad_and_fptensor_params[nout:2*nout]
-            fptensor_params = grad_and_fptensor_params[2*nout:]
+            grad_epf = grad_and_fptensor_params[0]
+            epf = grad_and_fptensor_params[1]
+            fptensor_params = grad_and_fptensor_params[2:]
             ftensor_params = fptensor_params[:nftensorparams]
             ptensor_params = fptensor_params[nftensorparams:]
             with torch.enable_grad():
@@ -182,13 +182,13 @@ class _MCQuad(torch.autograd.Function):
             dLdthetaf = []
             if len(ftensor_params) > 0:
                 dLdthetaf = torch.autograd.grad(fout, ftensor_params,
-                    grad_outputs=grad_epfs,
+                    grad_outputs=grad_epf,
                     retain_graph=True,
                     create_graph=local_grad_enabled)
             # derivative of pparams
             dLdthetap = []
             if len(ptensor_params) > 0:
-                dLdef = sum([torch.dot((f-y).reshape(-1), grad_epf.reshape(-1)) for (f, y, grad_epf) in zip(fout, epfs, grad_epfs)])
+                dLdef = torch.dot((fout - epf).reshape(-1), grad_epf.reshape(-1))
                 dLdthetap = torch.autograd.grad(pout, ptensor_params,
                     grad_outputs=dLdef.reshape(pout.shape),
                     retain_graph=True,
@@ -209,7 +209,7 @@ class _MCQuad(torch.autograd.Function):
             x0=xsamples[0], # unused because xsamples is set
             xsamples=xsamples,
             wsamples=wsamples,
-            fparams=(*grad_epfs, *epfs, *fptensor_params_copy),
+            fparams=(grad_epf, epf, *fptensor_params_copy),
             pparams=pparams,
             fwd_options=ctx.bck_config,
             bck_options=ctx.bck_config)
@@ -221,12 +221,12 @@ class _MCQuad(torch.autograd.Function):
         dLdpnontensor = [None for _ in range(ctx.pparam_sep.nnontensors())]
         dLdtf = ctx.fparam_sep.reconstruct_params(dLdthetaf, dLdfnontensor)
         dLdtp = ctx.pparam_sep.reconstruct_params(dLdthetap, dLdpnontensor)
-        return (None, None, None, None, None, None, None, None, None, None, None,
+        return (None, None, None, None, None, None, None, None, None, None,
                 *dLdtf, *dLdtp)
 
-def _integrate(ffcn, xsamples, wsamples, fparams, nf):
+def _integrate(ffcn, xsamples, wsamples, fparams):
     nsamples = len(xsamples)
-    sumfs = [0.0 for _ in range(nf)]
+    res = 0.0
     for x,w in zip(xsamples, wsamples):
-        sumfs = [s + f*w for s,f in zip(sumfs, ffcn(x, *fparams))]
-    return sumfs
+        res = res + ffcn(x, *fparams) * w
+    return res
