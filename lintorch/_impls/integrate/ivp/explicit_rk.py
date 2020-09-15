@@ -34,13 +34,9 @@ def explicit_rk(tableau, fcn, t, y0, params):
     device = t.device
 
     # set up the results list
-    yt = []
-    for i in range(ny):
-        y0i = y0[i]
-        yti = torch.empty((nt, *y0i.shape), dtype=dtype, device=device)
-        yti[0] = y0i
-        yt.append(yti)
+    yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
 
+    yt[0] = y0
     y = y0
     # see https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Explicit_Runge.E2.80.93Kutta_methods
     # for the implementation
@@ -56,11 +52,11 @@ def explicit_rk(tableau, fcn, t, y0, params):
             else:
                 ak = [0.0 for _ in range(ny)]
                 for m in range(j):
-                    ak = _tuple_axpy1(a[j][m], ks[m], ak)
-                k = fcn(t0 + c[j] * h, _tuple_axpy1(h, ak, y), *params)
+                    ak = a[j][m] * ks[m] + ak
+                k = fcn(t0 + c[j] * h, h * ak + y, *params)
             ks.append(k)
-            ksum = _tuple_axpy1(b[j], k, ksum)
-        y = _tuple_axpy1(h, ksum, y)
+            ksum += b[j] * k
+        y = h * ksum + y
         for j in range(ny):
             yt[j][i+1] = y[j]
     return yt
@@ -92,16 +88,11 @@ def rk4_ivp(fcn, t, y0, params, **kwargs):
     dtype = t.dtype
     device = t.device
     nt = torch.numel(t)
-    ny = len(y0)
 
-    # set up the results list
-    yt = []
-    for i in range(ny):
-        y0i = y0[i]
-        yti = torch.empty((nt, *y0i.shape), dtype=dtype, device=device)
-        yti[0] = y0i
-        yt.append(yti)
+    # set up the results
+    yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
 
+    yt[0] = y0
     y = y0
     for i in range(nt-1):
         t0 = t[i]
@@ -109,16 +100,9 @@ def rk4_ivp(fcn, t, y0, params, **kwargs):
         h = t1 - t0
         h2 = h * 0.5
         k1 = fcn(t0, y, *params)
-        k2 = fcn(t0 + h2, _tuple_axpy1(h2, k1, y), *params)
-        k3 = fcn(t0 + h2, _tuple_axpy1(h2, k2, y), *params)
-        k4 = fcn(t0 + h, _tuple_axpy1(h, k3, y), *params)
-        ksum = _tuple_axpy1(2, k2, k1)
-        ksum = _tuple_axpy1(2, k3, ksum)
-        ksum = _tuple_axpy1(1, k4, ksum)
-        y = _tuple_axpy1(h/6., ksum, y)
-        for j in range(ny):
-            yt[j][i+1] = y[j]
+        k2 = fcn(t0 + h2, h2 * k1 + y, *params)
+        k3 = fcn(t0 + h2, h2 * k2 + y, *params)
+        k4 = fcn(t0 + h , h  * k3 + y, *params)
+        y = h/6. * (k1 + 2*k2 + 2*k3 + k4) + y
+        yt[i+1] = y
     return yt
-
-def _tuple_axpy1(a, xs, ys): # a*x + y (only x and y are tuple)
-    return [(a * x + y) for (x,y) in zip(xs, ys)]

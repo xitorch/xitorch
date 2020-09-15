@@ -80,3 +80,19 @@ class TensorNonTensorSeparator(object):
         for idx,p in zip(self.tensor_idxs, tensor_params):
             params[idx] = p
         return params
+
+class TensorPacker(object):
+    def __init__(self, tensors):
+        self.idx_shapes = []
+        istart = 0
+        for i,p in enumerate(tensors):
+            ifinish = istart + torch.numel(p)
+            self.idx_shapes.append((istart, ifinish, p.shape))
+            istart = ifinish
+
+    def flatten(self, y_list):
+        return torch.cat([y.reshape(-1) for y in y_list], dim=-1)
+
+    def pack(self, y):
+        yshapem1 = y.shape[:-1]
+        return tuple([y[...,istart:ifinish].reshape((*yshapem1, *shape)) for (istart,ifinish,shape) in self.idx_shapes])
