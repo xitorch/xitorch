@@ -6,7 +6,7 @@ import scipy.optimize
 import lintorch as lt
 from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
 from lintorch._utils.assertfuncs import assert_fcn_params
-from lintorch._impls.optimize.rootfinder import lbfgs, selfconsistent, broyden, diis, gradrca
+from lintorch._impls.optimize.root.rootsolver import broyden1
 from lintorch.linalg.solve import solve
 from lintorch.grad.jachess import jac
 from lintorch.linalg.linop import LinearOperator, checklinop
@@ -178,11 +178,7 @@ class _RootFinder(torch.autograd.Function):
 
         # set default options
         config = set_default_option({
-            "min_eps": 1e-9,
-            "verbose": False,
-            "linesearch": True,
-            "jinv0": 0.5,
-            "method": "lbfgs",
+            "method": "broyden1",
         }, options)
         ctx.bck_options = set_default_option({
             "method": "exactsolve"
@@ -193,58 +189,12 @@ class _RootFinder(torch.autograd.Function):
 
         with fcn.useobjparams(objparams):
 
-            def loss(y):
-                yfcn = fcn(y, *params)
-                return yfcn
-
-            jinv0 = config["jinv0"]
-            method = config["method"].lower()
-            if method == "lbfgs":
-                y = lbfgs(loss, y0, **config)
-            elif method == "selfconsistent":
-                y = selfconsistent(loss, y0, **config)
-            elif method == "broyden":
-                y = broyden(loss, y0, **config)
-            elif method == "diis":
-                y = diis(loss, y0, **config)
-            elif method == "gradrca":
-                y = gradrca(loss, y0, **config)
-            elif method.startswith("np_"):
-                nbatch = y0.shape[0]
-
-                def loss_np(y):
-                    yt = torch.tensor(y, dtype=y0.dtype, device=y0.device).view(nbatch,-1)
-                    yfcn = fcn(yt, *params)
-                    return yfcn.reshape(-1).cpu().detach().numpy()
-
-                y0_np = y0.squeeze(0).cpu().detach().numpy()
-                if method == "np_broyden1":
-                    opt = set_default_option({
-                        "verbose": False,
-                        "max_niter": None,
-                        "min_eps": None,
-                        "linesearch": "armijo",
-                    }, config)
-                    y_np = scipy.optimize.broyden1(loss_np, y0_np,
-                        verbose=opt["verbose"],
-                        maxiter=opt["max_niter"],
-                        alpha=-config["jinv0"],
-                        f_tol=opt["min_eps"],
-                        line_search=opt["linesearch"])
-                elif method == "np_fsolve":
-                    opt = set_default_option({
-                        "max_niter": 0,
-                    }, config)
-                    y_np, info, ier, msg = scipy.optimize.fsolve(loss_np, y0_np,
-                        maxfev=opt["max_niter"])
-                    if ier != 1:
-                        warnings.warn(msg)
-                else:
-                    raise RuntimeError("Unknown method: %s" % config["method"])
-
-                y = torch.tensor(y_np, dtype=y0.dtype, device=y0.device)
+            orig_method = config.pop("method")
+            method = orig_method.lower()
+            if method == "broyden1":
+                y = broyden1(fcn, y0, params, **config)
             else:
-                raise RuntimeError("Unknown method: %s" % config["method"])
+                raise RuntimeError("Unknown rootfinder method: %s" % orig_method)
 
         ctx.fcn = fcn
 

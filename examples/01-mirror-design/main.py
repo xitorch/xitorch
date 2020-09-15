@@ -41,10 +41,7 @@ def get_intersection(r0, v, fcn):
         return (raypos - surface_pos)
 
     y0 = torch.zeros_like(v)
-    fwd_options = {
-        "method": "np_broyden1", # more robust
-    }
-    y = rootfinder(rootfinder_fcn, y0, params=(r0, v), fwd_options=fwd_options)
+    y = rootfinder(rootfinder_fcn, y0, params=(r0, v))
     return y[...,:-1], y[...,-1:] # (nbatch, ndim-1) and (nbatch, 1)
 
 def get_normal(rsurf, fcn):

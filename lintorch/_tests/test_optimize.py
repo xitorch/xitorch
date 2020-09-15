@@ -106,7 +106,8 @@ def test_rootfinder(dtype, device):
     nr = 3
     nbatch = 2
     fwd_options = {
-        "min_eps": 1e-9
+        "f_tol": 1e-9,
+        "alpha": -0.5,
     }
 
     for clss in [DummyModule, DummyNNModule]:
@@ -139,7 +140,8 @@ def test_equil(dtype, device):
     nr = 3
     nbatch = 2
     fwd_options = {
-        "min_eps": 1e-9
+        "f_tol": 1e-9,
+        "alpha": -0.5,
     }
 
     for clss in [DummyModule, DummyNNModule]:
@@ -172,7 +174,8 @@ def test_rootfinder_with_params(dtype, device):
     nr = 3
     nbatch = 2
     fwd_options = {
-        "min_eps": 1e-9
+        "f_tol": 1e-9,
+        "alpha": -0.5,
     }
 
     clss = DummyModuleExplicit
@@ -214,7 +217,8 @@ def test_minimize(dtype, device):
     y0 = torch.randn((nbatch, nr)).to(dtype)
     fwd_options = {
         "max_niter": 50,
-        "min_eps": 1e-9,
+        "f_tol": 1e-9,
+        "alpha": -0.5,
     }
     activation = "square" # square activation makes it easy to optimize
 
