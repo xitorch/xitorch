@@ -2,10 +2,10 @@ import os
 from setuptools import setup, find_packages
 
 setup(
-    name='lintorch',
+    name='xitorch',
     version="0.0.1",
     description='Pytorch-based linear algebra library for large matrix',
-    url='https://github.com/mfkasim91/lintorch',
+    url='https://github.com/mfkasim91/xitorch',
     author='mfkasim91',
     author_email='firman.kasim@gmail.com',
     license='MIT',

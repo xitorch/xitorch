@@ -2,7 +2,7 @@
 # and converted to PyTorch for GPU efficiency
 
 import torch
-from lintorch._impls.optimize.root._jacobian import BroydenFirst
+from xitorch._impls.optimize.root._jacobian import BroydenFirst
 
 __all__ = ["broyden1"]
 

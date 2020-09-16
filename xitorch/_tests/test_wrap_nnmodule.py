@@ -1,5 +1,5 @@
 import torch
-from lintorch._core.pure_function import get_pure_function
+from xitorch._core.pure_function import get_pure_function
 
 class NNModule(torch.nn.Module):
     def __init__(self, a):

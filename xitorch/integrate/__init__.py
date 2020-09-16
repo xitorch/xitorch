@@ -1,3 +1,3 @@
-from lintorch.integrate.quad import *
-from lintorch.integrate.solve_ivp import *
-from lintorch.integrate.mcquad import *
+from xitorch.integrate.quad import *
+from xitorch.integrate.solve_ivp import *
+from xitorch.integrate.mcquad import *

@@ -2,10 +2,10 @@ import random
 import torch
 import numpy as np
 from torch.autograd import gradcheck, gradgradcheck
-import lintorch as lt
-from lintorch.grad.jachess import hess
-from lintorch.integrate import quad, solve_ivp, mcquad
-from lintorch._tests.utils import device_dtype_float_test
+import xitorch as xt
+from xitorch.grad.jachess import hess
+from xitorch.integrate import quad, solve_ivp, mcquad
+from xitorch._tests.utils import device_dtype_float_test
 
 ################################## quadrature ##################################
 class IntegrationNNModule(torch.nn.Module):
@@ -18,7 +18,7 @@ class IntegrationNNModule(torch.nn.Module):
     def forward(self, x, c):
         return torch.cos(self.a * x + self.b * c)
 
-class IntegrationModule(lt.EditableModule):
+class IntegrationModule(xt.EditableModule):
     # cos(a*x + b * c)
     def __init__(self, a, b):
         self.a = a
@@ -40,7 +40,7 @@ class IntegrationNNMultiModule(torch.nn.Module):
     def forward(self, x, c):
         return torch.cos(self.a * x + self.b * c), torch.sin(self.a * x + self.b * c)
 
-class IntegrationMultiModule(lt.EditableModule):
+class IntegrationMultiModule(xt.EditableModule):
     # cos(a*x + b * c), sin(a*x + b*c)
     def __init__(self, a, b):
         self.a = a
@@ -161,7 +161,7 @@ class IVPNNModule(torch.nn.Module):
     def forward(self, t, y, c):
         return -self.a * y * t - self.b * y - c * y
 
-class IVPModule(lt.EditableModule):
+class IVPModule(xt.EditableModule):
     # dydt: -a * y * t - b * y - c * y
     def __init__(self, a, b):
         self.a = a
@@ -253,7 +253,7 @@ class MCQuadLogProbNNModule(torch.nn.Module):
         # x, w are single-element tensors
         return -x*x/(2*self.w*self.w)
 
-class MCQuadFcnModule(lt.EditableModule):
+class MCQuadFcnModule(xt.EditableModule):
     def __init__(self, a):
         self.a = a
 

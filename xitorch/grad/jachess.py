@@ -1,10 +1,10 @@
 import torch
 import warnings
 from typing import Callable, List, Any, Union, Sequence
-from lintorch.linalg.linop import LinearOperator
-from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch._utils.assertfuncs import assert_type
-from lintorch._utils.misc import TensorNonTensorSeparator
+from xitorch.linalg.linop import LinearOperator
+from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch._utils.assertfuncs import assert_type
+from xitorch._utils.misc import TensorNonTensorSeparator
 
 __all__ = ["jac", "hess"]
 

@@ -1,12 +1,12 @@
 import random
 import torch
 from torch.autograd import gradcheck, gradgradcheck
-import lintorch as lt
-from lintorch.grad.jachess import hess
-from lintorch.optimize import rootfinder, equilibrium, minimize
-from lintorch._tests.utils import device_dtype_float_test
+import xitorch as xt
+from xitorch.grad.jachess import hess
+from xitorch.optimize import rootfinder, equilibrium, minimize
+from xitorch._tests.utils import device_dtype_float_test
 
-class DummyModule(lt.EditableModule):
+class DummyModule(xt.EditableModule):
     def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
         super(DummyModule, self).__init__()
         self.A = A # (nr, nr)
@@ -77,7 +77,7 @@ class DummyNNModule(torch.nn.Module):
             yr = yr.sum()
         return yr
 
-class DummyModuleExplicit(lt.EditableModule):
+class DummyModuleExplicit(xt.EditableModule):
     def __init__(self, addx=True):
         super(DummyModuleExplicit, self).__init__()
         self.addx = addx

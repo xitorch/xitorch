@@ -1,10 +1,10 @@
 import sys
 import argparse
-from lintorch.debug.modes import enable_debug
+from xitorch.debug.modes import enable_debug
 
 def parse_args():
     # parse the argument
-    parser = argparse.ArgumentParser("Run python script by enabling lintorch debug mode")
+    parser = argparse.ArgumentParser("Run python script by enabling xitorch debug mode")
     parser.add_argument("scriptfile", type=str, help="Path to the script to run")
     parser.add_argument("args", type=str, nargs=argparse.REMAINDER,
         help="The arguments needed to run the script")

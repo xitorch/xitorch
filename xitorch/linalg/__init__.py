@@ -1,2 +1,2 @@
-from lintorch.linalg.solve import *
-from lintorch.linalg.symeig import *
+from xitorch.linalg.solve import *
+from xitorch.linalg.symeig import *

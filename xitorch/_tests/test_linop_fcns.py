@@ -2,10 +2,10 @@ import itertools
 import torch
 import pytest
 from torch.autograd import gradcheck, gradgradcheck
-from lintorch.linalg.linop import LinearOperator
-from lintorch.linalg.symeig import lsymeig, symeig
-from lintorch.linalg.solve import solve
-from lintorch._utils.bcast import get_bcasted_dims
+from xitorch.linalg.linop import LinearOperator
+from xitorch.linalg.symeig import lsymeig, symeig
+from xitorch.linalg.solve import solve
+from xitorch._utils.bcast import get_bcasted_dims
 
 seed = 12345
 

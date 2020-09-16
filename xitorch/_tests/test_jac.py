@@ -1,8 +1,8 @@
 import torch
 from torch.autograd import gradcheck, gradgradcheck
-from lintorch.grad.jachess import jac, hess
-from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import get_pure_function
+from xitorch.grad.jachess import jac, hess
+from xitorch._core.editable_module import EditableModule
+from xitorch._core.pure_function import get_pure_function
 
 dtype = torch.float64
 

@@ -3,16 +3,16 @@ from typing import Callable, Iterable, Mapping, Any, Sequence
 import torch
 import numpy as np
 import scipy.optimize
-import lintorch as lt
-from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator
-from lintorch._utils.assertfuncs import assert_fcn_params
-from lintorch._impls.optimize.root.rootsolver import broyden1
-from lintorch.linalg.solve import solve
-from lintorch.grad.jachess import jac
-from lintorch.linalg.linop import LinearOperator, checklinop
-from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch.debug.modes import is_debug_enabled
+import xitorch as xt
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from xitorch._utils.assertfuncs import assert_fcn_params
+from xitorch._impls.optimize.root.rootsolver import broyden1
+from xitorch.linalg.solve import solve
+from xitorch.grad.jachess import jac
+from xitorch.linalg.linop import LinearOperator, checklinop
+from xitorch._core.editable_module import EditableModule
+from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
 
@@ -53,7 +53,7 @@ def rootfinder(
     * To obtain the correct gradient and higher order gradients, the fcn must be:
         - a torch.nn.Module with fcn.parameters() list the tensors that determine
             the output of the fcn.
-        - a method in lt.EditableModule object with no out-of-scope parameters.
+        - a method in xt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
     # perform implementation check if debug mode is enabled
@@ -100,7 +100,7 @@ def equilibrium(
     * To obtain the correct gradient and higher order gradients, the fcn must be:
         - a torch.nn.Module with fcn.parameters() list the tensors that determine
             the output of the fcn.
-        - a method in lt.EditableModule object with no out-of-scope parameters.
+        - a method in xt.EditableModule object with no out-of-scope parameters.
         - a function with no out-of-scope parameters.
     """
     # perform implementation check if debug mode is enabled

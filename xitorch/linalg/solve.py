@@ -3,12 +3,12 @@ import warnings
 from typing import Union, Any, Mapping
 import numpy as np
 from scipy.sparse.linalg import gmres
-from lintorch.linalg.linop import LinearOperator
-from lintorch._impls.optimize.rootfinder import lbfgs, broyden
-from lintorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
-from lintorch._utils.assertfuncs import assert_runtime
-from lintorch._utils.misc import set_default_option, dummy_context_manager
-from lintorch.debug.modes import is_debug_enabled
+from xitorch.linalg.linop import LinearOperator
+from xitorch._impls.optimize.rootfinder import lbfgs, broyden
+from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
+from xitorch._utils.assertfuncs import assert_runtime
+from xitorch._utils.misc import set_default_option, dummy_context_manager
+from xitorch.debug.modes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None, posdef=False,
@@ -23,7 +23,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
 
     Arguments
     ---------
-    * A: lintorch.LinearOperator instance with shape (*BA, na, na)
+    * A: xitorch.LinearOperator instance with shape (*BA, na, na)
         A function that takes an input X and produce the vectors in the same
         space as B.
     * B: torch.tensor (*BB, na, ncols)
@@ -31,7 +31,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     * E: torch.tensor (*BE, ncols) or None
         If not None, it will solve AX-MXE = B. Otherwise, it just solves
         AX = B and M is ignored. E would be applied to every column.
-    * M: lintorch.LinearOperator instance (*BM, na, na) or None
+    * M: xitorch.LinearOperator instance (*BM, na, na) or None
         The transformation on the E side. If E is None,
         then this argument is ignored. I E is not None and M is None, then M=I.
         This LinearOperator must be Hermitian.
