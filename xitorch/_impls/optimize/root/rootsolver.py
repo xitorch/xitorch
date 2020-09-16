@@ -71,6 +71,8 @@ def _nonlin_solver(fcn, x0, params, method,
 
     y = func(x)
     y_norm = y.norm()
+    if (y_norm == 0):
+        return x.reshape(xshape)
 
     # set up the jacobian
     jacobian.setup(x, y)
@@ -97,7 +99,7 @@ def _nonlin_solver(fcn, x0, params, method,
         else:
             s = 1.0
             xnew = x + dx
-            ynew = func(x)
+            ynew = func(xnew)
             y_norm_new = ynew.norm()
 
         jacobian.update(xnew.clone(), ynew)
@@ -219,11 +221,11 @@ def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0):
 class TerminationCondition(object):
     def __init__(self, f_tol, f_rtol, x_tol, x_rtol):
         if f_tol is None:
-            f_tol = 1e-12
+            f_tol = 1e-6
         if f_rtol is None:
             f_rtol = float("inf")
         if x_tol is None:
-            x_tol = 1e-12
+            x_tol = 1e-6
         if x_rtol is None:
             x_rtol = float("inf")
         self.f_tol = f_tol
