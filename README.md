@@ -5,9 +5,9 @@ can be widely used in scientific computing applications as well as deep learning
 
 ## Modules
 
-* `linalg`: Linear algebra and sparse linear algebra module
-* `optimize`: Optimization and root finder module
-* `integrate`: Quadrature and integration module
+* [`linalg`](xitorch/linalg/): Linear algebra and sparse linear algebra module
+* [`optimize`](xitorch/optimize/): Optimization and root finder module
+* [`integrate`](xitorch/integrate/): Quadrature and integration module
 
 ## Requirements
 
@@ -25,7 +25,9 @@ After fulfilling all the requirements, type the commands below to install `xitor
 ## Gallery
 
 Neural mirror design ([example 01](examples/01-mirror-design/)):
+
 ![neural mirror design](examples/01-mirror-design/images/mirror.gif)
 
 Initial velocity optimization in molecular dynamics ([example 02](examples/02-molecular-dynamics/)):
+
 ![molecular dynamics](examples/02-molecular-dynamics/images/md.gif)
