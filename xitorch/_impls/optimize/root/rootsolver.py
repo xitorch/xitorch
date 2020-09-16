@@ -174,7 +174,7 @@ def _nonline_line_search(func, x, y, dx, search_type="armijo", rdiff=1e-8, smin=
 
     return s, x, y, y_norm
 
-def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0):
+def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0, max_niter=20):
     phi_a0 = phi(alpha0)
     if phi_a0 <= phi0 + c1*alpha0*derphi0:
         return alpha0, phi_a0
@@ -191,8 +191,8 @@ def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0):
     # satisfies the first Wolfe condition (since we are backtracking, we will
     # assume that the value of alpha is not too small and satisfies the second
     # condition.
-
-    while alpha1 > amin:       # we are assuming alpha>0 is a descent direction
+    niter = 0
+    while alpha1 > amin and niter < max_niter:       # we are assuming alpha>0 is a descent direction
         factor = alpha0**2 * alpha1**2 * (alpha1-alpha0)
         a = alpha0**2 * (phi_a1 - phi0 - derphi0*alpha1) - \
             alpha1**2 * (phi_a0 - phi0 - derphi0*alpha0)
@@ -214,6 +214,7 @@ def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0):
         alpha1 = alpha2
         phi_a0 = phi_a1
         phi_a1 = phi_a2
+        niter += 1
 
     # Failed to find a suitable step length
     return None, phi_a1
