@@ -1,6 +1,6 @@
 # `xitorch`: differentiable scientific computing library
 
-`xitorch` contains a library of differentiable functions and functionals that
+`xitorch` is a PyTorch-based library of differentiable functions and functionals that
 can be widely used in scientific computing applications as well as deep learning.
 
 ## Modules
