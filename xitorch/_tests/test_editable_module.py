@@ -1,9 +1,9 @@
 import torch
 import pytest
 from typing import List
-from lintorch._core.editable_module import EditableModule
-from lintorch._core.pure_function import get_pure_function
-from lintorch._utils.exceptions import GetSetParamsError
+from xitorch._core.editable_module import EditableModule
+from xitorch._core.pure_function import get_pure_function
+from xitorch._utils.exceptions import GetSetParamsError
 
 ##############
 # test the assertion with methods with various problems

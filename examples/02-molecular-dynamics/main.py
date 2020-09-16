@@ -1,7 +1,7 @@
 import os
 import torch
 import numpy as np
-from lintorch.integrate import solve_ivp
+from xitorch.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
 ######################## physics functions ########################

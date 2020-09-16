@@ -1,7 +1,7 @@
 import torch
 import inspect
-from lintorch._utils.attr import get_attr, set_attr, del_attr
-from lintorch._core.editable_module import EditableModule
+from xitorch._utils.attr import get_attr, set_attr, del_attr
+from xitorch._core.editable_module import EditableModule
 from contextlib import contextmanager
 from abc import abstractmethod
 
@@ -182,6 +182,6 @@ def get_pure_function(fcn, fcntocall=None):
 
     # return as it is if fcn is just a function and params all are tensors
     else:
-        raise RuntimeError("The fcn must be a Python function or a method of torch.nn.Module or lintorch.EditableModule")
+        raise RuntimeError("The fcn must be a Python function or a method of torch.nn.Module or xitorch.EditableModule")
 
     return pfunc

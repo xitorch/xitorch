@@ -1,13 +1,13 @@
 import torch
 from typing import Union, Mapping, Any
 import functools
-from lintorch.linalg.linop import LinearOperator
-from lintorch.linalg.solve import solve
-from lintorch.debug.modes import is_debug_enabled
-from lintorch._utils.assertfuncs import assert_runtime
-from lintorch._utils.bcast import get_bcasted_dims
-from lintorch._utils.misc import set_default_option, dummy_context_manager
-from lintorch._utils.tensor import tallqr, to_fortran_order, ortho
+from xitorch.linalg.linop import LinearOperator
+from xitorch.linalg.solve import solve
+from xitorch.debug.modes import is_debug_enabled
+from xitorch._utils.assertfuncs import assert_runtime
+from xitorch._utils.bcast import get_bcasted_dims
+from xitorch._utils.misc import set_default_option, dummy_context_manager
+from xitorch._utils.tensor import tallqr, to_fortran_order, ortho
 
 __all__ = ["lsymeig", "usymeig", "symeig"]
 
@@ -30,7 +30,7 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
 
     Arguments
     ---------
-    * A: lintorch.LinearOperator hermitian instance with shape (*BA, q, q)
+    * A: xitorch.LinearOperator hermitian instance with shape (*BA, q, q)
         The linear module object on which the eigenpairs are constructed.
     * neig: int or None
         The number of eigenpairs to be retrieved. If None, all eigenpairs are
@@ -38,7 +38,7 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
     * mode: str
         "lowest" or "uppermost"/"uppest". If "lowest", it will take the lowest
         `neig` eigenpairs. If "uppest", it will take the uppermost `neig`.
-    * M: lintorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
+    * M: xitorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
         The transformation on the right hand side. If None, then M=I.
     * fwd_options: dict with str as key
         Eigendecomposition iterative algorithm options.

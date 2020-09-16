@@ -1,8 +1,8 @@
 import torch
-import lintorch as lt
+import xitorch as xt
 import pytest
 import argparse
-from lintorch._utils.fd import finite_differences
+from xitorch._utils.fd import finite_differences
 
 __all__ = ["device_dtype_float_test", "get_diagonally_dominant_class"]
 
@@ -23,7 +23,7 @@ def device_dtype_float_test(only64=False, onlycpu=False):
     return device_dtype_float_test_fcn
 
 def get_diagonally_dominant_class(na):
-    class Acls(lt.Module):
+    class Acls(xt.Module):
         def __init__(self):
             super(Acls, self).__init__(shape=(na,na))
 
@@ -55,7 +55,7 @@ def get_diagonally_dominant_class(na):
     return Acls
 
 def get_lower_mat_class(na):
-    class Acls(lt.Module):
+    class Acls(xt.Module):
         def __init__(self):
             super(Acls, self).__init__(shape=(na,na), is_symmetric=False)
 

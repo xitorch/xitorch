@@ -1,9 +1,9 @@
 import torch
-from lintorch.debug.modes import is_debug_enabled
-from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
-from lintorch._utils.tupleops import tuple_axpy1
-from lintorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
+from xitorch.debug.modes import is_debug_enabled
+from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
+from xitorch._utils.tupleops import tuple_axpy1
+from xitorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
 
 __all__ = ["mcquad"]
 

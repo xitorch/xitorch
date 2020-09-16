@@ -7,8 +7,8 @@ import copy
 import traceback as tb
 import torch
 from typing import Sequence, Union, Mapping, List, Dict
-from lintorch._utils.exceptions import GetSetParamsError
-from lintorch._utils.attr import get_attr, set_attr, del_attr
+from xitorch._utils.exceptions import GetSetParamsError
+from xitorch._utils.attr import get_attr, set_attr, del_attr
 
 __all__ = ["EditableModule"]
 

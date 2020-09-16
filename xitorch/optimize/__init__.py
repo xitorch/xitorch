@@ -1,1 +1,1 @@
-from lintorch.optimize.rootfinder import *
+from xitorch.optimize.rootfinder import *

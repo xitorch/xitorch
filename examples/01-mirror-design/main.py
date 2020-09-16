@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 from torch.autograd.functional import jvp
-import lintorch as lt
-from lintorch.optimize import rootfinder
+import xitorch as xt
+from xitorch.optimize import rootfinder
 import matplotlib.pyplot as plt
 
 ################### neural network for the surface ###################
@@ -34,7 +34,7 @@ def get_intersection(r0, v, fcn):
     # r0: (nbatch, ndim) initial point of the rays
     # v: (nbatch, ndim) the direction of travel of the rays
     # fcn: a function that takes (nbatch, ndim-1) and outputs (nbatch, ndim)
-    @lt.make_sibling(fcn)
+    @xt.make_sibling(fcn)
     def rootfinder_fcn(y, r0, v):
         surface_pos = fcn(y[...,:-1])  # (nbatch, ndim)
         raypos = r0 + v * y[...,-1:]  # (nbatch, ndim)

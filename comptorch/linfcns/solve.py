@@ -21,7 +21,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
 
     Arguments
     ---------
-    * A: lintorch.LinearOperator instance with shape (*BA, na, na)
+    * A: xitorch.LinearOperator instance with shape (*BA, na, na)
         A function that takes an input X and produce the vectors in the same
         space as B.
     * B: torch.tensor (*BB, na, ncols)
@@ -29,7 +29,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     * E: torch.tensor (*BE, ncols) or None
         If not None, it will solve AX-MXE = B. Otherwise, it just solves
         AX = B and M is ignored. E would be applied to every column.
-    * M: lintorch.LinearOperator instance (*BM, na, na) or None
+    * M: xitorch.LinearOperator instance (*BM, na, na) or None
         The transformation on the E side. If E is None,
         then this argument is ignored. I E is not None and M is None, then M=I.
     * fwd_options: dict

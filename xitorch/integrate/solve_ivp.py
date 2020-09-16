@@ -1,12 +1,12 @@
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence
-from lintorch._utils.assertfuncs import assert_fcn_params, assert_runtime
-from lintorch._core.pure_function import get_pure_function, make_sibling
-from lintorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
-from lintorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
-from lintorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
-from lintorch._utils.tensor import convert_none_grads_to_zeros
-from lintorch.debug.modes import is_debug_enabled
+from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
+from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
+from xitorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
+from xitorch._utils.tensor import convert_none_grads_to_zeros
+from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["solve_ivp"]
 
