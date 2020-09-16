@@ -18,8 +18,8 @@ can be widely used in scientific computing applications as well as deep learning
 
 After fulfilling all the requirements, type the commands below to install `xitorch`
 
-    git clone https://github.com/mfkasim91/lintorch/
-    cd lintorch
+    git clone https://github.com/mfkasim91/xitorch/
+    cd xitorch
     python -m pip install -e .
 
 ## Gallery
