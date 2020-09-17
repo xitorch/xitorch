@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import scipy.optimize
 import xitorch as xt
-from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator
+from xitorch._utils.misc import TensorNonTensorSeparator
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch.linalg.solve import solve
@@ -189,12 +189,8 @@ class _RootFinder(torch.autograd.Function):
             *allparams) -> torch.Tensor:
 
         # set default options
-        config = set_default_option({
-            "method": "broyden1",
-        }, options)
-        ctx.bck_options = set_default_option({
-            "method": "exactsolve"
-        }, bck_options)
+        config = options
+        ctx.bck_options = bck_options
 
         params = allparams[:nparams]
         objparams = allparams[nparams:]
