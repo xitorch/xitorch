@@ -12,8 +12,9 @@ from xitorch.debug.modes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None, posdef=False,
-          fwd_options:Mapping[str,Any]={},
-          bck_options:Mapping[str,Any]={}):
+          bck_options:Mapping[str,Any]={},
+          method=None,
+          **fwd_options):
     """
     Performing iterative method to solve the equation AX=B or
     AX-MXE=B, where E is a diagonal matrix.
@@ -35,10 +36,12 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         The transformation on the E side. If E is None,
         then this argument is ignored. I E is not None and M is None, then M=I.
         This LinearOperator must be Hermitian.
-    * fwd_options: dict
-        Options of the iterative solver in the forward calculation
     * bck_options: dict
         Options of the iterative solver in the backward calculation
+    * method: str or None
+        Indicating the method of solve. If None, it will select "exactsolve".
+    * **fwd_options: dict
+        Options of the iterative solver in the forward calculation
     """
     assert_runtime(A.shape[-1] == A.shape[-2], "The linear operator A must have a square shape")
     assert_runtime(A.shape[-1] == B.shape[-2], "Mismatch shape of A & B (A: %s, B: %s)" % (A.shape, B.shape))
@@ -57,9 +60,13 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         if M is not None:
             M.check()
 
-    if "method" not in fwd_options or fwd_options["method"].lower() == "exactsolve":
+    if method is None:
+        method = "exactsolve" # TODO: do a proper method selection based on the size
+
+    if method == "exactsolve":
         return exactsolve(A, B, E, M)
     else:
+        fwd_options["method"] = method
         # get the unique parameters of A
         params = A.getlinopparams()
         mparams = M.getlinopparams() if M is not None else []

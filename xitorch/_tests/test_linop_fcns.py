@@ -55,7 +55,7 @@ def test_lsymeig_A():
         fwd_options = {"method": method}
 
         for neig in [2,shape[-1]]:
-            eigvals, eigvecs = lsymeig(linop1, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
+            eigvals, eigvecs = lsymeig(linop1, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
             assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
             assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
 
@@ -68,7 +68,7 @@ def test_lsymeig_A():
                 def lsymeig_fcn(amat):
                     amat = (amat + amat.transpose(-2,-1)) * 0.5 # symmetrize
                     alinop = LinearOperator.m(amat, is_hermitian=True)
-                    eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, fwd_options=fwd_options)
+                    eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, **fwd_options)
                     return eigvals_, eigvecs_
 
                 gradcheck(lsymeig_fcn, (mat1,))
@@ -93,7 +93,7 @@ def test_lsymeig_AM():
         na = ashape[-1]
         bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
         for neig in [2,ashape[-1]]:
-            eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig)
+            eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, **fwd_options) # eigvals: (..., neig)
             assert list(eigvals.shape) == list([*bshape, neig])
             assert list(eigvecs.shape) == list([*bshape, na, neig])
 
@@ -109,7 +109,7 @@ def test_lsymeig_AM():
                     mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
                     alinop = LinearOperator.m(amat, is_hermitian=True)
                     mlinop = LinearOperator.m(mmat, is_hermitian=True)
-                    eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, fwd_options=fwd_options)
+                    eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, **fwd_options)
                     return eigvals_, eigvecs_
 
                 gradcheck(lsymeig_fcn, (mata, matm))
@@ -146,7 +146,7 @@ def test_symeig_A_large():
         linop1 = ALarge(shape, dtype=dtype)
         fwd_options = {"method": method, "min_eps": 1e-8}
 
-        eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, fwd_options=fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
+        eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
 
         # the matrix's eigenvalues will be around arange(na)
         if mode == "lowest":
@@ -236,7 +236,7 @@ def test_solve_A():
             # is_hermitian=hermit is required to force the hermitian status in numerical gradient
             alinop = LinearOperator.m(amat, is_hermitian=hermit)
             x = solve(A=alinop, B=bmat,
-                fwd_options=fwd_options,
+                **fwd_options,
                 bck_options=bck_options)
             return x
 
@@ -272,7 +272,7 @@ def test_solve_A_gmres():
 
     def solvefcn(amat, bmat):
         alinop = LinearOperator.m(amat)
-        x = solve(A=alinop, B=bmat, fwd_options=fwd_options)
+        x = solve(A=alinop, B=bmat, **fwd_options)
         return x
 
     x = solvefcn(amat, bmat)
@@ -312,7 +312,7 @@ def test_solve_AE():
         def solvefcn(amat, bmat, emat):
             alinop = LinearOperator.m(amat)
             x = solve(A=alinop, B=bmat, E=emat,
-                      fwd_options=fwd_options,
+                      **fwd_options,
                       bck_options=bck_options)
             return x
 
@@ -364,7 +364,7 @@ def test_solve_AEM():
             alinop = LinearOperator.m(amat)
             mlinop = LinearOperator.m(mmat)
             x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
-                fwd_options=fwd_options,
+                **fwd_options,
                 bck_options=bck_options)
             return x
 

@@ -13,17 +13,22 @@ __all__ = ["lsymeig", "usymeig", "symeig"]
 
 def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
         M:Union[LinearOperator,None]=None,
-        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
-    return symeig(A, neig, "lowest", M, fwd_options, bck_options)
+        bck_options:Mapping[str,Any]={},
+        **fwd_options):
+    return symeig(A, neig, "lowest", M, **fwd_options, bck_options=bck_options)
 
 def usymeig(A:LinearOperator, neig:Union[int,None]=None,
         M:Union[LinearOperator,None]=None,
-        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
-    return symeig(A, neig, "uppest", M, fwd_options, bck_options)
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
+    return symeig(A, neig, "uppest", M, **fwd_options, bck_options=bck_options)
 
 def symeig(A:LinearOperator, neig:Union[int,None]=None,
         mode:str="lowest", M:Union[LinearOperator,None]=None,
-        fwd_options:Mapping[str,Any]={}, bck_options:Mapping[str,Any]={}):
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
     """
     Obtain `neig` lowest eigenvalues and eigenvectors of a linear operator.
     If M is specified, it solve the eigendecomposition Ax = eMx.
@@ -40,11 +45,13 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         `neig` eigenpairs. If "uppest", it will take the uppermost `neig`.
     * M: xitorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
         The transformation on the right hand side. If None, then M=I.
-    * fwd_options: dict with str as key
-        Eigendecomposition iterative algorithm options.
     * bck_options: dict with str as key
         Conjugate gradient options to calculate the gradient in
         backpropagation calculation.
+    * method: str or None
+        Method for the eigendecomposition. If None, it will choose exacteig.
+    * fwd_options: dict with str as key
+        Eigendecomposition iterative algorithm options.
 
     Returns
     -------
@@ -60,6 +67,8 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
     mode = mode.lower()
     if mode == "uppermost":
         mode = "uppest"
+    if method is None: # TODO: do a proper method selection based on size
+        method = "exacteig"
 
     # perform expensive check if debug mode is enabled
     if is_debug_enabled():
@@ -67,9 +76,10 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         if M is not None:
             M.check()
 
-    if "method" not in fwd_options or fwd_options["method"].lower() == "exacteig":
+    if method == "exacteig":
         return exacteig(A, neig, mode, M)
     else:
+        fwd_options["method"] = method
         # get the unique parameters of A & M
         params = A.getlinopparams()
         mparams = M.getlinopparams() if M is not None else []
