@@ -118,14 +118,14 @@ def test_rootfinder(dtype, device):
 
         model = clss(A, addx=True)
         model.set_diag_bias(diag, bias)
-        y = rootfinder(model.forward, y0, fwd_options=fwd_options)
+        y = rootfinder(model.forward, y0, **fwd_options)
         f = model.forward(y)
         assert torch.allclose(f*0, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=True)
             model.set_diag_bias(diag, bias)
-            y = rootfinder(model.forward, y0, fwd_options=fwd_options)
+            y = rootfinder(model.forward, y0, **fwd_options)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -152,14 +152,14 @@ def test_equil(dtype, device):
 
         model = clss(A, addx=False)
         model.set_diag_bias(diag, bias)
-        y = equilibrium(model.forward, y0, fwd_options=fwd_options)
+        y = equilibrium(model.forward, y0, **fwd_options)
         f = model.forward(y)
         assert torch.allclose(y, f)
 
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=False)
             model.set_diag_bias(diag, bias)
-            y = equilibrium(model.forward, y0, fwd_options=fwd_options)
+            y = equilibrium(model.forward, y0, **fwd_options)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
@@ -189,13 +189,13 @@ def test_rootfinder_with_params(dtype, device):
         y0 = torch.randn((nbatch, nr)).to(dtype)
 
         model = clss(addx=True)
-        y = rootfinder(model.forward, y0, (A, diag, bias), fwd_options=fwd_options)
+        y = rootfinder(model.forward, y0, (A, diag, bias), **fwd_options)
         f = model.forward(y, A, diag, bias)
         assert torch.allclose(f*0, f)
 
         def getloss(y0, A, diag, bias):
             model = clss(addx=True)
-            y = rootfinder(model.forward, y0, (A, diag, bias), fwd_options=fwd_options)
+            y = rootfinder(model.forward, y0, (A, diag, bias), **fwd_options)
             return y
 
         gradcheck(getloss, (y0, A, diag, bias))
@@ -225,7 +225,7 @@ def test_minimize(dtype, device):
     for clss in [DummyModule, DummyNNModule]:
         model = clss(A, addx=False, activation=activation, sumoutput=True)
         model.set_diag_bias(diag, bias)
-        y = minimize(model.forward, y0, fwd_options=fwd_options)
+        y = minimize(model.forward, y0, **fwd_options)
 
         # check the grad (must be close to 1)
         with torch.enable_grad():
@@ -242,11 +242,113 @@ def test_minimize(dtype, device):
         def getloss(A, y0, diag, bias):
             model = clss(A, addx=False, activation=activation, sumoutput=True)
             model.set_diag_bias(diag, bias)
-            y = minimize(model.forward, y0, fwd_options=fwd_options)
+            y = minimize(model.forward, y0, **fwd_options)
             return y
 
         gradcheck(getloss, (A, y0, diag, bias))
         gradgradcheck(getloss, (A, y0, diag, bias))
+
+############## forward methods test ##############
+@device_dtype_float_test(only64=True)
+def test_rootfinder_methods(dtype, device):
+    torch.manual_seed(100)
+    random.seed(100)
+    dtype = torch.float64
+
+    nr = 3
+    nbatch = 2
+    default_fwd_options = {
+        "f_tol": 1e-9,
+        "alpha": -0.5,
+    }
+    # list the methods and the options here
+    methods_and_options = {
+        "broyden1": default_fwd_options
+    }
+
+    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+    bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    for method in methods_and_options:
+        fwd_options = {**methods_and_options[method], "method": method}
+        model = DummyModule(A, addx=True)
+        model.set_diag_bias(diag, bias)
+        y = rootfinder(model.forward, y0, **fwd_options)
+        f = model.forward(y)
+        assert torch.allclose(f*0, f)
+
+@device_dtype_float_test(only64=True)
+def test_equil_methods(dtype, device):
+    torch.manual_seed(100)
+    random.seed(100)
+    dtype = torch.float64
+
+    nr = 3
+    nbatch = 2
+    default_fwd_options = {
+        "f_tol": 1e-9,
+        "alpha": -0.5,
+    }
+    # list the methods and the options here
+    methods_and_options = {
+        "broyden1": default_fwd_options
+    }
+
+    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+    bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    for method in methods_and_options:
+        fwd_options = {**methods_and_options[method], "method":method}
+        model = DummyModule(A, addx=False)
+        model.set_diag_bias(diag, bias)
+        y = equilibrium(model.forward, y0, **fwd_options)
+        f = model.forward(y)
+        assert torch.allclose(y, f)
+
+@device_dtype_float_test(only64=True)
+def test_minimize_methods(dtype, device):
+    torch.manual_seed(400)
+    random.seed(100)
+    dtype = torch.float64
+
+    nr = 3
+    nbatch = 2
+    default_fwd_options = {
+        "max_niter": 50,
+        "f_tol": 1e-9,
+        "alpha": -0.5,
+    }
+    # list the methods and the options here
+    methods_and_options = {
+        "broyden1": default_fwd_options,
+    }
+
+    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+    # bias will be detached from the optimization line, so set it undifferentiable
+    bias = torch.zeros((nbatch, nr)).to(dtype)
+    y0 = torch.randn((nbatch, nr)).to(dtype)
+    activation = "square" # square activation makes it easy to optimize
+
+    for method in methods_and_options:
+        fwd_options = {**methods_and_options[method], "method": method}
+        model = DummyModule(A, addx=False, activation=activation, sumoutput=True)
+        model.set_diag_bias(diag, bias)
+        y = minimize(model.forward, y0, **fwd_options)
+
+        # check the grad (must be close to 1)
+        with torch.enable_grad():
+            y1 = y.clone().requires_grad_()
+            f = model.forward(y1)
+        grady, = torch.autograd.grad(f, (y1,))
+        assert torch.allclose(grady, grady*0)
+
+        # check the hessian (must be posdef)
+        h = hess(model.forward, (y1,), idxs=0).fullmatrix()
+        eigval, _ = torch.symeig(h)
+        assert torch.all(eigval >= 0)
 
 if __name__ == "__main__":
     test_minimize()

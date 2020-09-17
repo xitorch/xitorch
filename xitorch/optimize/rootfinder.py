@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Iterable, Mapping, Any, Sequence
+from typing import Callable, Iterable, Mapping, Any, Sequence, Union
 import torch
 import numpy as np
 import scipy.optimize
@@ -20,8 +20,9 @@ def rootfinder(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
-        fwd_options:Mapping[str,Any]={},
-        bck_options:Mapping[str,Any]={}):
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
     """
     Solving the rootfinder equation of a given function,
 
@@ -38,10 +39,12 @@ def rootfinder(
         Initial guess of the solution
     * params: list
         List of any other parameters to be put in fcn
-    * fwd_options: dict
-        Options for the rootfinder method
     * bck_options: dict
         Options for the backward solve method
+    * method: str or None
+        Rootfinder method.
+    * **fwd_options: dict
+        Options for the rootfinder method
 
     Returns
     -------
@@ -61,14 +64,16 @@ def rootfinder(
         assert_fcn_params(fcn, (y0, *params))
 
     pfunc = get_pure_function(fcn)
+    fwd_options["method"] = _get_rootfinder_default_method(method)
     return _RootFinder.apply(pfunc, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 def equilibrium(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
-        fwd_options:Mapping[str,Any]={},
-        bck_options:Mapping[str,Any]={}):
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
     """
     Solving the equilibrium equation of a given function,
 
@@ -85,10 +90,12 @@ def equilibrium(
         Initial guess of the solution
     * params: list
         List of any other parameters to be put in fcn
-    * fwd_options: dict
-        Options for the rootfinder method
     * bck_options: dict
         Options for the backward solve method
+    * method: str or None
+        Rootfinder method
+    * **fwd_options: dict
+        Options for the rootfinder method
 
     Returns
     -------
@@ -113,14 +120,16 @@ def equilibrium(
     def new_fcn(y, *params):
         return y - pfunc(y, *params)
 
+    fwd_options["method"] = _get_rootfinder_default_method(method)
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.getobjparams())
 
 def minimize(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
         params:Sequence[Any]=[],
-        fwd_options:Mapping[str,Any]={},
-        bck_options:Mapping[str,Any]={}) -> torch.Tensor:
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options) -> torch.Tensor:
     """
     Solve the minimization problem:
 
@@ -137,10 +146,12 @@ def minimize(
         Initial guess of the solution
     * params: list
         List of any other parameters to be put in fcn
-    * fwd_options: dict
-        Options for the minimizer method
     * bck_options: dict
         Options for the backward solve method
+    * method: str or None
+        Method
+    * **fwd_options: dict
+        Options for the minimizer method
 
     Returns
     -------
@@ -153,6 +164,7 @@ def minimize(
 
     pfunc = get_pure_function(fcn)
 
+    fwd_options["method"] = _get_minimizer_default_method(method)
     # the rootfinder algorithms are designed to move to the opposite direction
     # of the output of the function, so the output of this function is just
     # the grad of z w.r.t. y
@@ -241,3 +253,15 @@ class _RootFinder(torch.autograd.Function):
             grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
 
         return (None, None, None, None, None, *grad_params)
+
+def _get_rootfinder_default_method(method):
+    if method is None:
+        return "broyden1"
+    else:
+        return method
+
+def _get_minimizer_default_method(method):
+    if method is None:
+        return "broyden1"
+    else:
+        return method
