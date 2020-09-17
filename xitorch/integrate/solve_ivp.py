@@ -14,8 +14,9 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
               ts:torch.Tensor,
               y0:torch.Tensor,
               params:Sequence[Any]=[],
-              fwd_options:Mapping[str,Any]={},
-              bck_options:Mapping[str,Any]={}) -> torch.Tensor:
+              bck_options:Mapping[str,Any]={},
+              method:Union[str,None]=None,
+              **fwd_options) -> torch.Tensor:
     """
     Solve the initial value problem (IVP) which given the initial value `y0`,
     the function is then solve
@@ -34,10 +35,13 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
         The initial value of y, i.e. y(t[0]) == y0
     * params: list
         List of other parameters required in the function.
-    * fwd_options: dict
-        Options for the forward solve_ivp method.
     * bck_options: dict
-        Options for the backward solve_ivp method.
+        Options for the backward solve_ivp method. If not specified, it will
+        take the same options as fwd_options.
+    * method: str or None
+        solve_ivp method.
+    * **fwd_options: dict
+        Options for the forward solve_ivp method.
 
     Returns
     -------
@@ -47,6 +51,10 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
     if is_debug_enabled():
         assert_fcn_params(fcn, (ts[0], y0, *params))
     assert_runtime(len(ts.shape) == 1, "Argument ts must be a 1D tensor")
+
+    if method is None:  # set the default method
+        method = "rk45"
+    fwd_options["method"] = method
 
     # run once to see if the outputs is a tuple or a single tensor
     is_y0_list = isinstance(y0, list) or isinstance(y0, tuple)
@@ -76,9 +84,7 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
 class _SolveIVP(torch.autograd.Function):
     @staticmethod
     def forward(ctx, pfcn, ts, fwd_options, bck_options, nparams, y0, *allparams):
-        config = set_default_option({
-            "method": "rk45",
-        }, fwd_options)
+        config = fwd_options
         ctx.bck_config = set_default_option(config, bck_options)
 
         params = allparams[:nparams]

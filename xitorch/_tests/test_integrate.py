@@ -79,13 +79,13 @@ def test_quad(dtype, device):
     for clss in [IntegrationModule, IntegrationNNModule]:
 
         module = clss(a, b)
-        y = quad(module.forward, xl, xu, params=(c,), fwd_options=fwd_options)
+        y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
         ytrue = (torch.sin(a * xu + b * c) - torch.sin(a * xl + b * c)) / a
         assert torch.allclose(y, ytrue)
 
         def getloss(a, b, c, xl, xu):
             module = clss(a, b)
-            y = quad(module.forward, xl, xu, params=(c,), fwd_options=fwd_options)
+            y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
             return y
 
         gradcheck    (getloss, (a, b, c, xl, xu))
@@ -111,7 +111,7 @@ def test_quad_multi(dtype, device):
 
     for clss in [IntegrationMultiModule, IntegrationNNMultiModule]:
         module = clss(a, b)
-        y = quad(module.forward, xl, xu, params=(c,), fwd_options=fwd_options)
+        y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
         ytrue0 = (torch.sin(a * xu + b * c) - torch.sin(a * xl + b * c)) / a
         ytrue1 = (-torch.cos(a * xu + b * c) + torch.cos(a * xl + b * c)) / a
         assert len(y) == 2
@@ -139,7 +139,7 @@ def test_quad_inf(dtype, device):
 
         def get_loss(w):
             module = IntegrationInfModule(w)
-            y = quad(module.forward, xl, xu, params=[], fwd_options=fwd_options)
+            y = quad(module.forward, xl, xu, params=[], **fwd_options)
             return y
 
         y = get_loss(w)
@@ -195,7 +195,7 @@ def test_ivp(dtype, device):
     for clss in [IVPModule, IVPNNModule]:
         def getoutput(a, b, c, ts, y0):
             module = clss(a, b)
-            yt = solve_ivp(module.forward, ts, y0, params=(c,), fwd_options=fwd_options)
+            yt = solve_ivp(module.forward, ts, y0, params=(c,), **fwd_options)
             return yt
 
         yt = getoutput(a, b, c, ts, y0)
@@ -236,7 +236,7 @@ def test_ivp_methods(dtype, device):
         for clss in [IVPModule, IVPNNModule]:
             def getoutput(a, b, c, ts, y0):
                 module = clss(a, b)
-                yt = solve_ivp(module.forward, ts, y0, params=(c,), fwd_options=fwd_options)
+                yt = solve_ivp(module.forward, ts, y0, params=(c,), **fwd_options)
                 return yt
 
             yt = getoutput(a, b, c, ts, y0)
@@ -297,7 +297,7 @@ def test_mcquad(dtype, device):
         def getoutput(w, a, x0):
             logp = MCQuadLogProbNNModule(w)
             fcn = MCQuadFcnModule(a)
-            res = mcquad(fcn.forward, logp.forward, x0, fparams=[], pparams=[], fwd_options=fwd_options)
+            res = mcquad(fcn.forward, logp.forward, x0, fparams=[], pparams=[], **fwd_options)
             return res
 
         rtol = 2e-2 if method != "_dummy1d" else 1e-3

@@ -7,7 +7,10 @@ from xitorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
 
 __all__ = ["mcquad"]
 
-def mcquad(ffcn, log_pfcn, x0, fparams, pparams, fwd_options={}, bck_options={}):
+def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
+        bck_options={},
+        method=None,
+        **fwd_options):
     """
     Performing monte carlo quadrature to calculate the expectation value:
 
@@ -28,10 +31,13 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams, fwd_options={}, bck_options={})
         List of any other parameters for `ffcn`.
     * pparams: list
         List of any other parameters for `gfcn`.
-    * fwd_options: dict
-        Options for the forward operation.
     * bck_options: dict
-        Options for the backward mcquad operation.
+        Options for the backward mcquad operation. Unspecified fields will be
+        taken from fwd_options.
+    * method: str or None
+        MC Quad method.
+    * **fwd_options: dict
+        Options for the forward operation.
 
     Returns
     -------
@@ -39,6 +45,9 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams, fwd_options={}, bck_options={})
         The expectation values of the function `ffcn` over the space of `x`.
         If the output of `ffcn` is a list, then this is also a list
     """
+    if method is None:
+        method = "mh"
+    fwd_options["method"] = method
     return _mcquad(ffcn, log_pfcn, x0, None, None, fparams, pparams, fwd_options, bck_options)
 
 def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, fwd_options, bck_options):
@@ -79,9 +88,7 @@ class _MCQuad(torch.autograd.Function):
     def forward(ctx, ffcn, log_pfcn, x0, xsamples, wsamples, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *all_fpparams):
         # set up the default options
-        config = set_default_option({
-            "method": "mh",
-        }, fwd_options)
+        config = fwd_options
         ctx.bck_config = set_default_option(config, bck_options)
 
         # split the parameters

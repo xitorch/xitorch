@@ -16,8 +16,9 @@ def quad(
         xl:Union[float,int,torch.Tensor],
         xu:Union[float,int,torch.Tensor],
         params:Sequence[Any]=[],
-        fwd_options:Mapping[str,Any]={},
-        bck_options:Mapping[str,Any]={}):
+        bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
     """
     Calculate the quadrature of the function `fcn` from `x0` to `xf`:
 
@@ -31,10 +32,12 @@ def quad(
         The lower and upper bound of the integration.
     * params: list
         List of any other parameters for the function `fcn`.
-    * fwd_options: dict
-        Options for the forward quadrature method.
     * bck_options: dict
         Options for the backward quadrature method.
+    * method: str or None
+        Quadrature method.
+    * **fwd_options: dict
+        Options for the forward quadrature method.
 
     Returns
     -------
@@ -48,6 +51,9 @@ def quad(
         assert_runtime(torch.numel(xl) == 1, "xl must be a 1-element tensors")
     if isinstance(xu, torch.Tensor):
         assert_runtime(torch.numel(xu) == 1, "xu must be a 1-element tensors")
+    if method is None:
+        method = "leggauss"
+    fwd_options["method"] = method
 
     out = fcn(xl, *params)
     is_tuple_out = not isinstance(out, torch.Tensor)
@@ -91,10 +97,7 @@ class _Quadrature(torch.autograd.Function):
 
         with fcn.disable_state_change():
 
-            config = set_default_option({
-                "method": "leggauss",
-                "n": 100,
-            }, fwd_options)
+            config = fwd_options
             ctx.bck_config = set_default_option(config, bck_options)
 
             params = all_params[:nparams]
