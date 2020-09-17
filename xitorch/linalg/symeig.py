@@ -50,7 +50,7 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         backpropagation calculation.
     * method: str or None
         Method for the eigendecomposition. If None, it will choose exacteig.
-    * fwd_options: dict with str as key
+    * **fwd_options: dict with str as key
         Eigendecomposition iterative algorithm options.
 
     Returns
