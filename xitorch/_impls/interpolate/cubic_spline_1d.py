@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import warnings
 from xitorch._impls.interpolate.base_interp import BaseInterp
+from xitorch._impls.interpolate.extrap_utils import get_extrap_pos, get_extrap_val
 
 class CubicSpline1D(BaseInterp):
     """
@@ -18,10 +19,13 @@ class CubicSpline1D(BaseInterp):
         on Wikipedia
     [2] Carl de Boor, "A Practical Guide to Splines", Springer-Verlag, 1978.
     """
-    def __init__(self, x, y=None, bc_type=None, **unused):
+    def __init__(self, x, y=None, bc_type=None, extrap=None, **unused):
         # x: (nr,)
         # y: (*BY, nr)
         self.x = x
+        self.xmin = torch.min(x, dim=-1, keepdim=True)
+        self.xmax = torch.max(x, dim=-1, keepdim=True)
+        self.extrap = extrap
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
@@ -38,8 +42,6 @@ class CubicSpline1D(BaseInterp):
             self.ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)
 
     def __call__(self, xq, y=None):
-        # https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline
-        # TODO: make x and xq batched
         # xq: (nrq)
         # y: (*BY, nr)
         if self.y_is_given and y is not None:
@@ -47,13 +49,39 @@ class CubicSpline1D(BaseInterp):
             # stacklevel=3 because this __call__ will be called by a wrapper's __call__
             warnings.warn(msg, stacklevel=3)
 
-        # get the k-vector (i.e. the gradient at every points)
+        extrap = self.extrap
         if self.y_is_given:
             y = self.y
+        elif y is None:
+            raise RuntimeError("y must be given")
+
+        xqinterp_mask = torch.logical_and(xq > self.xmin, xq < self.xmax) # (nrq)
+        allinterp = torch.all(xqinterp_mask)
+
+        if allinterp:
+            return self._interp(xq, y=y)
+        elif extrap == "mirror" or extrap == "periodic":
+            # extrapolation by mapping it to the interpolated region
+            xq2 = xq.clone()
+            xq2[xqextrap_mask] = get_extrap_pos(xq[~xqinterp_mask], extrap, self.xmin, self.xmax)
+            return self._interp(xq2, y=y)
+        else:
+            # interpolation
+            yqinterp = self._interp(xq[xqinterp_mask], y=y) # (*BY, nrq)
+            yqextrap = get_extrap_val(xq[~xqinterp_mask], y, extrap)
+
+            yq = torch.empty((*y.shape[:-1], xq.shape[-1]), dtype=y.dtype, device=y.device) # (*BY, nrq)
+            yq[...,xqinterp_mask] = yqinterp
+            yq[...,~xqinterp_mask] = yqextrap
+            return yq
+
+
+    def _interp(self, xq, y):
+        # https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline
+        # get the k-vector (i.e. the gradient at every points)
+        if self.y_is_given:
             ks = self.ks
         else:
-            if y is None:
-                raise RuntimeError("y must be given")
             ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1) # (*BY, nr)
 
         x = self.x # (nr)

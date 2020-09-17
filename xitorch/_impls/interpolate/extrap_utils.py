@@ -1,0 +1,28 @@
+import torch
+
+def get_extrap_pos(xqextrap, extrap, xmin=0.0, xmax=1.0):
+    # xqextrap: (nrq,)
+    xqnorm = (xqextrap - xmin) / (xmax - xmin)
+    xqinside = xqnorm % (1.0 + 1e-14) # to include 1 in the inside
+    if extrap == "mirror":
+        xqnorm_int = xqnorm.long()
+        odd_mask = torch.logical_not((xqnorm_int % 2 == 1) ^ (xqnorm > 0))
+        xqinside[odd_mask] = 1.0 - xqinside[odd_mask]
+    return xqinside * (xmax - xmin) + xmin
+
+def get_extrap_val(xqextrap, y, extrap):
+    # xqextrap: (nrq,)
+    # y: (*BY, nr)
+    shape = (*y.shape[:-1], xqextrap.shape[-1])
+    dtype = xqextrap.dtype
+    device = xqextrap.device
+
+    if extrap is None or extrap == "nan":
+        return torch.empty(shape, dtype=dtype, device=device) * float("nan")
+    elif isinstance(extrap, int) or isinstance(extrap, float) or \
+         (isinstance(extrap, torch.Tensor) and torch.numel(extrap) == 1):
+        return torch.zeros(shape, dtype=dtype, device=device) + extrap
+    elif hasattr(extrap, "__call__"):
+        return extrap(xqextrap).expand(*y.shape[:-1], -1) # (*BY, nrq)
+    else:
+        raise RuntimeError("Invalid extrap type (type: %s): %s" % (type(extrap), extrap))
