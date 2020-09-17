@@ -46,7 +46,8 @@ def test_lsymeig_mismatch_err():
 def test_lsymeig_A():
     torch.manual_seed(seed)
     shapes = [(4,4), (2,4,4), (2,3,4,4)]
-    methods = ["exacteig", "davidson"]
+    # only 2 of methods, because both gradient implementations are covered
+    methods = ["exacteig", "custom_exacteig"]
     for shape, method in itertools.product(shapes, methods):
         mat1 = torch.rand(shape, dtype=torch.float64)
         mat1 = mat1 + mat1.transpose(-2,-1)
@@ -77,7 +78,8 @@ def test_lsymeig_A():
 def test_lsymeig_AM():
     torch.manual_seed(seed)
     shapes = [(3,3), (2,3,3), (2,1,3,3)]
-    methods = ["exacteig", "davidson"]
+    # only 2 of methods, because both gradient implementations are covered
+    methods = ["exacteig", "custom_exacteig"]
     dtype = torch.float64
     for ashape,mshape,method in itertools.product(shapes, shapes, methods):
         mata = torch.rand(ashape, dtype=dtype)
@@ -115,7 +117,7 @@ def test_lsymeig_AM():
                 gradcheck(lsymeig_fcn, (mata, matm))
                 gradgradcheck(lsymeig_fcn, (mata, matm))
 
-def test_symeig_A_large():
+def test_symeig_A_large_methods():
     torch.manual_seed(seed)
     class ALarge(LinearOperator):
         def __init__(self, shape, dtype):
@@ -138,6 +140,7 @@ def test_symeig_A_large():
 
     na = 1000
     shapes = [(na,na), (2,na,na), (2,3,na,na)]
+    # list the methods here
     methods = ["davidson"]
     modes = ["uppermost", "lowest"]
     neig = 2
@@ -211,7 +214,7 @@ def test_solve_A():
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
     # custom exactsolve to check the backward implementation
-    methods = ["exactsolve", "custom_exactsolve", "lbfgs"]
+    methods = ["exactsolve", "custom_exactsolve"]
     # hermitian check here to make sure the gradient propagated symmetrically
     hermits = [False, True]
     for ashape, bshape, method, hermit in itertools.product(shapes, shapes, methods, hermits):
@@ -250,45 +253,43 @@ def test_solve_A():
             gradcheck(solvefcn, (amat, bmat))
             gradgradcheck(solvefcn, (amat, bmat))
 
-# TODO: use fixtures' params to iterate the methods
-def test_solve_A_gmres():
+def test_solve_A_methods():
     torch.manual_seed(seed)
     na = 3
     dtype = torch.float64
     ashape = (na, na)
     bshape = (2, na, na)
-    fwd_options = {"method": "gmres"}
+    methods = ["gmres", "lbfgs"]
+    for method in methods:
+        fwd_options = {"method": method}
 
-    ncols = bshape[-1]-1
-    bshape = [*bshape[:-1], ncols]
-    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
+        ncols = bshape[-1]-1
+        bshape = [*bshape[:-1], ncols]
+        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
 
-    amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
-    bmat = torch.rand(bshape, dtype=dtype)
-    amat = amat + amat.transpose(-2,-1)
+        amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
+        bmat = torch.rand(bshape, dtype=dtype)
+        amat = amat + amat.transpose(-2,-1)
 
-    amat = amat.requires_grad_()
-    bmat = bmat.requires_grad_()
+        amat = amat.requires_grad_()
+        bmat = bmat.requires_grad_()
 
-    def solvefcn(amat, bmat):
-        alinop = LinearOperator.m(amat)
-        x = solve(A=alinop, B=bmat, **fwd_options)
-        return x
+        def solvefcn(amat, bmat):
+            alinop = LinearOperator.m(amat)
+            x = solve(A=alinop, B=bmat, **fwd_options)
+            return x
 
-    x = solvefcn(amat, bmat)
-    assert list(x.shape) == xshape
+        x = solvefcn(amat, bmat)
+        assert list(x.shape) == xshape
 
-    ax = LinearOperator.m(amat).mm(x)
-    assert torch.allclose(ax, bmat)
-
-    gradcheck(solvefcn, (amat, bmat))
-    gradgradcheck(solvefcn, (amat, bmat))
+        ax = LinearOperator.m(amat).mm(x)
+        assert torch.allclose(ax, bmat)
 
 def test_solve_AE():
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    methods = ["exactsolve", "custom_exactsolve", "lbfgs"] # custom exactsolve to check the backward implementation
+    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
     dtype = torch.float64
     for ashape, bshape, eshape, method in itertools.product(shapes, shapes, shapes, methods):
         print(ashape, bshape, eshape, method)
@@ -333,7 +334,7 @@ def test_solve_AEM():
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     dtype = torch.float64
-    methods = ["exactsolve", "custom_exactsolve", "lbfgs"]
+    methods = ["exactsolve", "custom_exactsolve"]
     for abeshape, mshape, method in itertools.product(shapes, shapes, methods):
         ashape = abeshape
         bshape = abeshape
@@ -380,6 +381,3 @@ def test_solve_AEM():
         if checkgrad:
             gradcheck(solvefcn, (amat, mmat, bmat, emat))
             gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
-
-if __name__ == "__main__":
-    test_symeig_A_large()
