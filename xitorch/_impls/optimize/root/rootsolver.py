@@ -217,6 +217,8 @@ def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0, max_nit
         niter += 1
 
     # Failed to find a suitable step length
+    if niter == max_niter:
+        return alpha2, phi_a2
     return None, phi_a1
 
 class TerminationCondition(object):
