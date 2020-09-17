@@ -101,7 +101,6 @@ class DummyModuleExplicit(xt.EditableModule):
 def test_rootfinder(dtype, device):
     torch.manual_seed(100)
     random.seed(100)
-    dtype = torch.float64
 
     nr = 3
     nbatch = 2
@@ -135,7 +134,6 @@ def test_rootfinder(dtype, device):
 def test_equil(dtype, device):
     torch.manual_seed(100)
     random.seed(100)
-    dtype = torch.float64
 
     nr = 3
     nbatch = 2
@@ -169,7 +167,6 @@ def test_equil(dtype, device):
 def test_rootfinder_with_params(dtype, device):
     torch.manual_seed(100)
     random.seed(100)
-    dtype = torch.float64
 
     nr = 3
     nbatch = 2
@@ -205,7 +202,6 @@ def test_rootfinder_with_params(dtype, device):
 def test_minimize(dtype, device):
     torch.manual_seed(400)
     random.seed(100)
-    dtype = torch.float64
 
     nr = 3
     nbatch = 2
@@ -282,7 +278,6 @@ def test_rootfinder_methods(dtype, device):
 def test_equil_methods(dtype, device):
     torch.manual_seed(100)
     random.seed(100)
-    dtype = torch.float64
 
     nr = 3
     nbatch = 2
