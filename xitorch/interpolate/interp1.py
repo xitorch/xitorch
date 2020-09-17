@@ -33,7 +33,7 @@ class Interp1D(EditableModule):
         if method is None:
             method = "cspline"
         if method == "cspline":
-            self.obj = CubicSpline1D(x, y)
+            self.obj = CubicSpline1D(x, y, **fwd_options)
         else:
             raise RuntimeError("Unknown interp1d method: %s" % method)
 
