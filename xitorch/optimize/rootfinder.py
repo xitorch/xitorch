@@ -131,7 +131,7 @@ def minimize(
         method:Union[str,None]=None,
         **fwd_options) -> torch.Tensor:
     """
-    Solve the minimization problem:
+    Solve the unbounded minimization problem:
 
         z = (argmin_y) fcn(y, *params)
 
