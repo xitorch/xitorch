@@ -23,8 +23,8 @@ class CubicSpline1D(BaseInterp):
         # x: (nr,)
         # y: (*BY, nr)
         self.x = x
-        self.xmin = torch.min(x, dim=-1, keepdim=True)
-        self.xmax = torch.max(x, dim=-1, keepdim=True)
+        self.xmin = torch.min(x, dim=-1, keepdim=True)[0]
+        self.xmax = torch.max(x, dim=-1, keepdim=True)[0]
         self.extrap = extrap
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
@@ -55,7 +55,8 @@ class CubicSpline1D(BaseInterp):
         elif y is None:
             raise RuntimeError("y must be given")
 
-        xqinterp_mask = torch.logical_and(xq > self.xmin, xq < self.xmax) # (nrq)
+        xqinterp_mask = torch.logical_and(xq >= self.xmin, xq <= self.xmax) # (nrq)
+        xqextrap_mask = ~xqinterp_mask
         allinterp = torch.all(xqinterp_mask)
 
         if allinterp:
@@ -63,16 +64,16 @@ class CubicSpline1D(BaseInterp):
         elif extrap == "mirror" or extrap == "periodic":
             # extrapolation by mapping it to the interpolated region
             xq2 = xq.clone()
-            xq2[xqextrap_mask] = get_extrap_pos(xq[~xqinterp_mask], extrap, self.xmin, self.xmax)
+            xq2[xqextrap_mask] = get_extrap_pos(xq[xqextrap_mask], extrap, self.xmin, self.xmax)
             return self._interp(xq2, y=y)
         else:
             # interpolation
             yqinterp = self._interp(xq[xqinterp_mask], y=y) # (*BY, nrq)
-            yqextrap = get_extrap_val(xq[~xqinterp_mask], y, extrap)
+            yqextrap = get_extrap_val(xq[xqextrap_mask], y, extrap)
 
             yq = torch.empty((*y.shape[:-1], xq.shape[-1]), dtype=y.dtype, device=y.device) # (*BY, nrq)
             yq[...,xqinterp_mask] = yqinterp
-            yq[...,~xqinterp_mask] = yqextrap
+            yq[...,xqextrap_mask] = yqextrap
             return yq
 
 
