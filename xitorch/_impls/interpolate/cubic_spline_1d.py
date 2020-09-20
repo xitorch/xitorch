@@ -11,7 +11,25 @@ class CubicSpline1D(BaseInterp):
     Options
     -------
     * bc_type: str or None
-        Boundary condition (currently only "natural" is available)
+        Boundary condition:
+        * "natural": 2nd grad at the boundaries are 0
+        * "clamped": 1st grad at the boundaries are 0
+        If None, it will choose "natural"
+    * extrap: int, float, 1-element torch.Tensor, str, or None
+        Extrapolation option:
+        * int, float, or 1-element torch.Tensor: it will pad the extrapolated
+          values with the specified values
+        * "mirror": the extrapolation values are mirrored
+        * "periodic": periodic boundary condition
+        * "bound": fill in the extrapolated values with the left or right bound
+          values.
+        * "nan": fill the extrapolated values with nan
+        * callable: apply this extrapolation function with the extrapolated
+          positions and use the output as the values
+        * None: choose the extrapolation based on the `bc_type`. These are the
+          pairs:
+          * "clamped": "mirror"
+          * other: "nan"
 
     Reference
     ---------
@@ -25,15 +43,16 @@ class CubicSpline1D(BaseInterp):
         self.x = x
         self.xmin = torch.min(x, dim=-1, keepdim=True)[0]
         self.xmax = torch.max(x, dim=-1, keepdim=True)[0]
-        self.extrap = extrap
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
         if bc_type is None:
             bc_type = "natural"
-        # if bc_type != "natural":
-        #     raise RuntimeError("Only natural boundary condition is currently accepted for 1D cubic spline")
+        bc_types = ["natural", "clamped"]
+        if bc_type not in bc_types:
+            raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))
         self.bc_type = bc_type
+        self.extrap = check_and_get_extrap(extrap, bc_type)
 
         # precompute the inverse of spline matrix
         self.spline_mat_inv = _get_spline_mat_inv(x, bc_type) # (nr, nr)
@@ -149,6 +168,14 @@ class CubicSpline1D(BaseInterp):
         if self.y_is_given:
             res = res + ["y", "ks"]
         return res
+
+def check_and_get_extrap(extrap, bc_type):
+    if extrap is None:
+        return {
+            "natural": "nan",
+            "clamped": "mirror",
+        }[bc_type]
+    return extrap
 
 # @torch.jit.script
 def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
