@@ -3,11 +3,16 @@ import torch
 def get_extrap_pos(xqextrap, extrap, xmin=0.0, xmax=1.0):
     # xqextrap: (nrq,)
     xqnorm = (xqextrap - xmin) / (xmax - xmin)
-    xqinside = xqnorm % (1.0 + 1e-14) # to include 1 in the inside
-    if extrap == "mirror":
-        xqnorm_int = xqnorm.long()
-        odd_mask = torch.logical_not((xqnorm_int % 2 == 1) ^ (xqnorm > 0))
-        xqinside[odd_mask] = 1.0 - xqinside[odd_mask]
+    if extrap == "periodic":
+        xqinside = xqnorm % 1.0
+    elif extrap == "mirror":
+        xqnorm = xqnorm.abs()
+        xqnorm_ceil = xqnorm.long() + 1
+        xqinside = (2*(xqnorm_ceil // 2) - xqnorm) * (1 - (xqnorm_ceil % 2.0) * 2)
+    elif extrap == "bound":
+        xqinside = torch.clamp(xqnorm, 0.0, 1.0)
+    else:
+        raise RuntimeError("get_extrap_pos only work for periodic and mirror extrapolation")
     return xqinside * (xmax - xmin) + xmin
 
 def get_extrap_val(xqextrap, y, extrap):

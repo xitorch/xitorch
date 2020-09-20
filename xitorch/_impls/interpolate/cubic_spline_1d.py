@@ -31,11 +31,12 @@ class CubicSpline1D(BaseInterp):
 
         if bc_type is None:
             bc_type = "natural"
-        if bc_type != "natural":
-            raise RuntimeError("Only natural boundary condition is currently accepted for 1D cubic spline")
+        # if bc_type != "natural":
+        #     raise RuntimeError("Only natural boundary condition is currently accepted for 1D cubic spline")
+        self.bc_type = bc_type
 
         # precompute the inverse of spline matrix
-        self.spline_mat_inv = _get_spline_mat_inv(x) # (nr, nr)
+        self.spline_mat_inv = _get_spline_mat_inv(x, bc_type) # (nr, nr)
         self.y_is_given = y is not None
         if self.y_is_given:
             self.y = y
@@ -61,7 +62,7 @@ class CubicSpline1D(BaseInterp):
 
         if allinterp:
             return self._interp(xq, y=y)
-        elif extrap == "mirror" or extrap == "periodic":
+        elif extrap == "mirror" or extrap == "periodic" or extrap == "bound":
             # extrapolation by mapping it to the interpolated region
             xq2 = xq.clone()
             xq2[xqextrap_mask] = get_extrap_pos(xq[xqextrap_mask], extrap, self.xmin, self.xmax)
@@ -150,7 +151,7 @@ class CubicSpline1D(BaseInterp):
         return res
 
 # @torch.jit.script
-def _get_spline_mat_inv(x:torch.Tensor):
+def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
     """
     Returns the inverse of spline matrix where the gradient can be obtained just
     by
@@ -165,8 +166,8 @@ def _get_spline_mat_inv(x:torch.Tensor):
     ---------
     * x: torch.Tensor with shape (*BX, nr)
         The x-position of the data
-    * transpose: bool
-        If true, then transpose the result.
+    * bc_type: str
+        The boundary condition
 
     Returns
     -------
@@ -206,6 +207,14 @@ def _get_spline_mat_inv(x:torch.Tensor):
     matrdiag[...,:] = diagr
     matrudiag[...,:] = udiagr
     matrldiag[...,:] = ldiagr
+
+    if bc_type == "clamped":
+        spline_mat[...,0,:] = 0.
+        spline_mat[...,0,0] = 1.
+        spline_mat[...,-1,:] = 0.
+        spline_mat[...,-1,-1] = 1.
+        matr[...,0,:] = 0.
+        matr[...,-1,:] = 0.
 
     # solve the matrix inverse
     spline_mat_inv, _ = torch.solve(matr, spline_mat)
