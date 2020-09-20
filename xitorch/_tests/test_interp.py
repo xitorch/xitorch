@@ -82,8 +82,12 @@ def test_extrap(dtype, device):
         [1., 1.3127193 , 1.7445744 , 2.5, 1.3127193 , 2.5, 1.7445744 , 1.7445744 , 1., 1.3127193 , 2.5],
         [0., 2.13368966, 1.82654566, 1.2, 2.13368966, 1.2, 1.82654566, 1.82654566, 0., 2.13368966, 1.2],
     ], **dtype_device_kwargs)
-    extraps = ["nan", "mirror"][:1]
-    yq_trues = [yq_nan_true, yq_mir_true][:1]
+    yq_bnd_true = torch.tensor([
+        [1., 1.3127193 , 1.7445744 , 2.5, 1., 1., 1., 2.5, 2.5, 2.5, 2.5],
+        [0., 2.13368966, 1.82654566, 1.2, 0., 0., 0., 1.2, 1.2, 1.2, 1.2],
+    ], **dtype_device_kwargs)
+    extraps = ["nan", "mirror", "bound"]
+    yq_trues = [yq_nan_true, yq_mir_true, yq_bnd_true]
 
     def interp(x, y, xq, extrap):
         return Interp1D(x, y, extrap=extrap, method="cspline", bc_type="natural")(xq)
