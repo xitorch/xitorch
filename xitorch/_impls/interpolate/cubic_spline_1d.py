@@ -20,7 +20,8 @@ class CubicSpline1D(BaseInterp):
         * int, float, or 1-element torch.Tensor: it will pad the extrapolated
           values with the specified values
         * "mirror": the extrapolation values are mirrored
-        * "periodic": periodic boundary condition
+        * "periodic": periodic boundary condition. y[...,0] == y[...,-1] must
+          be fulfilled for this condition.
         * "bound": fill in the extrapolated values with the left or right bound
           values.
         * "nan": fill the extrapolated values with nan
@@ -53,11 +54,14 @@ class CubicSpline1D(BaseInterp):
             raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))
         self.bc_type = bc_type
         self.extrap = check_and_get_extrap(extrap, bc_type)
+        self.periodic_required = self.extrap == "periodic" # or self.bc_type == "periodic"
 
         # precompute the inverse of spline matrix
         self.spline_mat_inv = _get_spline_mat_inv(x, bc_type) # (nr, nr)
         self.y_is_given = y is not None
         if self.y_is_given:
+            if self.periodic_required:
+                check_periodic_value(y)
             self.y = y
             self.ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)
 
@@ -74,6 +78,8 @@ class CubicSpline1D(BaseInterp):
             y = self.y
         elif y is None:
             raise RuntimeError("y must be given")
+        elif self.periodic_required:
+            check_periodic_value(y)
 
         xqinterp_mask = torch.logical_and(xq >= self.xmin, xq <= self.xmax) # (nrq)
         xqextrap_mask = ~xqinterp_mask
@@ -176,6 +182,10 @@ def check_and_get_extrap(extrap, bc_type):
             "clamped": "mirror",
         }[bc_type]
     return extrap
+
+def check_periodic_value(y):
+    if not torch.allclose(y[...,0], y[...,-1]):
+        raise RuntimeError("The value of y must be periodic to have periodic bc_type or extrap")
 
 # @torch.jit.script
 def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
