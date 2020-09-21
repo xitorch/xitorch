@@ -1,10 +1,66 @@
 import numpy as np
 import torch
 import warnings
+from abc import abstractmethod
 from xitorch._impls.interpolate.base_interp import BaseInterp
 from xitorch._impls.interpolate.extrap_utils import get_extrap_pos, get_extrap_val
 
-class CubicSpline1D(BaseInterp):
+class BaseInterp1D(BaseInterp):
+    def __init__(self, x, y=None, extrap=None, **unused):
+        self._y_is_given = y is not None
+        self._extrap = extrap
+        self._xmin = torch.min(x, dim=-1, keepdim=True)[0]
+        self._xmax = torch.max(x, dim=-1, keepdim=True)[0]
+        self._is_periodic_required = False
+
+    def set_periodic_required(self, val):
+        self._is_periodic_required = val
+
+    def is_periodic_required(self):
+        return self._is_periodic_required
+
+    def __call__(self, xq, y=None):
+        # xq: (nrq)
+        # y: (*BY, nr)
+        if self._y_is_given and y is not None:
+            msg = "y has been supplied when initiating this instance. This value of y will be ignored"
+            # stacklevel=3 because this __call__ will be called by a wrapper's __call__
+            warnings.warn(msg, stacklevel=3)
+
+        extrap = self._extrap
+        if self._y_is_given:
+            y = self.y
+        elif y is None:
+            raise RuntimeError("y must be given")
+        elif self.is_periodic_required():
+            check_periodic_value(y)
+
+        xqinterp_mask = torch.logical_and(xq >= self._xmin, xq <= self._xmax) # (nrq)
+        xqextrap_mask = ~xqinterp_mask
+        allinterp = torch.all(xqinterp_mask)
+
+        if allinterp:
+            return self._interp(xq, y=y)
+        elif extrap == "mirror" or extrap == "periodic" or extrap == "bound":
+            # extrapolation by mapping it to the interpolated region
+            xq2 = xq.clone()
+            xq2[xqextrap_mask] = get_extrap_pos(xq[xqextrap_mask], extrap, self._xmin, self._xmax)
+            return self._interp(xq2, y=y)
+        else:
+            # interpolation
+            yqinterp = self._interp(xq[xqinterp_mask], y=y) # (*BY, nrq)
+            yqextrap = get_extrap_val(xq[xqextrap_mask], y, extrap)
+
+            yq = torch.empty((*y.shape[:-1], xq.shape[-1]), dtype=y.dtype, device=y.device) # (*BY, nrq)
+            yq[...,xqinterp_mask] = yqinterp
+            yq[...,xqextrap_mask] = yqextrap
+            return yq
+
+    @abstractmethod
+    def _interp(self, xq, y):
+        pass
+
+class CubicSpline1D(BaseInterp1D):
     """
     Perform 1D cubic spline interpolation for non-uniform `x`.
 
@@ -41,9 +97,12 @@ class CubicSpline1D(BaseInterp):
     def __init__(self, x, y=None, bc_type=None, extrap=None, **unused):
         # x: (nr,)
         # y: (*BY, nr)
+
+        # get the default extrapolation method
+        extrap = check_and_get_extrap(extrap, bc_type)
+        super(CubicSpline1D, self).__init__(x, y, extrap=extrap)
+
         self.x = x
-        self.xmin = torch.min(x, dim=-1, keepdim=True)[0]
-        self.xmax = torch.max(x, dim=-1, keepdim=True)[0]
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
@@ -53,55 +112,16 @@ class CubicSpline1D(BaseInterp):
         if bc_type not in bc_types:
             raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))
         self.bc_type = bc_type
-        self.extrap = check_and_get_extrap(extrap, bc_type)
-        self.periodic_required = self.extrap == "periodic" # or self.bc_type == "periodic"
+        self.set_periodic_required(extrap == "periodic") # or self.bc_type == "periodic"
 
         # precompute the inverse of spline matrix
         self.spline_mat_inv = _get_spline_mat_inv(x, bc_type) # (nr, nr)
         self.y_is_given = y is not None
         if self.y_is_given:
-            if self.periodic_required:
+            if self.is_periodic_required():
                 check_periodic_value(y)
             self.y = y
             self.ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)
-
-    def __call__(self, xq, y=None):
-        # xq: (nrq)
-        # y: (*BY, nr)
-        if self.y_is_given and y is not None:
-            msg = "y has been supplied when initiating this instance. This value of y will be ignored"
-            # stacklevel=3 because this __call__ will be called by a wrapper's __call__
-            warnings.warn(msg, stacklevel=3)
-
-        extrap = self.extrap
-        if self.y_is_given:
-            y = self.y
-        elif y is None:
-            raise RuntimeError("y must be given")
-        elif self.periodic_required:
-            check_periodic_value(y)
-
-        xqinterp_mask = torch.logical_and(xq >= self.xmin, xq <= self.xmax) # (nrq)
-        xqextrap_mask = ~xqinterp_mask
-        allinterp = torch.all(xqinterp_mask)
-
-        if allinterp:
-            return self._interp(xq, y=y)
-        elif extrap == "mirror" or extrap == "periodic" or extrap == "bound":
-            # extrapolation by mapping it to the interpolated region
-            xq2 = xq.clone()
-            xq2[xqextrap_mask] = get_extrap_pos(xq[xqextrap_mask], extrap, self.xmin, self.xmax)
-            return self._interp(xq2, y=y)
-        else:
-            # interpolation
-            yqinterp = self._interp(xq[xqinterp_mask], y=y) # (*BY, nrq)
-            yqextrap = get_extrap_val(xq[xqextrap_mask], y, extrap)
-
-            yq = torch.empty((*y.shape[:-1], xq.shape[-1]), dtype=y.dtype, device=y.device) # (*BY, nrq)
-            yq[...,xqinterp_mask] = yqinterp
-            yq[...,xqextrap_mask] = yqextrap
-            return yq
-
 
     def _interp(self, xq, y):
         # https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline
