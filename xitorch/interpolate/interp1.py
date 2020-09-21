@@ -1,6 +1,6 @@
 import torch
 from xitorch._core.editable_module import EditableModule
-from xitorch._impls.interpolate.cubic_spline_1d import CubicSpline1D
+from xitorch._impls.interpolate.interp_1d import CubicSpline1D
 
 __all__ = ["Interp1D"]
 
