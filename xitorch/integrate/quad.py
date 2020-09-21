@@ -6,7 +6,8 @@ from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
-from xitorch._impls.integrate.fixed_quad import leggaussquad
+from xitorch._impls.integrate.fixed_quad import leggauss
+from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["quad"]
@@ -37,7 +38,7 @@ def quad(
     * method: str or None
         Quadrature method.
     * **fwd_options: dict
-        Options for the forward quadrature method.
+        Method-specific options (see method section).
 
     Returns
     -------
@@ -125,7 +126,7 @@ class _Quadrature(torch.autograd.Function):
 
             method = config["method"].lower()
             if method == "leggauss":
-                y = leggaussquad(fcn2, tl, tu, params, **config)
+                y = leggauss(fcn2, tl, tu, params, **config)
             else:
                 raise RuntimeError("Unknown quad method: %s" % config["method"])
 
@@ -220,3 +221,6 @@ class _TanInfTransform(_BaseInfTransform):
 
     def x2t(self, x):
         return torch.atan(x)
+
+# docstring completion
+quad.__doc__ = get_methods_docstr(quad, [leggauss])

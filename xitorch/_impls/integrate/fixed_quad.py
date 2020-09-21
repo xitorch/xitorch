@@ -3,7 +3,7 @@ import torch
 
 # no gradient flowing in the following functions
 
-def leggaussquad(fcn, xl, xu, params, n=100, **unused):
+def leggauss(fcn, xl, xu, params, n=100, **unused):
     xlg, wlg = np.polynomial.legendre.leggauss(n)
     ndim = len(xu.shape)
     xlg = torch.tensor(xlg, dtype=xu.dtype, device=xu.device)[(...,)+(None,)*ndim] # (n, *nx)
