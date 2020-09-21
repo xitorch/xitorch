@@ -12,6 +12,7 @@ from xitorch.grad.jachess import jac
 from xitorch.linalg.linop import LinearOperator, checklinop
 from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
@@ -40,11 +41,11 @@ def rootfinder(
     * params: list
         List of any other parameters to be put in fcn
     * bck_options: dict
-        Options for the backward solve method
+        Method-specific options for the backward solve
     * method: str or None
         Rootfinder method.
     * **fwd_options: dict
-        Options for the rootfinder method
+        Method-specific options (see method section)
 
     Returns
     -------
@@ -91,11 +92,11 @@ def equilibrium(
     * params: list
         List of any other parameters to be put in fcn
     * bck_options: dict
-        Options for the backward solve method
+        Method-specific options for the backward solve
     * method: str or None
         Rootfinder method
     * **fwd_options: dict
-        Options for the rootfinder method
+        Method-specific options (see method section)
 
     Returns
     -------
@@ -147,11 +148,11 @@ def minimize(
     * params: list
         List of any other parameters to be put in fcn
     * bck_options: dict
-        Options for the backward solve method
+        Method-specific options for the backward solve
     * method: str or None
         Method
     * **fwd_options: dict
-        Options for the minimizer method
+        Method-specific options (see method section)
 
     Returns
     -------
@@ -261,3 +262,8 @@ def _get_minimizer_default_method(method):
         return "broyden1"
     else:
         return method
+
+# docstring completion
+rootfinder.__doc__ = get_methods_docstr(rootfinder, [broyden1])
+equilibrium.__doc__ = get_methods_docstr(equilibrium, [broyden1])
+minimize.__doc__ = get_methods_docstr(minimize, [broyden1])
