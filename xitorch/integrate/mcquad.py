@@ -4,6 +4,7 @@ from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
 from xitorch._utils.tupleops import tuple_axpy1
 from xitorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
+from xitorch._docstr.api_docstr import get_methods_docstr
 
 __all__ = ["mcquad"]
 
@@ -37,7 +38,7 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
     * method: str or None
         MC Quad method.
     * **fwd_options: dict
-        Options for the forward operation.
+        Method-specific options (see method section).
 
     Returns
     -------
@@ -237,3 +238,6 @@ def _integrate(ffcn, xsamples, wsamples, fparams):
     for x,w in zip(xsamples, wsamples):
         res = res + ffcn(x, *fparams) * w
     return res
+
+# docstring completion
+mcquad.__doc__ = get_methods_docstr(mcquad, [mh, mhcustom])
