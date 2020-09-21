@@ -6,6 +6,7 @@ from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
 from xitorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
 from xitorch._utils.tensor import convert_none_grads_to_zeros
+from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["solve_ivp"]
@@ -220,3 +221,11 @@ class _SolveIVP(torch.autograd.Function):
         grad_ntensor_params = [None for _ in range(len(allparams)-ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
         return (None, grad_ts, None, None, None, grad_y0, *grad_params)
+
+# docstring completion
+ivp_methods = {
+    "rk45": rk45_adaptive,
+    "rk23": rk23_adaptive,
+    "rk4": rk4_ivp,
+}
+solve_ivp.__doc__ = get_methods_docstr(solve_ivp, ivp_methods)
