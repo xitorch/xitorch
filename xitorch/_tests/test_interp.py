@@ -1,3 +1,4 @@
+import warnings
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 from xitorch.interpolate.interp1 import Interp1D
@@ -63,6 +64,23 @@ def test_interp1_cspline(dtype, device):
     gradgradcheck(interp, (x, y1, xq2))
     gradgradcheck(interp, (x, y2, xq1))
     gradgradcheck(interp, (x, y2, xq2))
+
+@device_dtype_float_test(only64=True)
+def test_interp1_editable_module(dtype, device):
+    dtype_device_kwargs = {"dtype": dtype, "device": device}
+    x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
+    y = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
+                      [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
+    xq = torch.linspace(0, 1, 10, **dtype_device_kwargs).requires_grad_()
+
+    methods = ["cspline"]
+    for method in methods:
+        cls1 = Interp1D(x, y, method=method)
+        cls2 = Interp1D(x, method=method)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            cls1.assertparams(cls1.__call__, xq)
+            cls2.assertparams(cls2.__call__, xq, y)
 
 @device_dtype_float_test(only64=True)
 def test_extrap(dtype, device):

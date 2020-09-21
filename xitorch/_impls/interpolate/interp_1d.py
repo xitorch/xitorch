@@ -190,9 +190,10 @@ class CubicSpline1D(BaseInterp1D):
             return yq
 
     def getparamnames(self):
-        res = ["spline_mat_inv", "x"]
         if self.y_is_given:
-            res = res + ["y", "ks"]
+            res = ["x", "y", "ks"]
+        else:
+            res = ["spline_mat_inv", "x"]
         return res
 
 def check_and_get_extrap(extrap, bc_type):
