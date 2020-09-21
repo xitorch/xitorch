@@ -1,6 +1,7 @@
 import torch
 from xitorch._core.editable_module import EditableModule
 from xitorch._impls.interpolate.interp_1d import CubicSpline1D
+from xitorch._docstr.api_docstr import get_methods_docstr
 
 __all__ = ["Interp1D"]
 
@@ -42,3 +43,9 @@ class Interp1D(EditableModule):
 
     def getparamnames(self, methodname, prefix=""):
         return [prefix+"obj."+c for c in self.obj.getparamnames()]
+
+# docstring completion
+interp1d_methods = {
+    "cspline": CubicSpline1D,
+}
+Interp1D.__doc__ = get_methods_docstr(Interp1D, interp1d_methods)
