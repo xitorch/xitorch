@@ -98,7 +98,9 @@ class CubicSpline1D(BaseInterp1D):
         # x: (nr,)
         # y: (*BY, nr)
 
-        # get the default extrapolation method
+        # get the default extrapolation method and boundary condition
+        if bc_type is None:
+            bc_type = "natural"
         extrap = check_and_get_extrap(extrap, bc_type)
         super(CubicSpline1D, self).__init__(x, y, extrap=extrap)
 
@@ -106,8 +108,6 @@ class CubicSpline1D(BaseInterp1D):
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
-        if bc_type is None:
-            bc_type = "natural"
         bc_types = ["natural", "clamped"]
         if bc_type not in bc_types:
             raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))

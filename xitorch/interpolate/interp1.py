@@ -41,4 +41,4 @@ class Interp1D(EditableModule):
         return self.obj(xq, y)
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+c for c in self.obj.getparamnames()]
+        return [prefix+"obj."+c for c in self.obj.getparamnames()]
