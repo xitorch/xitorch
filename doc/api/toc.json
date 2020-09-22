@@ -6,6 +6,7 @@
   ],
   "xitorch.integrate": [
     "quad",
-    "solve_ivp"
+    "solve_ivp",
+    "mcquad"
   ]
 }

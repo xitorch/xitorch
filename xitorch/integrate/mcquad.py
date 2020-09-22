@@ -15,36 +15,38 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
     """
     Performing monte carlo quadrature to calculate the expectation value:
 
-    E[f] = int[f(x,*fparams) g(x,*pparams) dx] / int[g(x,*pparams) dx]
+    .. math::
+
+       \mathbb{E}_p[f] = \\frac{\int f(\mathbf{x},\\theta_f) p(\mathbf{x},\\theta_p)\\ \mathrm{d}\mathbf{x} }{ \int p(\mathbf{x},\\theta_p)\\ \mathrm{d}\mathbf{x} }
 
     Arguments
     ---------
     * ffcn: Callable
-        The function with to be integrated. Its outputs should be a tensor or a
-        list of tensors. To call the function: ffcn(x, *fparams)
+        The function with to be integrated. Its outputs is a tensor or a
+        list of tensors. To call the function: ``ffcn(x, *fparams)``
     * log_pfcn: Callable
         The natural logarithm of the probability function. The output should be
-        one-element tensor. To call the function: gfcn(x, *pparams)
+        a one-element tensor. To call the function: ``log_pfcn(x, *pparams)``
     * x0: torch.Tensor
         Tensor with any size as the initial position.
-        The call `ffcn(x0,*fparams)` must work.
+        The call ``ffcn(x0,*fparams)`` must work.
     * fparams: list
-        List of any other parameters for `ffcn`.
+        List of any other parameters for ``ffcn``.
     * pparams: list
-        List of any other parameters for `gfcn`.
+        List of any other parameters for ``gfcn``.
     * bck_options: dict
         Options for the backward mcquad operation. Unspecified fields will be
-        taken from fwd_options.
+        taken from ``fwd_options``.
     * method: str or None
-        MC Quad method.
-    * **fwd_options: dict
-        Method-specific options (see method section).
+        Monte Carlo quadrature method.
+    **fwd_options: dict
+        Method-specific options (see method section below).
 
     Returns
     -------
-    * epf: torch.Tensor or a list of torch.Tensor
-        The expectation values of the function `ffcn` over the space of `x`.
-        If the output of `ffcn` is a list, then this is also a list
+    torch.Tensor or a list of torch.Tensor
+        The expectation values of the function ``ffcn`` over the space of ``x``.
+        If the output of ``ffcn`` is a list, then this is also a list.
     """
     if method is None:
         method = "mh"
