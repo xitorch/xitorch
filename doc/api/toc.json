@@ -1,5 +1,6 @@
 {
   "xitorch.optimize": [
-    "rootfinder"
+    "rootfinder",
+    "equilibrium"
   ]
 }

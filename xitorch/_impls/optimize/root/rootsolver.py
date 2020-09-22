@@ -8,11 +8,11 @@ __all__ = ["broyden1"]
 
 def broyden1(fcn, x0, params=(), **kwargs):
     """
-        Solve the root finder using the first Broyden method [Rotten2003]_.
+        Solve the root finder using the first Broyden method [1]_.
 
         References
         ----------
-        .. [Rotten2003] B.A. van der Rotten, PhD thesis,
+        .. [1] B.A. van der Rotten, PhD thesis,
                "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
                Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
                https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf

@@ -76,38 +76,35 @@ def equilibrium(
     """
     Solving the equilibrium equation of a given function,
 
-        y = fcn(y, *params)
+        :math:`\mathbf{y} = \mathbf{f}(\mathbf{y}, \\theta)`
 
-    where `fcn` is a function that can be non-linear and produce output of shape
-    `y`. The output of this block is `y` that produces the 0 as the output.
+    where :math:`\mathbf{f}` is a function that can be non-linear and
+    produce output of the same shape of :math:`\mathbf{y}`, and :math:`\\theta`
+    is other parameters required in the function.
+    The output of this block is :math:`\mathbf{y}`
+    that produces the same :math:`\mathbf{y}` as the output.
 
     Arguments
     ---------
-    * fcn: callable with output tensor (*ny)
-        The function
-    * y0: torch.tensor with shape (*ny)
-        Initial guess of the solution
-    * params: list
-        List of any other parameters to be put in fcn
-    * bck_options: dict
+    * fcn : callable
+        The function :math:`\mathbf{f}` with output tensor (``*ny``)
+    * y0 : torch.tensor
+        Initial guess of the solution with shape (``*ny``)
+    * params : list
+        List of any other parameters to be put in ``fcn``
+    * bck_options : dict
         Method-specific options for the backward solve
-    * method: str or None
-        Rootfinder method
-    * **fwd_options: dict
+    * method : str or None
+        Rootfinder method.
+    **fwd_options
         Method-specific options (see method section)
 
     Returns
     -------
-    * yout: torch.tensor with shape (*ny)
-        The solution which satisfies yout = fcn(yout)
-
-    Note
-    ----
-    * To obtain the correct gradient and higher order gradients, the fcn must be:
-        - a torch.nn.Module with fcn.parameters() list the tensors that determine
-            the output of the fcn.
-        - a method in xt.EditableModule object with no out-of-scope parameters.
-        - a function with no out-of-scope parameters.
+    torch.tensor
+        The solution which satisfies
+        :math:`\mathbf{y} = \mathbf{f}(\mathbf{y},\\theta)`
+        with shape (``*ny``)
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
