@@ -22,7 +22,9 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
     Solve the initial value problem (IVP) which given the initial value
     :math:`\mathbf{y_0}`, the function then solves
 
-        :math:`\mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t_1} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'`
+    .. math::
+
+        \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t_1} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'
 
     Arguments
     ---------

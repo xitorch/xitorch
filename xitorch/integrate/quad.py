@@ -23,7 +23,9 @@ def quad(
     """
     Calculate the quadrature:
 
-        :math:`y = \int_{x_l}^{x_u} f(x, \\theta)\\ \mathrm{d}x``
+    .. math::
+
+        y = \int_{x_l}^{x_u} f(x, \\theta)\\ \mathrm{d}x
 
     Arguments
     ---------
