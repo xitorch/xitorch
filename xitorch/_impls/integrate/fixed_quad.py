@@ -5,7 +5,7 @@ import torch
 
 def leggauss(fcn, xl, xu, params, n=100, **unused):
     """
-        Performing 1D integration using Legendre-Gaussian quadrature
+    Performing 1D integration using Legendre-Gaussian quadrature
 
     Arguments
     ---------
