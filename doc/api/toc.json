@@ -5,6 +5,7 @@
     "minimize"
   ],
   "xitorch.integrate": [
-    "quad"
+    "quad",
+    "solve_ivp"
   ]
 }

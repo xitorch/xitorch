@@ -19,35 +19,41 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
               method:Union[str,None]=None,
               **fwd_options) -> torch.Tensor:
     """
-    Solve the initial value problem (IVP) which given the initial value `y0`,
-    the function is then solve
+    Solve the initial value problem (IVP) which given the initial value
+    :math:`\mathbf{y_0}`, the function then solves
 
-        y(t) = y0 + int_t0^t f(t', y, *params) dt'
+        :math:`\mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t_1} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'`
 
     Arguments
     ---------
-    * fcn: callable with output a tensor with shape (*ny) or a list of tensors
+    * fcn: callable
         The function that represents dy/dt. The function takes an input of a
-        single time `t` and `y` with shape (*ny) and produce dydt with shape (*ny).
-    * ts: torch.tensor with shape (nt,)
-        The time points where the value of `y` is returned.
+        single time ``t`` and tensor ``y`` with shape ``(*ny)`` and
+        produce :math:`\mathrm{d}\mathbf{y}/\mathrm{d}t` with shape ``(*ny)``.
+        The output of the function must be a tensor with shape ``(*ny)`` or
+        a list of tensors.
+    * ts: torch.tensor
+        The time points where the value of `y` will be returned.
         It must be monotonically increasing or decreasing.
-    * y0: torch.tensor with shape (*ny) or a list of tensors
-        The initial value of y, i.e. y(t[0]) == y0
+        It is a tensor with shape ``(nt,)``.
+    * y0: torch.tensor
+        The initial value of ``y``, i.e. ``y(t[0]) == y0``.
+        It is a tensor with shape ``(*ny)`` or a list of tensors.
     * params: list
         List of other parameters required in the function.
     * bck_options: dict
         Options for the backward solve_ivp method. If not specified, it will
         take the same options as fwd_options.
     * method: str or None
-        solve_ivp method.
-    * **fwd_options: dict
-        Options for the forward solve_ivp method.
+        Initial value problem solver.
+    **fwd_options
+        Method-specific option (see method section below).
 
     Returns
     -------
-    * yt: torch.tensor with shape (nt,*ny) or a list of tensors
-        The values of `y` for each time step in `ts`.
+    torch.tensor
+        The values of ``y`` for each time step in ``ts``.
+        It is a tensor with shape ``(nt,*ny)`` or a list of tensors
     """
     if is_debug_enabled():
         assert_fcn_params(fcn, (ts[0], y0, *params))
