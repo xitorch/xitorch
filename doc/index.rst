@@ -10,6 +10,7 @@ Welcome to xitorch's documentation!
    :maxdepth: 2
 
    api/xitorch_optimize/index
+   api/xitorch_integrate/index
 
 
 Indices and tables

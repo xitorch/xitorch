@@ -3,5 +3,8 @@
     "rootfinder",
     "equilibrium",
     "minimize"
+  ],
+  "xitorch.integrate": [
+    "quad"
   ]
 }

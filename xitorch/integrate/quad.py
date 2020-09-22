@@ -21,29 +21,32 @@ def quad(
         method:Union[str,None]=None,
         **fwd_options):
     """
-    Calculate the quadrature of the function `fcn` from `x0` to `xf`:
+    Calculate the quadrature:
 
-        y = int_xl^xu fcn(x, *params)
+        :math:`y = \int_{x_l}^{x_u} f(x, \\theta)\\ \mathrm{d}x``
 
     Arguments
     ---------
-    * fcn: callable with output tensor with shape (*nout) or list of tensors
-        The function to be integrated.
-    * xl, xu: float, int, or 1-element torch.Tensor
-        The lower and upper bound of the integration.
+    * fcn: callable
+        The function to be integrated. Its output must be a tensor with
+        shape (``*nout``) or list of tensors.
+    * xl: float, int or 1-element torch.Tensor
+        The lower bound of the integration.
+    * xu: float, int or 1-element torch.Tensor
+        The upper bound of the integration.
     * params: list
-        List of any other parameters for the function `fcn`.
+        List of any other parameters for the function ``fcn``.
     * bck_options: dict
         Options for the backward quadrature method.
     * method: str or None
         Quadrature method.
-    * **fwd_options: dict
+    **fwd_options
         Method-specific options (see method section).
 
     Returns
     -------
-    * y: torch.tensor with shape (*nout) or list of tensors
-        The quadrature results.
+    torch.tensor
+        The quadrature results with shape (``*nout``) or list of tensors.
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
