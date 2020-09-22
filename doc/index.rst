@@ -8,9 +8,8 @@ Welcome to xitorch's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-   api/rootfinder
+   api/xitorch_optimize/index
 
 
 Indices and tables

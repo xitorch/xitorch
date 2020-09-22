@@ -1,0 +1,5 @@
+{
+  "xitorch.optimize": [
+    "rootfinder"
+  ]
+}

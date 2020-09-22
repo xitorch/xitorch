@@ -22,6 +22,57 @@ import sys
 import sphinx_rtd_theme
 sys.path.insert(0, os.path.abspath('../xitorch/'))
 
+# -- API docs file generators ------------------------------------------------
+import json
+
+# generate the api files
+api_dir = os.path.abspath("api")
+api_toc_path = os.path.join(api_dir, "toc.json")
+module_index_template = """{name}
+{underlines}
+
+.. toctree::
+   :maxdepth: 2
+
+   {api_list}
+"""
+module_api_list_indent = " "*3
+file_template = """{name}
+{underlines}
+
+.. autofunction:: {fullname}
+"""
+with open(api_toc_path, "r") as f:
+    api_toc = json.load(f)
+
+for module, api_list in api_toc.items():
+    module_dir_name = module.replace(".", "_")
+    module_api_dir = os.path.join(api_dir, module_dir_name)
+    if not os.path.exists(module_api_dir):
+        os.mkdir(module_api_dir)
+
+    # write the index.rst
+    api_list_str = ("\n"+module_api_list_indent).join(api_list)
+    module_index_fname = os.path.join(module_api_dir, "index.rst")
+    with open(module_index_fname, "w") as f:
+        content = module_index_template.format(
+            name=module,
+            underlines="="*len(module),
+            api_list=api_list_str
+        )
+        f.write(content)
+
+    for fn in api_list:
+        fullname = module + "." + fn
+        fname = os.path.join(module_api_dir, fn+".rst")
+        file_content = file_template.format(
+            name=fn,
+            fullname=fullname,
+            underlines="="*len(fn),
+        )
+        with open(fname, "w") as f:
+            f.write(file_content)
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
