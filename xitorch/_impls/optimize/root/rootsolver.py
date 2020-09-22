@@ -9,6 +9,8 @@ __all__ = ["broyden1"]
 def broyden1(fcn, x0, params=(), **kwargs):
     """
         Solve the root finder using the first Broyden method [1]_.
+        It can be used to solve minimization by finding the root of the
+        function's gradient.
 
         References
         ----------

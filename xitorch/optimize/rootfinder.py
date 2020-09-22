@@ -129,30 +129,30 @@ def minimize(
     """
     Solve the unbounded minimization problem:
 
-        z = (argmin_y) fcn(y, *params)
+        :math:`\mathbf{y^*} = \\arg\min_\mathbf{y} f(\mathbf{y}, \\theta)`
 
-    to find the best `y` that minimizes the output of the function `fcn`.
-    The output of `fcn` must be a single element tensor.
+    to find the best :math:`\mathbf{y}` that minimizes the output of the
+    function :math:`f`.
 
     Arguments
     ---------
-    * fcn: callable with output tensor (numel=1)
-        The function
-    * y0: torch.tensor with shape (*ny)
-        Initial guess of the solution
+    * fcn: callable
+        The function to be optimized with output tensor with 1 element.
+    * y0: torch.tensor
+        Initial guess of the solution with shape (``*ny``)
     * params: list
-        List of any other parameters to be put in fcn
+        List of any other parameters to be put in ``fcn``
     * bck_options: dict
-        Method-specific options for the backward solve
+        Method-specific options for the backward solve.
     * method: str or None
-        Method
-    * **fwd_options: dict
+        Minimization method.
+    **fwd_options
         Method-specific options (see method section)
 
     Returns
     -------
-    * y: torch.tensor with shape (*ny)
-        The solution of the minimization
+    torch.tensor
+        The solution of the minimization with shape (``*ny``)
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
