@@ -27,7 +27,9 @@ def rootfinder(
     """
     Solving the rootfinder equation of a given function,
 
-        :math:`\mathbf{0} = \mathbf{f}(\mathbf{y}, \\theta)`
+    .. math::
+
+        \mathbf{0} = \mathbf{f}(\mathbf{y}, \\theta)
 
     where :math:`\mathbf{f}` is a function that can be non-linear and
     produce output of the same shape of :math:`\mathbf{y}`, and :math:`\\theta`
@@ -76,7 +78,9 @@ def equilibrium(
     """
     Solving the equilibrium equation of a given function,
 
-        :math:`\mathbf{y} = \mathbf{f}(\mathbf{y}, \\theta)`
+    .. math::
+
+        \mathbf{y} = \mathbf{f}(\mathbf{y}, \\theta)
 
     where :math:`\mathbf{f}` is a function that can be non-linear and
     produce output of the same shape of :math:`\mathbf{y}`, and :math:`\\theta`
@@ -129,7 +133,9 @@ def minimize(
     """
     Solve the unbounded minimization problem:
 
-        :math:`\mathbf{y^*} = \\arg\min_\mathbf{y} f(\mathbf{y}, \\theta)`
+    .. math::
+
+        \mathbf{y^*} = \\arg\min_\mathbf{y} f(\mathbf{y}, \\theta)
 
     to find the best :math:`\mathbf{y}` that minimizes the output of the
     function :math:`f`.
