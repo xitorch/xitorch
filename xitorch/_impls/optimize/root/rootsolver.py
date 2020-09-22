@@ -8,14 +8,15 @@ __all__ = ["broyden1"]
 
 def broyden1(fcn, x0, params=(), **kwargs):
     """
-    Solve the root finder using the first Broyden method.
+        Solve the root finder using the first Broyden method [Rotten2003]_.
 
-    Reference
-    ---------
-    [1] B.A. van der Rotten, PhD thesis,
-        "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
-        Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
-        https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
+        References
+        ----------
+        .. [Rotten2003] B.A. van der Rotten, PhD thesis,
+               "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
+               Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
+               https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
+
     """
     return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 
@@ -30,24 +31,25 @@ def _nonlin_solver(fcn, x0, params, method,
         verbose=False,
         **unused):
     """
-    Options
-    -------
+    Arguments
+    ---------
     * alpha: float or None
-        The initial inverse Jacobian is -1/alpha
+        The initial inverse Jacobian is ``-1/alpha``
     * max_rank: int or None
-        The maximum rank of inverse Jacobian approximation. If None, it is inf.
+        The maximum rank of inverse Jacobian approximation. If ``None``, it
+        is ``inf``.
     * maxiter: int or None
         Maximum number of iterations, or inf if it is set to None.
     * f_tol: float or None
-        The absolute tolerance of the norm of the output f.
+        The absolute tolerance of the norm of the output ``f``.
     * f_rtol: float or None
-        The relative tolerance of the norm of the output f.
+        The relative tolerance of the norm of the output ``f``.
     * x_tol: float or None
-        The absolute tolerance of the norm of the input x.
+        The absolute tolerance of the norm of the input ``x``.
     * x_rtol: float or None
-        The relative tolerance of the norm of the input x.
+        The relative tolerance of the norm of the input ``x``.
     * line_search: bool or str
-        Options to perform line search. If True, it is set to "armijo".
+        Options to perform line search. If ``True``, it is set to ``"armijo"``.
     * verbose: bool
         Options for verbosity
     """

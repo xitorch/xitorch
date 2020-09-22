@@ -20,8 +20,9 @@ def get_methods_docstr(cls_or_func, methods):
         The full docstring of cls_or_func
     """
     method_template = """
-    Method: {name}
-    ========{namelength}
+    Methods
+    -------
+    method="{name}"
     """
     res = cls_or_func.__doc__
 
@@ -34,7 +35,10 @@ def get_methods_docstr(cls_or_func, methods):
 
     for name, method in generator:
         methoddoc = method.__doc__
-        res = res + method_template.format(name=name, namelength=("="*len(name)))
+        res = res + method_template.format(name=name)
         if methoddoc is not None:
-            res = res + method.__doc__
+            res = res + _add_indent(method.__doc__, indent="")#"    ")
     return res
+
+def _add_indent(s, indent):
+    return "\n".join([indent+line for line in s.split("\n")])
