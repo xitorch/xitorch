@@ -9,6 +9,7 @@ Welcome to xitorch's documentation!
 .. toctree::
    :maxdepth: 2
 
+   api/xitorch/index
    api/xitorch_optimize/index
    api/xitorch_integrate/index
    api/xitorch_linalg/index

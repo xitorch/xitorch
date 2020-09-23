@@ -43,6 +43,7 @@ file_template = """{name}
 {underlines}
 
 .. auto{function_or_class}:: {fullname}
+   {with_members}
 """
 with open(api_toc_path, "r") as f:
     api_toc = json.load(f)
@@ -67,13 +68,14 @@ for module, api_list in api_toc.items():
     pymod = importlib.import_module(module)
     for fn in api_list:
         fullname = module + "." + fn
-        pyfn = getattr(pymod, fn)
+        isfn = inspect.isfunction(getattr(pymod, fn))
         fname = os.path.join(module_api_dir, fn+".rst")
         file_content = file_template.format(
             name=fn,
             fullname=fullname,
             underlines="="*len(fn),
-            function_or_class="function" if inspect.isfunction(pyfn) else "class",
+            function_or_class="function" if isfn else "class",
+            with_members="" if isfn else ":members:"
         )
         with open(fname, "w") as f:
             f.write(file_content)
@@ -92,10 +94,13 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.coverage',
     'sphinx.ext.napoleon',
     'sphinx.ext.mathjax',
+    'sphinx.ext.doctest',
     'sphinx_rtd_theme',
     'sphinx.ext.viewcode']
 
 napoleon_include_special_with_doc = True
+napoleon_include_private_with_doc = True
+autodoc_member_order = "bysource"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

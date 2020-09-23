@@ -1,4 +1,7 @@
 {
+  "xitorch": [
+    "LinearOperator"
+  ],
   "xitorch.optimize": [
     "rootfinder",
     "equilibrium",

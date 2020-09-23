@@ -13,13 +13,43 @@ __all__ = ["LinearOperator"]
 
 class LinearOperator(EditableModule):
     """
-    LinearOperator is a class designed to behave as a linear operator without
-    explicitly determining the matrix.
-    This LinearOperator can operate a batch of linear operator and it has shape
-    of (B1,B2,...,Bb,p,q) where B* is the (optional) batch dimensions.
+    ``LinearOperator`` is a base class designed to behave as a linear operator
+    without explicitly determining the matrix.
+    This ``LinearOperator`` should be able to operate as batched linear
+    operators where its shape is ``(B1,B2,...,Bb,p,q)``
+    with ``B*`` as the (optional) batch dimensions.
+
+    For a user-defined class to behave as ``LinearOperator``, it must use
+    ``LinearOperator`` as one of the parent and it has to have ``._mv()``
+    and ``._getparamnames()`` methods implemented at the very least.
     """
     @classmethod
     def m(cls, mat:torch.Tensor, is_hermitian:Union[bool,None]=None):
+        """
+        Class method to wrap a matrix into ``LinearOperator``.
+
+        Arguments
+        ---------
+        mat: torch.Tensor
+            Matrix to be wrapped in the ``LinearOperator``.
+        is_hermitian: bool or None
+            Indicating if the matrix is Hermitian. If ``None``, the symmetry
+            will be checked. If supplied as a bool, there is no check performed.
+
+        Example
+        -------
+        .. testsetup:: *
+
+            import torch
+            import xitorch
+
+        .. doctest::
+
+            >>> mat = torch.rand(4,2,5,5)  # 5x5 matrix with (4,2) batch dimensions
+            >>> linop = xitorch.LinearOperator.m(mat)
+            >>> print(linop)
+            xitorch.LinearOperator with shape: (4,2,5,5)
+        """
         if is_hermitian is None:
             if mat.shape[-2] != mat.shape[-1]:
                 is_hermitian = False
@@ -62,28 +92,57 @@ class LinearOperator(EditableModule):
         self._matrix_defined = False
         self._matrix = torch.tensor([])
 
+    def __repr__(self):
+        return "xitorch.LinearOperator with shape: (%s)" % \
+            (",".join([str(s) for s in self.shape]))
+
+    @abstractmethod
+    def _getparamnames(self) -> Sequence[str]:
+        """
+        List the self's parameters that affecting the ``LinearOperator``.
+        This is for higher order derivative purpose.
+        """
+        pass
+
     @abstractmethod
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
+        """
+        Abstract method to be implemented for matrix-vector multiplication.
+        Required for all ``LinearOperator`` objects.
+        """
         pass
 
     # @abstractmethod
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
+        """
+        Abstract method to be implemented for transposed matrix-vector multiplication.
+        Optional, but will raise an error if not implemented but ``.rmv()``
+        is called.
+        """
         pass
 
     # @abstractmethod # (optional)
     def _mm(self, x:torch.Tensor) -> torch.Tensor:
+        """
+        Abstract method to be implemented for matrix-matrix multiplication.
+        If not implemented, then it uses batched version of matrix-vector
+        multiplication.
+        Usually this is implemented for efficiency reasons.
+        """
         pass
 
     # @abstractmethod
     def _rmm(self, x:torch.Tensor) -> torch.Tensor:
+        """
+        Abstract method to be implemented for transposed matrix-matrix multiplication.
+        If not implemented, then it uses batched version of transposed matrix-vector
+        multiplication.
+        Usually this is implemented for efficiency reasons.
+        """
         pass
 
     # @abstractmethod
     def _fullmatrix(self) -> torch.Tensor:
-        pass
-
-    @abstractmethod
-    def _getparamnames(self) -> Sequence[str]:
         pass
 
     # linear operators must have a set of parameters that affects most of
@@ -107,19 +166,19 @@ class LinearOperator(EditableModule):
     ############# implemented functions ################
     def mv(self, x:torch.Tensor) -> torch.Tensor:
         """
-        Apply the matrix-vector operation to vector x with shape (...,q).
-        The batch dimensions of x need not be the same as the batch dimensions
-        of the LinearOperator, but it must be broadcastable.
+        Apply the matrix-vector operation to vector ``x`` with shape ``(...,q)``.
+        The batch dimensions of ``x`` need not be the same as the batch dimensions
+        of the ``LinearOperator``, but it must be broadcastable.
 
         Arguments
         ---------
-        * x: torch.tensor (...,q)
-            The vector where the linear operation is operated at.
+        x: torch.tensor
+            The vector with shape ``(...,q)`` where the linear operation is operated on
 
         Returns
         -------
-        * y: torch.tensor (...,p)
-            The result of the linear operation.
+        y: torch.tensor
+            The result of the linear operation with shape ``(...,p)``
         """
         if x.shape[-1] != self.shape[-1]:
             raise RuntimeError("Cannot operate .mv on shape %s. Expected (...,%d)" %\
@@ -129,19 +188,19 @@ class LinearOperator(EditableModule):
 
     def mm(self, x:torch.Tensor) -> torch.Tensor:
         """
-        Apply the matrix-matrix operation to matrix x with shape (...,q,r).
-        The batch dimensions of x need not be the same as the batch dimensions
-        of the LinearOperator, but it must be broadcastable.
+        Apply the matrix-matrix operation to matrix ``x`` with shape ``(...,q,r)``.
+        The batch dimensions of ``x`` need not be the same as the batch dimensions
+        of the ``LinearOperator``, but it must be broadcastable.
 
         Arguments
         ---------
-        * x: torch.tensor (...,q,r)
-            The matrix where the linear operation is operated at.
+        x: torch.tensor
+            The matrix with shape ``(...,q,r)`` where the linear operation is operated on.
 
         Returns
         -------
-        * y: torch.tensor (...,p,r)
-            The result of the linear operation.
+        y: torch.tensor
+            The result of the linear operation with shape ``(...,p,r)``
         """
         if x.shape[-2] != self.shape[-1]:
             raise RuntimeError("Cannot operate .mm on shape %s. Expected (...,%d,*)" %\
@@ -166,20 +225,20 @@ class LinearOperator(EditableModule):
 
     def rmv(self, x:torch.Tensor) -> torch.Tensor:
         """
-        Apply the matrix-vector adjoint operation to vector x with shape (...,p),
-        i.e. A^H x.
-        The batch dimensions of x need not be the same as the batch dimensions
-        of the LinearOperator, but it must be broadcastable.
+        Apply the matrix-vector adjoint operation to vector ``x`` with shape ``(...,p)``,
+        i.e. ``A^H x``.
+        The batch dimensions of ``x`` need not be the same as the batch dimensions
+        of the ``LinearOperator``, but it must be broadcastable.
 
         Arguments
         ---------
-        * x: torch.tensor (...,p)
-            The vector where the adjoint linear operation is operated at.
+        x: torch.tensor
+            The vector of shape ``(...,p)`` where the adjoint linear operation is operated at.
 
         Returns
         -------
-        * y: torch.tensor (...,q)
-            The result of the adjoint linear operation.
+        y: torch.tensor
+            The result of the adjoint linear operation with shape ``(...,q)``
         """
         if x.shape[-1] != self.shape[-2]:
             raise RuntimeError("Cannot operate .rmv on shape %s. Expected (...,%d)" %\
@@ -193,20 +252,20 @@ class LinearOperator(EditableModule):
 
     def rmm(self, x:torch.Tensor) -> torch.Tensor:
         """
-        Apply the matrix-matrix adjoint operation to matrix x with shape (...,p,r),
-        i.e. A^H X.
-        The batch dimensions of x need not be the same as the batch dimensions
-        of the LinearOperator, but it must be broadcastable.
+        Apply the matrix-matrix adjoint operation to matrix ``x`` with shape ``(...,p,r)``,
+        i.e. ``A^H X``.
+        The batch dimensions of ``x`` need not be the same as the batch dimensions
+        of the ``LinearOperator``, but it must be broadcastable.
 
         Arguments
         ---------
-        * x: torch.tensor (...,p,r)
-            The matrix where the adjoint linear operation is operated at.
+        x: torch.Tensor
+            The matrix of shape ``(...,p,r)`` where the adjoint linear operation is operated on.
 
         Returns
         -------
-        * y: torch.tensor (...,q,r)
-            The result of the adjoint linear operation.
+        y: torch.Tensor
+            The result of the adjoint linear operation with shape ``(...,q,r)``.
         """
         if x.shape[-2] != self.shape[-2]:
             raise RuntimeError("Cannot operate .rmm on shape %s. Expected (...,%d,*)" %\
@@ -310,24 +369,24 @@ class LinearOperator(EditableModule):
     ############ debug functions ##############
     def check(self, warn:Union[bool,None]=None) -> None:
         """
-        Perform checks to make sure the linear operator behaves as a proper
+        Perform checks to make sure the ``LinearOperator`` behaves as a proper
         linear operator.
 
         Arguments
         ---------
-        * warn: bool or None
-            If True, then raises a warning to the user that the check might slow
+        warn: bool or None
+            If ``True``, then raises a warning to the user that the check might slow
             down the program. This is to remind the user to turn off the check
             when not in a debugging mode.
-            If None, it will raise a warning if it runs not in a debug mode, but
+            If ``None``, it will raise a warning if it runs not in a debug mode, but
             will be silent if it runs in a debug mode.
 
-        Exceptions
-        ----------
-        * RuntimeError
+        Raises
+        ------
+        RuntimeError
             Raised if an error is raised when performing linear operations of the
-            object (e.g. calling .mv(), .mm(), etc)
-        * AssertionError
+            object (e.g. calling ``.mv()``, ``.mm()``, etc)
+        AssertionError
             Raised if the linear operations do not behave as proper linear operations.
             (e.g. not scaling linearly)
         """

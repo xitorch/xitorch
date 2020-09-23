@@ -36,10 +36,8 @@ class EditableModule(object):
 
     # @abstractmethod
     def getparamnames(self, methodname, prefix="") -> List[str]:
-        """
-        Return the parameter names of tensors used in the method.
-        If the methodname is not on the list, returns KeyError
-        """
+        # Return the parameter names of tensors used in the method.
+        # If the methodname is not on the list, returns KeyError
         pass
 
     def getuniqueparams(self, methodname:str) -> Sequence[torch.Tensor]:
