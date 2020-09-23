@@ -1,5 +1,6 @@
 {
   "xitorch": [
+    "EditableModule",
     "LinearOperator"
   ],
   "xitorch.optimize": [

@@ -315,6 +315,10 @@ class LinearOperator(EditableModule):
         )
 
     def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+        """"""
+        # just to remove the docstring from EditableModule because user
+        # does not need to know about this function
+
         if methodname in ["mv", "rmv", "mm", "rmm"]:
             names = self._getparamnames()
             return [(prefix+s) for s in names] if prefix != "" else names

@@ -15,29 +15,69 @@ __all__ = ["EditableModule"]
 torch_float_type = [torch.float32, torch.float, torch.float64, torch.float16]
 
 class EditableModule(object):
+    """
+    ``EditableModule`` is a base class to enable classes that it inherits be
+    converted to pure functions for higher order derivatives purpose.
+    """
     def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
-        """
-        Returns a list of tensor parameters used in the object's operations
-        """
+        # Returns a list of tensor parameters used in the object's operations
+
         paramnames = self.getparamnames(methodname)
         return [get_attr(self, name) for name in paramnames]
 
     def setparams(self, methodname:str, *params) -> int:
-        """
-        Set the input parameters to the object's parameters to make a copy of
-        the operations.
-        *params is an excessive list of the parameters to be set and the
-        method will return the number of parameters it sets.
-        """
+        # Set the input parameters to the object's parameters to make a copy of
+        # the operations.
+        # *params is an excessive list of the parameters to be set and the
+        # method will return the number of parameters it sets.
         paramnames = self.getparamnames(methodname)
         for name,val in zip(paramnames, params):
             set_attr(self, name, val)
         return len(params)
 
-    # @abstractmethod
+    @abstractmethod
     def getparamnames(self, methodname, prefix="") -> List[str]:
-        # Return the parameter names of tensors used in the method.
-        # If the methodname is not on the list, returns KeyError
+        """
+        This method should list tensor names that affect the output of the
+        method with name indicated in ``methodname``.
+        If the ``methodname`` is not on the list in this function, it should
+        raise ``KeyError``.
+
+        Arguments
+        ---------
+        methodname: str
+            The name of the method of the class.
+        prefix: str
+            The prefix to be appended in front of the parameters name.
+            This usually contains the dots.
+
+        Raises
+        ------
+        KeyError
+            If the list in this function does not contain ``methodname``.
+
+        Example
+        -------
+        .. testsetup::
+
+            import torch
+            import xitorch
+
+        .. doctest::
+
+            >>> class A(xitorch.EditableModule):
+            ...     def __init__(self, a):
+            ...         self.b = a*a
+            ...
+            ...     def mult(self, x):
+            ...         return self.b * x
+            ...
+            ...     def getparamnames(self, methodname, prefix=""):
+            ...         if methodname == "mult":
+            ...             return [prefix+"b"]
+            ...         else:
+            ...             raise KeyError()
+        """
         pass
 
     def getuniqueparams(self, methodname:str) -> Sequence[torch.Tensor]:
@@ -113,9 +153,11 @@ class EditableModule(object):
     ############# debugging #############
     def assertparams(self, method, *args, **kwargs):
         """
-        Perform a rigorous check on the implemented getparams and setparams
-        in the class for a given method and its arguments (as well as keyword
-        arguments)
+        Perform a rigorous check on the implemented ``getparamnames``
+        in the class for a given method and its arguments as well as keyword
+        arguments.
+        It raises warnings if there are missing or excess parameters in the
+        ``getparamnames`` implementation.
         """
         methodname = method.__name__
 
@@ -222,10 +264,9 @@ class EditableModule(object):
             warnings.warn(msg)
 
     def __list_operating_params(self, method, *args, **kwargs):
-        """
-        List the tensors used in executing the method by calling the method
-        and see which parameters are connected in the backward graph
-        """
+        # List the tensors used in executing the method by calling the method
+        # and see which parameters are connected in the backward graph
+
         # get all the tensors recursively
         all_tensors, all_names = _get_tensors(self)
 
