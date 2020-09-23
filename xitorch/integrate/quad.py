@@ -29,18 +29,18 @@ def quad(
 
     Arguments
     ---------
-    * fcn: callable
+    fcn: callable
         The function to be integrated. Its output must be a tensor with
         shape (``*nout``) or list of tensors.
-    * xl: float, int or 1-element torch.Tensor
+    xl: float, int or 1-element torch.Tensor
         The lower bound of the integration.
-    * xu: float, int or 1-element torch.Tensor
+    xu: float, int or 1-element torch.Tensor
         The upper bound of the integration.
-    * params: list
+    params: list
         List of any other parameters for the function ``fcn``.
-    * bck_options: dict
+    bck_options: dict
         Options for the backward quadrature method.
-    * method: str or None
+    method: str or None
         Quadrature method.
     **fwd_options
         Method-specific options (see method section).

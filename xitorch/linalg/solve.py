@@ -37,25 +37,25 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
 
     Arguments
     ---------
-    * A: xitorch.LinearOperator
+    A: xitorch.LinearOperator
         A linear operator that takes an input ``X`` and produce the vectors in the same
         space as ``B``.
         It should have the shape of ``(*BA, na, na)``
-    * B: torch.tensor
+    B: torch.tensor
         The tensor on the right hand side with shape ``(*BB, na, ncols)``
-    * E: torch.tensor or None
+    E: torch.tensor or None
         If a tensor, it will solve :math:`\mathbf{AX-MXE = B}`.
         It will be regarded as the diagonal of the matrix.
         Otherwise, it just solves :math:`\mathbf{AX = B}` and ``M`` is ignored.
         If it is a tensor, it should have shape of ``(*BE, ncols)``.
-    * M: xitorch.LinearOperator or None
+    M: xitorch.LinearOperator or None
         The transformation on the ``E`` side. If ``E`` is ``None``,
         then this argument is ignored.
         If E is not ``None`` and ``M`` is ``None``, then ``M=I``.
         If LinearOperator, it must be Hermitian with shape ``(*BM, na, na)``.
-    * bck_options: dict
+    bck_options: dict
         Options of the iterative solver in the backward calculation.
-    * method: str or None
+    method: str or None
         Indicating the method of solve. If None, it will select ``exactsolve``.
     **fwd_options
         Method-specific options (see method below)

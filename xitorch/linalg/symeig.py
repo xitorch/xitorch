@@ -43,23 +43,23 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
 
     Arguments
     ---------
-    * A: xitorch.LinearOperator
+    A: xitorch.LinearOperator
         The linear operator object on which the eigenpairs are constructed.
         It must be a Hermitian linear operator with shape ``(*BA, q, q)``
-    * neig: int or None
+    neig: int or None
         The number of eigenpairs to be retrieved. If ``None``, all eigenpairs are
         retrieved
-    * mode: str
+    mode: str
         ``"lowest"`` or ``"uppermost"``/``"uppest"``. If ``"lowest"``,
         it will take the lowest ``neig`` eigenpairs.
         If ``"uppest"``, it will take the uppermost ``neig``.
-    * M: xitorch.LinearOperator
+    M: xitorch.LinearOperator
         The transformation on the right hand side. If ``None``, then ``M=I``.
         If specified, it must be a Hermitian with shape ``(*BM, q, q)``.
-    * bck_options: dict
+    bck_options: dict
         Method-specific options for :func:`solve` which used in backpropagation
         calculation.
-    * method: str or None
+    method: str or None
         Method for the eigendecomposition. If None, it will choose exacteig.
     **fwd_options
         Method-specific options (see method section below).

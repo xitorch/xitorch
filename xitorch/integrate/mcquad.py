@@ -21,23 +21,23 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
 
     Arguments
     ---------
-    * ffcn: Callable
+    ffcn: Callable
         The function with to be integrated. Its outputs is a tensor or a
         list of tensors. To call the function: ``ffcn(x, *fparams)``
-    * log_pfcn: Callable
+    log_pfcn: Callable
         The natural logarithm of the probability function. The output should be
         a one-element tensor. To call the function: ``log_pfcn(x, *pparams)``
-    * x0: torch.Tensor
+    x0: torch.Tensor
         Tensor with any size as the initial position.
         The call ``ffcn(x0,*fparams)`` must work.
-    * fparams: list
+    fparams: list
         List of any other parameters for ``ffcn``.
-    * pparams: list
+    pparams: list
         List of any other parameters for ``gfcn``.
-    * bck_options: dict
+    bck_options: dict
         Options for the backward mcquad operation. Unspecified fields will be
         taken from ``fwd_options``.
-    * method: str or None
+    method: str or None
         Monte Carlo quadrature method.
     **fwd_options: dict
         Method-specific options (see method section below).

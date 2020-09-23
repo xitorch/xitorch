@@ -40,15 +40,15 @@ def rootfinder(
 
     Arguments
     ---------
-    * fcn : callable
+    fcn : callable
         The function :math:`\mathbf{f}` with output tensor (``*ny``)
-    * y0 : torch.tensor
+    y0 : torch.tensor
         Initial guess of the solution with shape (``*ny``)
-    * params : list
+    params : list
         List of any other parameters to be put in ``fcn``
-    * bck_options : dict
+    bck_options : dict
         Method-specific options for the backward solve
-    * method : str or None
+    method : str or None
         Rootfinder method.
     **fwd_options
         Method-specific options (see method section)
@@ -91,15 +91,15 @@ def equilibrium(
 
     Arguments
     ---------
-    * fcn : callable
+    fcn : callable
         The function :math:`\mathbf{f}` with output tensor (``*ny``)
-    * y0 : torch.tensor
+    y0 : torch.tensor
         Initial guess of the solution with shape (``*ny``)
-    * params : list
+    params : list
         List of any other parameters to be put in ``fcn``
-    * bck_options : dict
+    bck_options : dict
         Method-specific options for the backward solve
-    * method : str or None
+    method : str or None
         Rootfinder method.
     **fwd_options
         Method-specific options (see method section)
@@ -143,15 +143,15 @@ def minimize(
 
     Arguments
     ---------
-    * fcn: callable
+    fcn: callable
         The function to be optimized with output tensor with 1 element.
-    * y0: torch.tensor
+    y0: torch.tensor
         Initial guess of the solution with shape (``*ny``)
-    * params: list
+    params: list
         List of any other parameters to be put in ``fcn``
-    * bck_options: dict
+    bck_options: dict
         Method-specific options for the backward solve.
-    * method: str or None
+    method: str or None
         Minimization method.
     **fwd_options
         Method-specific options (see method section)

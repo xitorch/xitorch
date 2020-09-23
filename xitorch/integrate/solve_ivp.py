@@ -28,25 +28,25 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
 
     Arguments
     ---------
-    * fcn: callable
+    fcn: callable
         The function that represents dy/dt. The function takes an input of a
         single time ``t`` and tensor ``y`` with shape ``(*ny)`` and
         produce :math:`\mathrm{d}\mathbf{y}/\mathrm{d}t` with shape ``(*ny)``.
         The output of the function must be a tensor with shape ``(*ny)`` or
         a list of tensors.
-    * ts: torch.tensor
+    ts: torch.tensor
         The time points where the value of `y` will be returned.
         It must be monotonically increasing or decreasing.
         It is a tensor with shape ``(nt,)``.
-    * y0: torch.tensor
+    y0: torch.tensor
         The initial value of ``y``, i.e. ``y(t[0]) == y0``.
         It is a tensor with shape ``(*ny)`` or a list of tensors.
-    * params: list
+    params: list
         List of other parameters required in the function.
-    * bck_options: dict
+    bck_options: dict
         Options for the backward solve_ivp method. If not specified, it will
         take the same options as fwd_options.
-    * method: str or None
+    method: str or None
         Initial value problem solver.
     **fwd_options
         Method-specific option (see method section below).
