@@ -1,7 +1,7 @@
 import torch
 from typing import Union, Mapping, Any
 import functools
-from xitorch.linalg.linop import LinearOperator
+from xitorch import LinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._utils.assertfuncs import assert_runtime

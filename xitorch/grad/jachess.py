@@ -1,7 +1,7 @@
 import torch
 import warnings
 from typing import Callable, List, Any, Union, Sequence
-from xitorch.linalg.linop import LinearOperator
+from xitorch import LinearOperator
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.assertfuncs import assert_type
 from xitorch._utils.misc import TensorNonTensorSeparator

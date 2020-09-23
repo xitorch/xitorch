@@ -1,5 +1,5 @@
 import torch
-from xitorch.linalg.linop import LinearOperator
+from xitorch import LinearOperator
 
 class BaseLinOp(LinearOperator):
     def __init__(self, mat, is_hermitian=False):

@@ -9,7 +9,8 @@ from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
-from xitorch.linalg.linop import LinearOperator, checklinop
+from xitorch import LinearOperator
+from xitorch._core.linop import checklinop
 from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._docstr.api_docstr import get_methods_docstr
