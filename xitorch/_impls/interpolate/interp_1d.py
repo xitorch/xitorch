@@ -62,37 +62,44 @@ class BaseInterp1D(BaseInterp):
 
 class CubicSpline1D(BaseInterp1D):
     """
-    Perform 1D cubic spline interpolation for non-uniform `x`.
+    Perform 1D cubic spline interpolation for non-uniform ``x`` [1]_ [2]_.
 
-    Options
-    -------
+    Arguments
+    ---------
     * bc_type: str or None
         Boundary condition:
-        * "natural": 2nd grad at the boundaries are 0
-        * "clamped": 1st grad at the boundaries are 0
-        If None, it will choose "natural"
+
+        * ``"natural"``: 2nd grad at the boundaries are 0
+        * ``"clamped"``: 1st grad at the boundaries are 0
+
+        If ``None``, it will choose ``"natural"``
+
     * extrap: int, float, 1-element torch.Tensor, str, or None
         Extrapolation option:
-        * int, float, or 1-element torch.Tensor: it will pad the extrapolated
+
+        * ``int``, ``float``, or 1-element ``torch.Tensor``: it will pad the extrapolated
           values with the specified values
-        * "mirror": the extrapolation values are mirrored
-        * "periodic": periodic boundary condition. y[...,0] == y[...,-1] must
+        * ``"mirror"``: the extrapolation values are mirrored
+        * ``"periodic"``: periodic boundary condition. ``y[...,0] == y[...,-1]`` must
           be fulfilled for this condition.
-        * "bound": fill in the extrapolated values with the left or right bound
+        * ``"bound"``: fill in the extrapolated values with the left or right bound
           values.
-        * "nan": fill the extrapolated values with nan
+        * ``"nan"``: fill the extrapolated values with nan
         * callable: apply this extrapolation function with the extrapolated
           positions and use the output as the values
-        * None: choose the extrapolation based on the `bc_type`. These are the
+        * ``None``: choose the extrapolation based on the ``bc_type``. These are the
           pairs:
-          * "clamped": "mirror"
-          * other: "nan"
 
-    Reference
-    ---------
-    [1] [SplineInterpolation](https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline)
-        on Wikipedia
-    [2] Carl de Boor, "A Practical Guide to Splines", Springer-Verlag, 1978.
+          * ``"clamped"``: ``"mirror"``
+          * other: ``"nan"``
+
+        Default: ``None``
+
+    References
+    ----------
+    .. [1] SplineInterpolation on Wikipedia,
+           https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline)
+    .. [2] Carl de Boor, "A Practical Guide to Splines", Springer-Verlag, 1978.
     """
     def __init__(self, x, y=None, bc_type=None, extrap=None, **unused):
         # x: (nr,)

@@ -69,7 +69,7 @@ def _method_indent(method_doc):
     # add the indentation of all part, except args
     for i,line in enumerate(lines):
         # not in arg mode
-        if i < i0_arg or i >= i1_arg:
+        if i < i0_arg or i >= i1_arg or True:
             line = indent + line
             lines[i] = line
     return "\n".join(lines)

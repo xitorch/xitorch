@@ -18,7 +18,6 @@ def broyden1(fcn, x0, params=(), **kwargs):
            "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
            Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
            https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
-
     """
     return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 

@@ -12,5 +12,8 @@
   "xitorch.linalg": [
     "solve",
     "symeig"
+  ],
+  "xitorch.interpolate": [
+    "Interp1D"
   ]
 }

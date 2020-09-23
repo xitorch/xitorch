@@ -24,6 +24,8 @@ sys.path.insert(0, os.path.abspath('../xitorch/'))
 
 # -- API docs file generators ------------------------------------------------
 import json
+import importlib
+import inspect
 
 # generate the api files
 api_dir = os.path.abspath("api")
@@ -40,7 +42,7 @@ module_api_list_indent = " "*3
 file_template = """{name}
 {underlines}
 
-.. autofunction:: {fullname}
+.. auto{function_or_class}:: {fullname}
 """
 with open(api_toc_path, "r") as f:
     api_toc = json.load(f)
@@ -62,13 +64,16 @@ for module, api_list in api_toc.items():
         )
         f.write(content)
 
+    pymod = importlib.import_module(module)
     for fn in api_list:
         fullname = module + "." + fn
+        pyfn = getattr(pymod, fn)
         fname = os.path.join(module_api_dir, fn+".rst")
         file_content = file_template.format(
             name=fn,
             fullname=fullname,
             underlines="="*len(fn),
+            function_or_class="function" if inspect.isfunction(pyfn) else "class",
         )
         with open(fname, "w") as f:
             f.write(file_content)
@@ -89,6 +94,8 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx_rtd_theme',
     'sphinx.ext.viewcode']
+
+napoleon_include_special_with_doc = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

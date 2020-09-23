@@ -10,25 +10,36 @@ class Interp1D(EditableModule):
     1D interpolation class. When initializing the class, the `x` must be
     specified and `y` can be specified during initialization or later.
 
-    __init__ arguments
-    ------------------
-    * x: torch.Tensor (nr,)
-        The position of known values
-    * y: torch.Tensor (*BY, nr) or None
-        The known values. If None, it must be supplied during __call__
-    * method: str or None
+    Arguments
+    ---------
+    x: torch.Tensor
+        The position of known values in tensor with shape ``(nr,)``
+    y: torch.Tensor or None
+        The values at the given position with shape ``(*BY, nr)``.
+        If ``None``, it must be supplied during ``__call__``
+    method: str or None
         Interpolation method
-    * **fwd_options: dict
-        The method-specific options
+    **fwd_options
+        Method-specific options (see method section below)
 
-    __call__ arguments
-    ------------------
-    * xq: torch.Tensor (nrq,)
-        The position of query points.
-    * y: torch.Tensor (*BY, nr) or None
-        The values. If `y` has been specified during __init__ and here it is
-        not None, this value of `y` will be ignored.
-        If no `y` ever specified, then it will raise an error.
+    Methods
+    -------
+    __call__
+
+        Arguments
+        ----------------
+        xq: torch.Tensor
+            The position of query points with shape ``(nrq,)``.
+        y: torch.Tensor or None
+            The values at the given position with shape ``(*BY, nr)``.
+            If ``y`` has been specified during ``__init__`` and also
+            specified here, the value of ``y`` given here will be ignored.
+            If no ``y`` ever specified, then it will raise an error.
+
+        Returns
+        -------
+        torch.Tensor
+            The interpolated values with shape ``(*BY, nrq)``.
     """
     def __init__(self, x, y=None, method=None, **fwd_options):
         if method is None:
