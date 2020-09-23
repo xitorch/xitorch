@@ -24,7 +24,7 @@ class Interp1D(EditableModule):
 
     Methods
     -------
-    __call__
+    __call__(self, xq, y=None)
 
         Arguments
         ----------------
