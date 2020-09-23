@@ -136,15 +136,6 @@ def make_sibling(pfunc):
     behaves differently.
     Changing the state of the decorated function will also change the state of
     ``pfunc`` and its other siblings.
-
-    Example
-    -------
-    >>> @make_sibling(pfunc)
-    >>> def newpfunc(x, *params):
-    ...     return x - pfunc(x, *params)
-    ...
-    >>> with newpfunc.useobjparams(objparams): # changes the state of pfunc as well
-    ...    ...
     """
     if not isinstance(pfunc, PureFunction):
         pfunc = _get_pure_function(pfunc)
