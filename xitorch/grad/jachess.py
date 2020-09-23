@@ -162,7 +162,7 @@ class _Jac(LinearOperator):
         nbatch = gy1.shape[0]
         dfdyfs = []
         for i in range(nbatch):
-            dfdyf, = torch.autograd.grad(dfdy, (v,), grad_outputs=gy1[i].reshape(*self.inshape),
+            dfdyf, = torch.autograd.grad(dfdy, (v,), grad_outputs=gy1[i].reshape(self.inshape),
                 retain_graph=True, create_graph=torch.is_grad_enabled()) # (*nout)
             dfdyfs.append(dfdyf.unsqueeze(0))
         dfdyfs = torch.cat(dfdyfs, dim=0) # (nbatch, *nout)
@@ -187,7 +187,7 @@ class _Jac(LinearOperator):
         nbatch = gout1.shape[0]
         dfdy = []
         for i in range(nbatch):
-            one_dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=gout1[i].reshape(*self.outshape),
+            one_dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=gout1[i].reshape(self.outshape),
                 retain_graph=True, create_graph=torch.is_grad_enabled()) # (*nin)
             dfdy.append(one_dfdy.unsqueeze(0))
         dfdy = torch.cat(dfdy, dim=0) # (nbatch, *nin)
