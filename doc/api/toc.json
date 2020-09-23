@@ -1,7 +1,8 @@
 {
   "xitorch": [
     "EditableModule",
-    "LinearOperator"
+    "LinearOperator",
+    "make_sibling"
   ],
   "xitorch.optimize": [
     "rootfinder",

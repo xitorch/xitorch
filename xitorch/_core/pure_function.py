@@ -131,33 +131,46 @@ class FunctionPureFunction(PureFunction):
 def make_sibling(pfunc):
     """
     Used as a decor to mark the decorated function as a sibling method of the
-    input `pfunc`.
+    input ``pfunc``.
     Sibling method is a method that is virtually belong to the same object, but
     behaves differently.
     Changing the state of the decorated function will also change the state of
-    `pfunc` and its other siblings.
+    ``pfunc`` and its other siblings.
 
     Example
     -------
-    @make_sibling(pfunc)
-    def newpfunc(x, *params):
-        return x - pfunc(x, *params)
-
-    with newpfunc.useobjparams(objparams): # changes the state of pfunc as well
-        ...
+    >>> @make_sibling(pfunc)
+    >>> def newpfunc(x, *params):
+    ...     return x - pfunc(x, *params)
+    ...
+    >>> with newpfunc.useobjparams(objparams): # changes the state of pfunc as well
+    ...    ...
     """
     if not isinstance(pfunc, PureFunction):
-        pfunc = get_pure_function(pfunc)
+        pfunc = _get_pure_function(pfunc)
     def decor(fcn):
-        new_pfunc = get_pure_function(pfunc.fcn, fcntocall=fcn)
+        new_pfunc = _get_pure_function(pfunc.fcn, fcntocall=fcn)
         return new_pfunc
     return decor
 
-def get_pure_function(fcn, fcntocall=None):
+def get_pure_function(fcn):
     """
-    Get the pure function form of the fcn
-    """
+    Get the pure function form of the function or method ``fcn``.
 
+    Arguments
+    ---------
+    fcn: function or method
+        Function or method to be converted into a ``PureFunction`` by exposing
+        the hidden parameters affecting its outputs.
+
+    Returns
+    -------
+    PureFunction
+        The pure function wrapper
+    """
+    return _get_pure_function(fcn)
+
+def _get_pure_function(fcn, fcntocall=None):
     if not inspect.ismethod(fcn) and not inspect.isfunction(fcn) and not isinstance(fcn, PureFunction):
         if hasattr(fcn, "__call__"):
             fcn = fcn.__call__
