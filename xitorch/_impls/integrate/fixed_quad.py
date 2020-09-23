@@ -9,7 +9,7 @@ def leggauss(fcn, xl, xu, params, n=100, **unused):
 
     Arguments
     ---------
-    * n: int
+    n: int
         The number of integration points.
     """
     xlg, wlg = np.polynomial.legendre.leggauss(n)

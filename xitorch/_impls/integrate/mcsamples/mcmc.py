@@ -48,11 +48,11 @@ def mhcustom(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, custom_step=No
 
     Arguments
     --------
-    * nsamples: int
+    nsamples: int
         The number of samples to be collected
-    * nburnout: int
+    nburnout: int
         The number of initial steps to be performed before collecting samples
-    * custom_step: callable
+    custom_step: callable
         Callable with call signature `custom_step(x, *pparams)` to produce the
         next samples (already decided whether to accept or not)
     """

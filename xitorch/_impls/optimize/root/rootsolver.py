@@ -34,24 +34,24 @@ def _nonlin_solver(fcn, x0, params, method,
     """
     Arguments
     ---------
-    * alpha: float or None
+    alpha: float or None
         The initial inverse Jacobian is ``-1/alpha``
-    * max_rank: int or None
+    max_rank: int or None
         The maximum rank of inverse Jacobian approximation. If ``None``, it
         is ``inf``.
-    * maxiter: int or None
+    maxiter: int or None
         Maximum number of iterations, or inf if it is set to None.
-    * f_tol: float or None
+    f_tol: float or None
         The absolute tolerance of the norm of the output ``f``.
-    * f_rtol: float or None
+    f_rtol: float or None
         The relative tolerance of the norm of the output ``f``.
-    * x_tol: float or None
+    x_tol: float or None
         The absolute tolerance of the norm of the input ``x``.
-    * x_rtol: float or None
+    x_rtol: float or None
         The relative tolerance of the norm of the input ``x``.
-    * line_search: bool or str
+    line_search: bool or str
         Options to perform line search. If ``True``, it is set to ``"armijo"``.
-    * verbose: bool
+    verbose: bool
         Options for verbosity
     """
 

@@ -66,7 +66,7 @@ class CubicSpline1D(BaseInterp1D):
 
     Arguments
     ---------
-    * bc_type: str or None
+    bc_type: str or None
         Boundary condition:
 
         * ``"natural"``: 2nd grad at the boundaries are 0
@@ -74,7 +74,7 @@ class CubicSpline1D(BaseInterp1D):
 
         If ``None``, it will choose ``"natural"``
 
-    * extrap: int, float, 1-element torch.Tensor, str, or None
+    extrap: int, float, 1-element torch.Tensor, str, or None
         Extrapolation option:
 
         * ``int``, ``float``, or 1-element ``torch.Tensor``: it will pad the extrapolated
@@ -229,14 +229,14 @@ def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
 
     Arguments
     ---------
-    * x: torch.Tensor with shape (*BX, nr)
+    x: torch.Tensor with shape (*BX, nr)
         The x-position of the data
-    * bc_type: str
+    bc_type: str
         The boundary condition
 
     Returns
     -------
-    * mat: torch.Tensor with shape (*BX, nr, nr)
+    mat: torch.Tensor with shape (*BX, nr, nr)
         The inverse of spline matrix.
     """
     nr = x.shape[-1]
