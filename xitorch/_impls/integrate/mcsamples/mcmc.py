@@ -46,8 +46,8 @@ def mhcustom(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, custom_step=No
     """
     Perform Metropolis sampling using custom_step
 
-    Arguments
-    --------
+    Keyword arguments
+    -----------------
     nsamples: int
         The number of samples to be collected
     nburnout: int

@@ -32,8 +32,8 @@ def _nonlin_solver(fcn, x0, params, method,
         verbose=False,
         **unused):
     """
-    Arguments
-    ---------
+    Keyword arguments
+    -----------------
     alpha: float or None
         The initial inverse Jacobian is ``-1/alpha``
     max_rank: int or None

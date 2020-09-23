@@ -64,8 +64,8 @@ class CubicSpline1D(BaseInterp1D):
     """
     Perform 1D cubic spline interpolation for non-uniform ``x`` [1]_ [2]_.
 
-    Arguments
-    ---------
+    Keyword arguments
+    -----------------
     bc_type: str or None
         Boundary condition:
 

@@ -7,8 +7,8 @@ def leggauss(fcn, xl, xu, params, n=100, **unused):
     """
     Performing 1D integration using Legendre-Gaussian quadrature
 
-    Arguments
-    ---------
+    Keyword arguments
+    -----------------
     n: int
         The number of integration points.
     """
