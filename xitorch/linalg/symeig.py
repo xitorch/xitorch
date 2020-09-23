@@ -8,6 +8,7 @@ from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.bcast import get_bcasted_dims
 from xitorch._utils.misc import set_default_option, dummy_context_manager
 from xitorch._utils.tensor import tallqr, to_fortran_order, ortho
+from xitorch._docstr.api_docstr import get_methods_docstr
 
 __all__ = ["lsymeig", "usymeig", "symeig"]
 
@@ -30,35 +31,45 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         method:Union[str,None]=None,
         **fwd_options):
     """
-    Obtain `neig` lowest eigenvalues and eigenvectors of a linear operator.
-    If M is specified, it solve the eigendecomposition Ax = eMx.
+    Obtain ``neig`` lowest eigenvalues and eigenvectors of a linear operator,
+
+    .. math::
+
+        \mathbf{AX = MXE}
+
+    where :math:`\mathbf{A}, \mathbf{M}` are linear operators,
+    :math:`\mathbf{E}` is a diagonal matrix containing the eigenvalues, and
+    :math:`\mathbf{X}` is a matrix containing the eigenvectors.
 
     Arguments
     ---------
-    * A: xitorch.LinearOperator hermitian instance with shape (*BA, q, q)
-        The linear module object on which the eigenpairs are constructed.
+    * A: xitorch.LinearOperator
+        The linear operator object on which the eigenpairs are constructed.
+        It must be a Hermitian linear operator with shape ``(*BA, q, q)``
     * neig: int or None
-        The number of eigenpairs to be retrieved. If None, all eigenpairs are
+        The number of eigenpairs to be retrieved. If ``None``, all eigenpairs are
         retrieved
     * mode: str
-        "lowest" or "uppermost"/"uppest". If "lowest", it will take the lowest
-        `neig` eigenpairs. If "uppest", it will take the uppermost `neig`.
-    * M: xitorch.LinearOperator hermitian instance with shape (*BM, q, q) or None
-        The transformation on the right hand side. If None, then M=I.
-    * bck_options: dict with str as key
-        Conjugate gradient options to calculate the gradient in
-        backpropagation calculation.
+        ``"lowest"`` or ``"uppermost"``/``"uppest"``. If ``"lowest"``,
+        it will take the lowest ``neig`` eigenpairs.
+        If ``"uppest"``, it will take the uppermost ``neig``.
+    * M: xitorch.LinearOperator
+        The transformation on the right hand side. If ``None``, then ``M=I``.
+        If specified, it must be a Hermitian with shape ``(*BM, q, q)``.
+    * bck_options: dict
+        Method-specific options for :func:`solve` which used in backpropagation
+        calculation.
     * method: str or None
         Method for the eigendecomposition. If None, it will choose exacteig.
-    * **fwd_options: dict with str as key
-        Eigendecomposition iterative algorithm options.
+    **fwd_options
+        Method-specific options (see method section below).
 
     Returns
     -------
-    * eigvals: (*BAM, neig)
-    * eigvecs: (*BAM, na, neig)
-        The lowest eigenvalues and eigenvectors, where *BAM are the broadcasted
-        shape of *BA and *BM.
+    tuple of tensors
+        It will return eigenvalues and eigenvectors with shapes respectively
+        ``(*BAM, neig)`` and ``(*BAM, na, neig)``, where ``*BAM`` is the
+        broadcasted shape of ``*BA`` and ``*BM``.
     """
     assert_runtime(A.is_hermitian, "The linear operator A must be Hermitian")
     if M is not None:
@@ -90,6 +101,15 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
 
 def exacteig(A:LinearOperator, neig:Union[int,None],
         mode:str, M:Union[LinearOperator,None]):
+    """
+    Eigendecomposition using explicit matrix construction.
+    No additional option for this method.
+
+    Notes
+    -----
+    * As this method construct the linear operators explicitly, it might requires
+      a large memory.
+    """
     Amatrix = A.fullmatrix() # (*BA, q, q)
     if neig is None:
         neig = A.shape[-1]
@@ -217,33 +237,12 @@ def custom_exacteig(A, params, neig, mode, M=None, mparams=[], **options):
 
 def davidson(A, params, neig, mode, M=None, mparams=[], **options):
     """
-    Iterative methods to obtain the `neig` lowest eigenvalues and eigenvectors.
-    This function is written so that the backpropagation can be done.
-    It solves the eigendecomposition AV = VME where V are the matrix of eigenvectors,
-    and E are the diagonal matrix consists of the eigenvalues.
+    Using Davidson method for large sparse matrix eigendecomposition [1]_.
 
-    Arguments
-    ---------
-    * A: LinearOperator instance (*BA, na, na)
-        The linear operator object on which the eigenpairs are constructed.
-    * params: list of differentiable torch.tensor of any shapes
-        List of differentiable torch.tensor to be put to A.
-    * neig: int
-        The number of eigenpairs to be retrieved.
-    * mode: str
-        Take the `neig` "lowest" or "uppest" of the eigenpairs.
-    * M: LinearOperator instance (*BM, na, na) or None
-        The transformation on the right hand side. If None, then M=I.
-    * mparams: list of differentiable torch.tensor of any shapes
-        List of differentiable torch.tensor to be put to M.
-    * **options:
-        Iterative algorithm options.
-
-    Returns
-    -------
-    * eigvals: torch.tensor (*BAM, neig)
-    * eigvecs: torch.tensor (*BAM, na, neig)
-        The `neig` lowest eigenpairs
+    References
+    ----------
+    .. [1] P. Arbenz, "Lecture Notes on Solving Large Scale Eigenvalue Problems"
+           http://people.inf.ethz.ch/arbenz/ewp/Lnotes/chapter12.pdf
     """
     # TODO: optimize for large linear operator and strict min_eps
     # Ideas:
@@ -428,3 +427,10 @@ def _take_eigpairs(eival, eivec, neig, mode):
         eival = eival[...,-neig:]
         eivec = eivec[...,-neig:]
     return eival, eivec
+
+# docstring completion
+_symeig_methods = {
+    "exacteig": exacteig,
+    "davidson": davidson,
+}
+symeig.__doc__ = get_methods_docstr(symeig, _symeig_methods)
