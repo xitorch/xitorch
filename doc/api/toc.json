@@ -8,5 +8,8 @@
     "quad",
     "solve_ivp",
     "mcquad"
+  ],
+  "xitorch.linalg": [
+    "solve"
   ]
 }

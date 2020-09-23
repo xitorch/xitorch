@@ -11,6 +11,7 @@ Welcome to xitorch's documentation!
 
    api/xitorch_optimize/index
    api/xitorch_integrate/index
+   api/xitorch_linalg/index
 
 
 Indices and tables

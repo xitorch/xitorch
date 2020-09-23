@@ -8,6 +8,7 @@ from xitorch._impls.optimize.rootfinder import lbfgs, broyden
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.misc import set_default_option, dummy_context_manager
+from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
@@ -16,32 +17,48 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           method=None,
           **fwd_options):
     """
-    Performing iterative method to solve the equation AX=B or
-    AX-MXE=B, where E is a diagonal matrix.
+    Performing iterative method to solve the equation
+
+    .. math::
+
+        \mathbf{AX=B}
+
+    or
+
+    .. math::
+
+        \mathbf{AX-MXE=B}
+
+    where :math:`\mathbf{E}` is a diagonal matrix.
     This function can also solve batched multiple inverse equation at the
-    same time by applying A to a tensor X with shape (...,na,ncols).
-    The applied E are not necessarily identical for each column.
+    same time by applying :math:`\mathbf{A}` to a tensor :math:`\mathbf{X}`
+    with shape ``(...,na,ncols)``.
+    The applied :math:`\mathbf{E}` are not necessarily identical for each column.
 
     Arguments
     ---------
-    * A: xitorch.LinearOperator instance with shape (*BA, na, na)
-        A function that takes an input X and produce the vectors in the same
-        space as B.
-    * B: torch.tensor (*BB, na, ncols)
-        The tensor on the right hand side.
-    * E: torch.tensor (*BE, ncols) or None
-        If not None, it will solve AX-MXE = B. Otherwise, it just solves
-        AX = B and M is ignored. E would be applied to every column.
-    * M: xitorch.LinearOperator instance (*BM, na, na) or None
-        The transformation on the E side. If E is None,
-        then this argument is ignored. I E is not None and M is None, then M=I.
-        This LinearOperator must be Hermitian.
+    * A: xitorch.LinearOperator
+        A linear operator that takes an input ``X`` and produce the vectors in the same
+        space as ``B``.
+        It should have the shape of ``(*BA, na, na)``
+    * B: torch.tensor
+        The tensor on the right hand side with shape ``(*BB, na, ncols)``
+    * E: torch.tensor or None
+        If a tensor, it will solve :math:`\mathbf{AX-MXE = B}`.
+        It will be regarded as the diagonal of the matrix.
+        Otherwise, it just solves :math:`\mathbf{AX = B}` and ``M`` is ignored.
+        If it is a tensor, it should have shape of ``(*BE, ncols)``.
+    * M: xitorch.LinearOperator or None
+        The transformation on the ``E`` side. If ``E`` is ``None``,
+        then this argument is ignored.
+        If E is not ``None`` and ``M`` is ``None``, then ``M=I``.
+        If LinearOperator, it must be Hermitian with shape ``(*BM, na, na)``.
     * bck_options: dict
-        Options of the iterative solver in the backward calculation
+        Options of the iterative solver in the backward calculation.
     * method: str or None
-        Indicating the method of solve. If None, it will select "exactsolve".
-    * **fwd_options: dict
-        Options of the iterative solver in the forward calculation
+        Indicating the method of solve. If None, it will select ``exactsolve``.
+    **fwd_options
+        Method-specific options (see method below)
     """
     assert_runtime(A.shape[-1] == A.shape[-2], "The linear operator A must have a square shape")
     assert_runtime(A.shape[-1] == B.shape[-2], "Mismatch shape of A & B (A: %s, B: %s)" % (A.shape, B.shape))
@@ -302,3 +319,10 @@ def _get_batchdims(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None],
         if M is not None:
             batchdims.append(M.shape[:-2])
     return get_bcasted_dims(*batchdims)
+
+# docstring completion
+_solve_methods = {
+    "exactsolve": exactsolve,
+    "gmres": wrap_gmres
+}
+solve.__doc__ = get_methods_docstr(solve, _solve_methods)
