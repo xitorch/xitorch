@@ -8,23 +8,24 @@ xitorch: differentiable scientific computing library
 
 xitorch (pronounced "sigh-torch") is a library based on PyTorch that provides
 operations and functionals for scientific computing and deep learning.
+It is inspired by SciPy, a popular library for scientific library.
 
-Requirements
-------------
+.. toctree::
+   :maxdepth: 1
+   :caption: Notes
 
-* python >= 3.6
-* pytorch >= 1.6 (install `here <https://pytorch.org/>`_)
+   notes/installation
+   notes/getstart
 
-Installation
-------------
+.. toctree::
+   :maxdepth: 1
+   :caption: Modules
 
-In your terminal, type:
-
-.. code-block::
-
-    git clone https://github.com/mfkasim91/xitorch
-    cd xitorch
-    pip install -e .
+   api/xitorch/index
+   api/xitorch_optimize/index
+   api/xitorch_integrate/index
+   api/xitorch_linalg/index
+   api/xitorch_interpolate/index
 
 Example of use
 --------------
@@ -47,16 +48,6 @@ Example of use
     >>> d2xda2, = torch.autograd.grad(dxda[0], (a,)) # second derivative
     >>> print(d2xda2)
     tensor([0.0293, 0.0430, 0.0547])
-
-
-Table of content
-================
-
-.. toctree::
-   :maxdepth: 2
-
-   api/index
-
 
 Indices and tables
 ==================
