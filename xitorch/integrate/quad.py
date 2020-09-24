@@ -31,7 +31,7 @@ def quad(
     ---------
     fcn: callable
         The function to be integrated. Its output must be a tensor with
-        shape (``*nout``) or list of tensors.
+        shape ``(*nout)`` or list of tensors.
     xl: float, int or 1-element torch.Tensor
         The lower bound of the integration.
     xu: float, int or 1-element torch.Tensor
@@ -48,7 +48,7 @@ def quad(
     Returns
     -------
     torch.tensor
-        The quadrature results with shape (``*nout``) or list of tensors.
+        The quadrature results with shape ``(*nout)`` or list of tensors.
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():

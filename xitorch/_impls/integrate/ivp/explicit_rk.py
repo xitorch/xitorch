@@ -85,6 +85,9 @@ def rk38_ivp(fcn, t, y0, params, **kwargs):
 
 # explicit rk4 implementation to speed up
 def rk4_ivp(fcn, t, y0, params, **kwargs):
+    """
+    Perform the Runge-Kutta steps of order 4 with a fixed step size.
+    """
     dtype = t.dtype
     device = t.device
     nt = torch.numel(t)

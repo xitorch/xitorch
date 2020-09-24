@@ -24,7 +24,7 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
 
     .. math::
 
-        \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t_1} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'
+        \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'
 
     Arguments
     ---------

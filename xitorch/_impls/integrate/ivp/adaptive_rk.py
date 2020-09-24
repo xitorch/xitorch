@@ -1,4 +1,5 @@
 import torch
+import functools
 
 __all__ = ["rk23_adaptive", "rk45_adaptive"]
 
@@ -25,9 +26,9 @@ class RKAdaptiveStepSolver(object):
     n_stages = None
     error_estimator_order = None
 
-    def __init__(self, atol=None, rtol=None):
-        self.atol = atol if atol is not None else 1e-8
-        self.rtol = rtol if rtol is not None else 1e-5
+    def __init__(self, atol, rtol):
+        self.atol = atol
+        self.rtol = rtol
         self.max_factor = 10
         self.min_factor = 0.2
         self.step_mult = 0.9
@@ -148,13 +149,33 @@ class RK45(RKAdaptiveStepSolver):
     E = torch.tensor([-71/57600, 0, 71/16695, -71/1920, 17253/339200, -22/525,
                       1/40], dtype=torch.float64)
 
-def _rk_adaptive(fcn, ts, y0, params, cls, atol=None, rtol=None, **unused):
+def _rk_adaptive(fcn, ts, y0, params, cls, atol=1e-8, rtol=1e-5, **unused):
+    """
+    Keyword arguments
+    -----------------
+    atol: float
+        The absolute error tolerance in deciding the steps
+    rtol: float
+        The relative error tolerance in deciding the steps
+    """
     solver = cls(atol=atol, rtol=rtol)
     solver.setup(fcn, ts, y0, params)
     return solver.solve()
 
+@functools.wraps(_rk_adaptive, assigned='__annotations__')
 def rk23_adaptive(fcn, ts, y0, params, **kwargs):
+    """
+    Perform the adaptive Runge-Kutta steps with order 2 and 3.
+    """
     return _rk_adaptive(fcn, ts, y0, params, RK23, **kwargs)
 
+@functools.wraps(_rk_adaptive, assigned='__annotations__')
 def rk45_adaptive(fcn, ts, y0, params, **kwargs):
+    """
+    Perform the adaptive Runge-Kutta steps with order 4 and 5.
+    """
     return _rk_adaptive(fcn, ts, y0, params, RK45, **kwargs)
+
+# complete the docstring
+rk23_adaptive.__doc__ += _rk_adaptive.__doc__
+rk45_adaptive.__doc__ += _rk_adaptive.__doc__

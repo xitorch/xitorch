@@ -41,9 +41,9 @@ def rootfinder(
     Arguments
     ---------
     fcn : callable
-        The function :math:`\mathbf{f}` with output tensor (``*ny``)
+        The function :math:`\mathbf{f}` with output tensor ``(*ny)``
     y0 : torch.tensor
-        Initial guess of the solution with shape (``*ny``)
+        Initial guess of the solution with shape ``(*ny)``
     params : list
         List of any other parameters to be put in ``fcn``
     bck_options : dict
@@ -58,7 +58,7 @@ def rootfinder(
     torch.tensor
         The solution which satisfies
         :math:`\mathbf{0} = \mathbf{f}(\mathbf{y},\\theta)`
-        with shape (``*ny``)
+        with shape ``(*ny)``
 
     """
     # perform implementation check if debug mode is enabled
@@ -92,9 +92,9 @@ def equilibrium(
     Arguments
     ---------
     fcn : callable
-        The function :math:`\mathbf{f}` with output tensor (``*ny``)
+        The function :math:`\mathbf{f}` with output tensor ``(*ny)``
     y0 : torch.tensor
-        Initial guess of the solution with shape (``*ny``)
+        Initial guess of the solution with shape ``(*ny)``
     params : list
         List of any other parameters to be put in ``fcn``
     bck_options : dict
@@ -109,7 +109,7 @@ def equilibrium(
     torch.tensor
         The solution which satisfies
         :math:`\mathbf{y} = \mathbf{f}(\mathbf{y},\\theta)`
-        with shape (``*ny``)
+        with shape ``(*ny)``
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
@@ -146,7 +146,7 @@ def minimize(
     fcn: callable
         The function to be optimized with output tensor with 1 element.
     y0: torch.tensor
-        Initial guess of the solution with shape (``*ny``)
+        Initial guess of the solution with shape ``(*ny)``
     params: list
         List of any other parameters to be put in ``fcn``
     bck_options: dict
@@ -159,7 +159,7 @@ def minimize(
     Returns
     -------
     torch.tensor
-        The solution of the minimization with shape (``*ny``)
+        The solution of the minimization with shape ``(*ny)``
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():

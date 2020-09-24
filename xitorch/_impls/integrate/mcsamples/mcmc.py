@@ -4,6 +4,18 @@ import numpy as np
 
 ################### metropolis hastings ###################
 def mh(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, step_size=1.0, **unused):
+    """
+    Perform Metropolis-Hasting steps to collect samples
+
+    Keyword arguments
+    -----------------
+    nsamples: int
+        The number of samples to be collected
+    nburnout: int
+        The number of initial steps to be performed before collecting samples
+    step_size: float
+        The size of the steps to be taken
+    """
     x, dtype, device = _mh_sample(logpfcn, x0, pparams, nburnout, step_size, False)
     samples = _mh_sample(logpfcn, x, pparams, nsamples, step_size, True)
     weights = torch.zeros((samples.shape[0],), dtype=dtype, device=device) + (1./samples.shape[0])
@@ -52,9 +64,10 @@ def mhcustom(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, custom_step=No
         The number of samples to be collected
     nburnout: int
         The number of initial steps to be performed before collecting samples
-    custom_step: callable
-        Callable with call signature `custom_step(x, *pparams)` to produce the
-        next samples (already decided whether to accept or not)
+    custom_step: callable or None
+        Callable with call signature ``custom_step(x, *pparams)`` to produce the
+        next samples (already decided whether to accept or not).
+        This argument is **required**. If ``None``, it will raise an error
     """
     if custom_step is None:
         raise RuntimeError("custom_step must be specified for mhcustom method")
