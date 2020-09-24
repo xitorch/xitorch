@@ -200,6 +200,7 @@ class EditableModule(object):
               A.assertparams(A.mult, x) # doctest:+ELLIPSIS
             <doctest assertparams[4]>:1: UserWarning: getparams for AClass.mult has excess parameters: a
               A.assertparams(A.mult, x) # doctest:+ELLIPSIS
+            "mult" method check done
         """
         # check the method input
         if not inspect.ismethod(method):
@@ -213,6 +214,7 @@ class EditableModule(object):
         self.__assert_method_preserve(method, *args, **kwargs) # assert if the method preserve the float tensors of the object
         self.__assert_match_getsetparams(methodname) # check if getparams and setparams matched the tensors
         self.__assert_get_correct_params(method, *args, **kwargs) # check if getparams returns the correct tensors
+        print('"%s" method check done' % methodname)
 
     def __assert_method_preserve(self, method, *args, **kwargs):
         # this method assert if method does not change the float tensor parameters

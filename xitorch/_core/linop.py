@@ -411,6 +411,7 @@ class LinearOperator(EditableModule):
             msg = "The linear operator check is performed. This might slow down your program."
             warnings.warn(msg, stacklevel=2)
         checklinop(self)
+        print("Check linear operator done")
 
     ############ private functions #################
     def __check_if_implemented(self, methodname:str) -> bool:
