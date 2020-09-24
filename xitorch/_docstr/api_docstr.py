@@ -26,9 +26,14 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
     method_template = """
     Methods
     -------
-    ({kwargs_sig})
+    method="{name}"
+
+        .. code-block:: python
+
+            {mainname}(..., {kwargs_sig})
     """
     res = cls_or_func.__doc__
+    mainname = cls_or_func.__name__
 
     def_ignore_kwargs = ["params"]
     if ignore_kwargs is None:
@@ -46,12 +51,14 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
         # get the signatures
         sigparams = inspect.signature(method).parameters
         kwargs_sig_list = ['method="%s"'%name] + \
-            ["%s=%s"%(name,val) for name,val in _get_default_parameters(sigparams, ignore_kwargs)]
+            ["%s=%s"%(pname,val) for pname,val in _get_default_parameters(sigparams, ignore_kwargs)]
         kwargs_sig = ", ".join(kwargs_sig_list)
 
         # add the method name
         methoddoc = method.__doc__
         res = res + method_template.format(
+            mainname=mainname,
+            name=name,
             kwargs_sig=kwargs_sig,
         )
         if methoddoc is not None:

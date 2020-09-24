@@ -2,24 +2,10 @@
 # and converted to PyTorch for GPU efficiency
 
 import torch
+import functools
 from xitorch._impls.optimize.root._jacobian import BroydenFirst
 
 __all__ = ["broyden1"]
-
-def broyden1(fcn, x0, params=(), **kwargs):
-    """
-    Solve the root finder using the first Broyden method [1]_.
-    It can be used to solve minimization by finding the root of the
-    function's gradient.
-
-    References
-    ----------
-    .. [1] B.A. van der Rotten, PhD thesis,
-           "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
-           Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
-           https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
-    """
-    return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 
 def _nonlin_solver(fcn, x0, params, method,
         # jacobian parameters
@@ -128,6 +114,22 @@ def _nonlin_solver(fcn, x0, params, method,
         x = xnew
         y = ynew
     return x.reshape(xshape)
+
+@functools.wraps(_nonlin_solver, assigned=('__annotations__',)) # takes only the signature
+def broyden1(fcn, x0, params=(), **kwargs):
+    """
+    Solve the root finder using the first Broyden method [1]_.
+    It can be used to solve minimization by finding the root of the
+    function's gradient.
+
+    References
+    ----------
+    .. [1] B.A. van der Rotten, PhD thesis,
+           "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
+           Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
+           https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
+    """
+    return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 
 # set the docstring of the functions
 broyden1.__doc__ += _nonlin_solver.__doc__
