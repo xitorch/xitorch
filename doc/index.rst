@@ -19,6 +19,7 @@ It is inspired by SciPy, a popular Python library for scientific computing.
 
    getstart/installation
    getstart/functional
+   getstart/linearop
 
 .. toctree::
    :maxdepth: 1
@@ -29,28 +30,6 @@ It is inspired by SciPy, a popular Python library for scientific computing.
    api/xitorch_integrate/index
    api/xitorch_linalg/index
    api/xitorch_interpolate/index
-
-Example of use
---------------
-
-.. doctest::
-
-    >>> import torch
-    >>> from xitorch.optimize import rootfinder
-    >>> def func1(x, a):
-    ...     return a[0]*x*x + a[1]*x + a[2]
-    ...
-    >>> a = torch.tensor([1.0, 3.0, -1.75], requires_grad=True)
-    >>> x0 = torch.tensor(0.5)
-    >>> xroot = rootfinder(func1, x0, params=(a,))
-    >>> print(xroot)
-    tensor(0.5000, grad_fn=<_RootFinderBackward>)
-    >>> dxda, = torch.autograd.grad(xroot, (a,), create_graph=True) # first derivative
-    >>> print(dxda)
-    tensor([-0.0625, -0.1250, -0.2500], grad_fn=<AddBackward0>)
-    >>> d2xda2, = torch.autograd.grad(dxda[0], (a,)) # second derivative
-    >>> print(d2xda2)
-    tensor([0.0293, 0.0430, 0.0547])
 
 Indices and tables
 ==================
