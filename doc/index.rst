@@ -7,15 +7,18 @@ xitorch: differentiable scientific computing library
 ===========================================================
 
 xitorch (pronounced "sigh-torch") is a library based on PyTorch that provides
-operations and functionals for scientific computing and deep learning.
-It is inspired by SciPy, a popular library for scientific library.
+differentiable operations and functionals for scientific computing and deep
+learning.
+xitorch provides analytic first and higher order derivatives automatically
+using PyTorch's autograd engine.
+It is inspired by SciPy, a popular Python library for scientific computing.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Notes
+   :caption: Getting started
 
-   notes/installation
-   notes/getstart
+   getstart/installation
+   getstart/functional
 
 .. toctree::
    :maxdepth: 1
