@@ -3,6 +3,5 @@
 This directory is dedicated for implementation of the forward models.
 To add a new implementation here, please follow the rules:
 
-* **Avoid dependency** outside the `_impls` directory (only `torch` and `numpy` are acceptable)
 * All functions in the functional input are assumed to produce a single output tensor (so no need to use `torch.cat`)
 * The input arguments for the functions (in the functional input) should be made as another argument in the functional
