@@ -158,7 +158,56 @@ class EditableModule(object):
         arguments.
         It raises warnings if there are missing or excess parameters in the
         ``getparamnames`` implementation.
+
+        Arguments
+        ---------
+        method: callable method
+            The method of this class to be tested
+        *args:
+            Arguments of the method
+        **kwargs:
+            Keyword arguments of the method
+
+        Example
+        -------
+        .. testsetup:: assertparams
+
+            import torch
+            import xitorch
+            import sys
+            sys.stderr = sys.stdout
+
+        .. doctest:: assertparams
+
+            >>> class AClass(xitorch.EditableModule):
+            ...     def __init__(self, a):
+            ...         self.a = a
+            ...         self.b = a*a
+            ...
+            ...     def mult(self, x):
+            ...         return self.b * x
+            ...
+            ...     def getparamnames(self, methodname, prefix=""):
+            ...         if methodname == "mult":
+            ...             return [prefix+"a"]  # intentionally wrong
+            ...         else:
+            ...             raise KeyError()
+            >>> a = torch.tensor(2.0).requires_grad_()
+            >>> x = torch.tensor(0.4).requires_grad_()
+            >>> A = AClass(a)
+            >>> A.assertparams(A.mult, x) # doctest:+ELLIPSIS
+            <doctest assertparams[4]>:1: UserWarning: getparams for AClass.mult does not include: b
+              A.assertparams(A.mult, x) # doctest:+ELLIPSIS
+            <doctest assertparams[4]>:1: UserWarning: getparams for AClass.mult has excess parameters: a
+              A.assertparams(A.mult, x) # doctest:+ELLIPSIS
         """
+        # check the method input
+        if not inspect.ismethod(method):
+            raise TypeError("The input method must be a method")
+        methodself = method.__self__
+        if methodself is not self:
+            raise RuntimeError("The method does not belong to the same instance")
+
         methodname = method.__name__
 
         self.__assert_method_preserve(method, *args, **kwargs) # assert if the method preserve the float tensors of the object
@@ -249,7 +298,7 @@ class EditableModule(object):
         # are never set to require grad)
         if len(missing_names) > 0:
             msg = "getparams for %s.%s does not include: %s" % (clsname, methodname, ", ".join(missing_names))
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=3)
 
         # check if there are excessive parameters (present in the user params, but not in the operating params)
         excess_names = []
@@ -261,7 +310,7 @@ class EditableModule(object):
         if len(excess_names) > 0:
             msg = "getparams for %s.%s has excess parameters: %s" % \
                 (clsname, methodname, ", ".join(excess_names))
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=3)
 
     def __list_operating_params(self, method, *args, **kwargs):
         # List the tensors used in executing the method by calling the method
