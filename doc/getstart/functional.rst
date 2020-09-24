@@ -19,7 +19,11 @@ Pure function as input
 ----------------------
 
 Let's say we want to find :math:`\mathbf{x}` that is a root of the equation
-:math:`\mathbf{0}=\mathrm{tanh}(\mathbf{Ax+b}) + \mathbf{x}/2`,
+
+.. math::
+
+    \mathbf{0}=\mathrm{tanh}(\mathbf{A}\mathbf{x+b}) + \mathbf{x}/2
+
 where :math:`\mathbf{x}` and :math:`\mathbf{b}` are vectors of size :math:`n\times 1`,
 and :math:`\mathbf{A}` is a matrix of size :math:`n\times n`.
 The first step is to write the function with :math:`\mathbf{x}` as the first argument
@@ -70,8 +74,13 @@ inputs, given that all the affecting parameters are listed in
 ``.named_parameters()``.
 
 Let's take the previous problem as an example: finding the root :math:`\mathbf{x}`
-to satisfy :math:`\mathbf{0}=\mathrm{tanh}(\mathbf{Ax+b}) + \mathbf{x}/2` where
-now :math:`\mathbf{A}` and :math:`\mathbf{b}` are parameters in a ``torch.nn.Module``.
+to satisfy
+
+.. math::
+
+    \mathbf{0}=\mathrm{tanh}(\mathbf{A}\mathbf{x+b}) + \mathbf{x}/2
+
+where now :math:`\mathbf{A}` and :math:`\mathbf{b}` are parameters in a ``torch.nn.Module``.
 
 .. doctest:: tut_functional2
 
@@ -120,7 +129,11 @@ However, in large scientific simulations, sometimes we want processed variables
 To illustrate the use case of :class:`xitorch.EditableModule`, let's slightly
 modify the test case above.
 We want to find the root :math:`\mathbf{x}` to satisfy the equation
-:math:`\mathbf{0}=\mathrm{tanh}[(\mathbf{E}^3)\mathbf{x+b}] + \mathbf{x}/2`
+
+.. math::
+
+    \mathbf{0}=\mathrm{tanh}[(\mathbf{E}^3)\mathbf{x+b}] + \mathbf{x}/2
+
 where :math:`\mathbf{E}^3` is the matrix power operator.
 Because the matrix power operand does not depend on :math:`\mathbf{x}`,
 we should be able to precompute :math:`\mathbf{A}=\mathbf{E}^3` so
