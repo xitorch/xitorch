@@ -325,4 +325,5 @@ _solve_methods = {
     "exactsolve": exactsolve,
     "gmres": wrap_gmres
 }
-solve.__doc__ = get_methods_docstr(solve, _solve_methods)
+ignore_kwargs = ["E", "M", "mparams"]
+solve.__doc__ = get_methods_docstr(solve, _solve_methods, ignore_kwargs)

@@ -433,4 +433,5 @@ _symeig_methods = {
     "exacteig": exacteig,
     "davidson": davidson,
 }
-symeig.__doc__ = get_methods_docstr(symeig, _symeig_methods)
+ignore_kwargs = ["M", "mparams"]
+symeig.__doc__ = get_methods_docstr(symeig, _symeig_methods, ignore_kwargs)
