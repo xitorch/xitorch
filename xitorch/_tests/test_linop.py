@@ -12,7 +12,7 @@ class BaseLinOp(LinearOperator):
         self.mat = mat
         self.implemented_methods = []
 
-    def _getparamnames(self):
+    def _getparamnames(self, prefix=""):
         return [prefix+"mat"]
 
 class LinOp0(BaseLinOp):

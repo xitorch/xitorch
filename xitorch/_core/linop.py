@@ -97,10 +97,22 @@ class LinearOperator(EditableModule):
             (",".join([str(s) for s in self.shape]))
 
     @abstractmethod
-    def _getparamnames(self) -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
         """
         List the self's parameters that affecting the ``LinearOperator``.
-        This is for higher order derivative purpose.
+        This is for the derivative purpose.
+
+        Arguments
+        ---------
+        prefix: str
+            The prefix to be appended in front of the parameters name.
+            This usually contains the dots.
+
+        Returns
+        -------
+        list of str
+            List of parameter names (including the prefix) that affecting
+            the ``LinearOperator``.
         """
         pass
 
@@ -320,8 +332,7 @@ class LinearOperator(EditableModule):
         # does not need to know about this function
 
         if methodname in ["mv", "rmv", "mm", "rmm"]:
-            names = self._getparamnames()
-            return [(prefix+s) for s in names] if prefix != "" else names
+            return self._getparamnames(prefix=prefix)
         elif methodname == "fullmatrix":
             return [prefix+"_matrix"]
         else:
@@ -425,8 +436,8 @@ class AdjointLinearOperator(LinearOperator):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.obj._mv(x)
 
-    def _getparamnames(self) -> Sequence[str]:
-        return ["obj."+s for s in self.obj._getparamnames()]
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+        return self.obj._getparamnames(prefix=prefix+"obj.")
 
     @property
     def H(self):
@@ -460,8 +471,8 @@ class _MatrixNonHermitLinOp(LinearOperator):
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparamnames(self) -> Sequence[str]:
-        return ["mat"]
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+        return [prefix+"mat"]
 
 class _MatrixHermitLinOp(LinearOperator):
     def __init__(self, mat:torch.Tensor) -> None:
@@ -483,8 +494,8 @@ class _MatrixHermitLinOp(LinearOperator):
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparamnames(self) -> Sequence[str]:
-        return ["mat"]
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+        return [prefix+"mat"]
 
     @property
     def H(self):

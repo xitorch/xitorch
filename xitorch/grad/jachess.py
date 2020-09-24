@@ -137,9 +137,10 @@ class _Jac(LinearOperator):
         self.id_params_tensor = [id(param) for param in self.params_tensor]
         self.id_objparams_tensor = [id(param) for param in self.objparams]
 
-    def _getparamnames(self) -> Sequence[str]:
-        return ["yparam"] + ["params_tensor[%d]"%i for i in range(len(self.params_tensor))] + \
-               ["objparams[%d]"%i for i in range(len(self.objparams))]
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+        return [prefix+"yparam"] + \
+               [prefix+("params_tensor[%d]"%i) for i in range(len(self.params_tensor))] + \
+               [prefix+("objparams[%d]"%i) for i in range(len(self.objparams))]
 
     def _mv(self, gy:torch.Tensor) -> torch.Tensor:
         # gy: (..., nin)

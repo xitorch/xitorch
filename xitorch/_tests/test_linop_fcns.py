@@ -135,8 +135,8 @@ def test_symeig_A_large_methods():
             xm1 = torch.roll(xsmall, shifts=-1, dims=-1)
             return xb + xp1 + xm1
 
-        def _getparamnames(self):
-            return ["b"]
+        def _getparamnames(self, prefix=""):
+            return [prefix+"b"]
 
     na = 1000
     shapes = [(na,na), (2,na,na), (2,3,na,na)]
