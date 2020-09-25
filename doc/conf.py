@@ -48,7 +48,14 @@ file_template = """{name}
 with open(api_toc_path, "r") as f:
     api_toc = json.load(f)
 
-for module, api_list in api_toc.items():
+def format_api_display(api, desc):
+    if desc == "":
+        return api
+    else:
+        return "{api}: {desc} <{api}>".format(desc=desc, api=api)
+
+for module, module_details in api_toc.items():
+    api_list = [format_api_display(api, desc) for (api, desc) in module_details["api"].items()]
     module_dir_name = module.replace(".", "_")
     module_api_dir = os.path.join(api_dir, module_dir_name)
     if not os.path.exists(module_api_dir):
@@ -66,7 +73,7 @@ for module, api_list in api_toc.items():
         f.write(content)
 
     pymod = importlib.import_module(module)
-    for fn in api_list:
+    for fn in module_details["api"]:
         fullname = module + "." + fn
         isfn = inspect.isfunction(getattr(pymod, fn))
         fname = os.path.join(module_api_dir, fn+".rst")

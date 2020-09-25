@@ -1,25 +1,40 @@
 {
-  "xitorch": [
-    "EditableModule",
-    "LinearOperator",
-    "make_sibling"
-  ],
-  "xitorch.optimize": [
-    "rootfinder",
-    "equilibrium",
-    "minimize"
-  ],
-  "xitorch.integrate": [
-    "quad",
-    "solve_ivp",
-    "mcquad",
-    "SQuad"
-  ],
-  "xitorch.linalg": [
-    "solve",
-    "symeig"
-  ],
-  "xitorch.interpolate": [
-    "Interp1D"
-  ]
+  "xitorch": {
+    "desc": "",
+    "api": {
+      "EditableModule": "",
+      "LinearOperator": "",
+      "make_sibling": ""
+    }
+  },
+  "xitorch.optimize": {
+    "desc": "optimizers and root finders",
+    "api": {
+      "rootfinder": "",
+      "equilibrium": "",
+      "minimize": ""
+    }
+  },
+  "xitorch.integrate": {
+    "desc": "quadratures and integrations",
+    "api": {
+      "quad": "1D quadrature",
+      "solve_ivp": "initial value problem solver",
+      "mcquad": "Monte Carlo quadrature",
+      "SQuad": "quadrature of fixed samples"
+    }
+  },
+  "xitorch.linalg": {
+    "desc": "(sparse) linear algebra operations",
+    "api": {
+      "solve": "",
+      "symeig": ""
+    }
+  },
+  "xitorch.interpolate": {
+    "desc": "",
+    "api": {
+      "Interp1D": ""
+    }
+  }
 }
