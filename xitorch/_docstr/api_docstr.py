@@ -50,8 +50,9 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
     for name, method in generator:
         # get the signatures
         sigparams = inspect.signature(method).parameters
-        kwargs_sig_list = ['method="%s"'%name] + \
-            ["%s=%s"%(pname,val) for pname,val in _get_default_parameters(sigparams, ignore_kwargs)]
+        kwargs_sig_list = ['method="%s"'%name]
+        kwargs_sig_list2 = ["%s=%s"%(pname,val) for pname,val in _get_default_parameters(sigparams, ignore_kwargs)]
+        kwargs_sig_list = kwargs_sig_list + (["*"] if len(kwargs_sig_list2) > 0 else []) + kwargs_sig_list2
         kwargs_sig = ", ".join(kwargs_sig_list)
 
         # add the method name
