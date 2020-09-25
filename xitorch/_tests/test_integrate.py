@@ -4,7 +4,7 @@ import numpy as np
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
 from xitorch.grad.jachess import hess
-from xitorch.integrate import quad, solve_ivp, mcquad
+from xitorch.integrate import quad, solve_ivp, mcquad, SQuad
 from xitorch._tests.utils import device_dtype_float_test
 
 ################################## quadrature ##################################
@@ -335,6 +335,52 @@ def test_mcquad(dtype, device):
         assert torch.allclose(ggwa, ggwa_true)
         assert torch.allclose(ggwg, ggwg_true)
         assert torch.allclose(ggww, ggww_true)
+
+################################## SQuad ##################################
+@device_dtype_float_test(only64=True)
+def test_squad(dtype, device):
+    x = torch.tensor( [0.0, 1.0, 2.0, 4.0, 5.0, 7.0],
+                      dtype=dtype, device=device).requires_grad_()
+    y = torch.tensor([[1.0, 2.0, 2.0, 1.5, 1.2, 4.0],
+                      [0.0, 0.8, 1.0, 1.5, 2.0, 1.4]],
+                      dtype=dtype, device=device).requires_grad_()
+
+    # true values
+    ycumsum_trapz = torch.tensor(
+                     [[0.0, 1.5, 3.5, 7.0, 8.35, 13.55],
+                      [0.0, 0.4, 1.3, 3.8, 5.55, 8.95]],
+                      dtype=dtype, device=device)
+    # ysimpson_trapz = torch.tensor(
+    #                  [[0.0, 1.5, 3.6666666666666665, 7.0, 8.541666666666666, 13.55],
+    #                   [0.0, 0.4, 1.4, 3.8, 5.525, 8.95]],
+    #                   dtype=dtype, device=device) # (-1, and -3 is not correct)
+
+    methods = ["trapz"]
+    options = [{}]
+    ytrues = [ycumsum_trapz]
+
+    for method, option, ytrue in zip(methods, options, ytrues):
+        print(method)
+        def getval(x, y, tpe):
+            quad = SQuad(x, method=method, **option)
+            if tpe == "cumsum":
+                return quad.cumsum(y, dim=-1)
+            else:
+                return quad.integrate(y, dim=-1)
+
+        # cumsum
+        ycumsum = getval(x, y, "cumsum")
+        assert torch.allclose(ycumsum, ytrue)
+
+        # integrate
+        yintegrate = getval(x, y, "integrate")
+        assert torch.allclose(yintegrate, ytrue[...,-1])
+
+        gradcheck(getval, (x, y, "cumsum"))
+        gradgradcheck(getval, (x, y, "cumsum"))
+        gradcheck(getval, (x, y, "integrate"))
+        gradgradcheck(getval, (x, y, "integrate"))
+
 
 if __name__ == "__main__":
     # with torch.autograd.detect_anomaly():

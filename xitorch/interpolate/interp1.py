@@ -21,11 +21,17 @@ class Interp1D(EditableModule):
         Interpolation method
     **fwd_options
         Method-specific options (see method section below)
+    """
+    def __init__(self, x, y=None, method=None, **fwd_options):
+        if method is None:
+            method = "cspline"
+        if method == "cspline":
+            self.obj = CubicSpline1D(x, y, **fwd_options)
+        else:
+            raise RuntimeError("Unknown interp1d method: %s" % method)
 
-    Methods
-    -------
-    __call__(self, xq, y=None)
-
+    def __call__(self, xq, y=None):
+        """
         Arguments
         ----------------
         xq: torch.Tensor
@@ -40,19 +46,11 @@ class Interp1D(EditableModule):
         -------
         torch.Tensor
             The interpolated values with shape ``(*BY, nrq)``.
-    """
-    def __init__(self, x, y=None, method=None, **fwd_options):
-        if method is None:
-            method = "cspline"
-        if method == "cspline":
-            self.obj = CubicSpline1D(x, y, **fwd_options)
-        else:
-            raise RuntimeError("Unknown interp1d method: %s" % method)
-
-    def __call__(self, xq, y=None):
+        """
         return self.obj(xq, y)
 
     def getparamnames(self, methodname, prefix=""):
+        """"""
         return [prefix+"obj."+c for c in self.obj.getparamnames()]
 
 # docstring completion

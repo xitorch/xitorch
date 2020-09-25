@@ -14,6 +14,6 @@ In your terminal, type:
 
 .. code-block::
 
-    git clone https://github.com/mfkasim91/xitorch
+    git clone https://github.com/xitorch/xitorch
     cd xitorch
     pip install -e .

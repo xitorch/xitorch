@@ -12,7 +12,8 @@
   "xitorch.integrate": [
     "quad",
     "solve_ivp",
-    "mcquad"
+    "mcquad",
+    "SQuad"
   ],
   "xitorch.linalg": [
     "solve",
