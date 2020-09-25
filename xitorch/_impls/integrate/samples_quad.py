@@ -29,26 +29,32 @@ class BaseSQuad(xt.EditableModule):
         pass
 
 class CubicSplineSQuad(BaseSQuad):
-    """
+    r"""
     Perform integration of given sampled values by assuming it is interpolated
-    with cubic spline.
+    with cubic spline [1]_. It is simply
+
+    .. math::
+
+        S = \sum_{i=0}^{N-2} \left[\frac{1}{2}(y_i+y_{i+1}) + \frac{1}{12}(y'_i - y'_{i+1})(x_{i+1}-x_i)^2\right]
 
     Keyword arguments
     -----------------
     bc_type: str
         Boundary condition. See :class:`xitorch.interpolate.Interp1D` with
         ``"cspline"`` method for details.
+
+    References
+    ----------
+    .. [1] Mark H. Holmes, "Connections Between Cubic Splines and Quadrature Rules" (eq. 8),
+           The American Mathematical Monthly, Volume 121, Issue 8, 2014.
     """
     def __init__(self, x, bc_type="natural", **unused):
         # x: (nx,)
         xshape = x.shape
         nx = xshape[-1]
 
-        spline_mat = torch.zeros((nx, nx, nx), dtype=x.dtype, device=x.device)
-        for i in range(2,nx):
-            spline_mat[i,:i,:i] = _get_spline_mat_inv(x[:i], bc_type=bc_type) # (i, i)
-
-        self.spline_mat = spline_mat # (nx, nx, nx)
+        spline_mat = _get_spline_mat_inv(x, bc_type=bc_type)
+        self.spline_mat = spline_mat # (nx, nx)
         self.xshape = xshape
         self.wy = get_trapz_weights(x) # (nx, nx)
         self.wk = get_cspline_grad_weights(x) # (nx, nx)
@@ -56,17 +62,18 @@ class CubicSplineSQuad(BaseSQuad):
     def cumsum(self, y):
         # y: (*, nx)
         # return: (*, nx)
-        yshape = y.shape
-        y1 = y.unsqueeze(-2).unsqueeze(-1) # (*, 1, nx, 1)
-        # y1 = y.view(-1, 1, y.shape[-1], 1) # (nb, 1, nx, 1)
-        ks = torch.matmul(self.spline_mat, y1).squeeze(-1) # (*, nx, nx)
-        kfactor = torch.einsum("bc,...bc->...b", self.wk, ks) # (*, nx)
-        yfactor = torch.matmul(self.wy, y1).squeeze(-1).squeeze(-2) # (*, nx)
+        y1 = y.unsqueeze(-1) # (*, nx, 1)
+        ks = torch.matmul(self.spline_mat, y1) # (*, nx, 1)
+        kfactor = torch.matmul(self.wk, ks) # (*, nx, 1)
+        yfactor = torch.matmul(self.wy, y1) # (*, nx, 1)
         res = kfactor + yfactor # (*, nx)
-        return res
+        return res.squeeze(-1)
 
     def integrate(self, y):
-        raise NotImplementedError
+        ks = torch.matmul(self.spline_mat, y.unsqueeze(-1)).squeeze(-1) # (*, nx)
+        kfactor = torch.einsum("c,...c->...", self.wk[-1], ks)
+        yfactor = torch.einsum("c,...c->...", self.wy[-1], y)
+        return kfactor + yfactor
 
     def getparamnames(self, methodname, prefix=""):
         if methodname == "cumsum" or methodname == "integrate":
@@ -106,8 +113,12 @@ class WeightBasedSQuad(BaseSQuad):
             raise KeyError("%s has no %s method" % (self.__class__.__name__, methodname))
 
 class TrapzSQuad(WeightBasedSQuad):
-    """
-    Perform integration with trapezoidal rule.
+    r"""
+    Perform integration with trapezoidal rule. It is simply
+
+    .. math::
+
+        S = \sum_{i=0}^{N-2} \frac{1}{2}(y_i+y_{i+1})
     """
     def get_weights(self, x):
         return get_trapz_weights(x)

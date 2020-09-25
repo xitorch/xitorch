@@ -28,7 +28,7 @@ class SQuad(EditableModule):
     **fwd_options
         Method-specific options (see method section below)
     """
-    def __init__(self, x:torch.Tensor, method:str="trapz", **fwd_options):
+    def __init__(self, x:torch.Tensor, method:str="cspline", **fwd_options):
         if not (isinstance(x, torch.Tensor) and x.ndim == 1):
             raise RuntimeError("The input x to SQuad must be a 1D tensor")
 
@@ -110,7 +110,7 @@ class SQuad(EditableModule):
 
 # docstring completion
 _squad_methods = {
-    # "cspline": CubicSplineSQuad,
+    "cspline": CubicSplineSQuad,
     # "simpson": SimpsonSQuad,
     "trapz": TrapzSQuad,
 }

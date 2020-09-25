@@ -346,21 +346,21 @@ def test_squad(dtype, device):
                       dtype=dtype, device=device).requires_grad_()
 
     # true values
-    ycumsum_trapz = torch.tensor(
+    ycumsum_trapz = torch.tensor( # obtained by calculating manually
                      [[0.0, 1.5, 3.5, 7.0, 8.35, 13.55],
                       [0.0, 0.4, 1.3, 3.8, 5.55, 8.95]],
                       dtype=dtype, device=device)
-    # ysimpson_trapz = torch.tensor(
-    #                  [[0.0, 1.5, 3.6666666666666665, 7.0, 8.541666666666666, 13.55],
-    #                   [0.0, 0.4, 1.4, 3.8, 5.525, 8.95]],
-    #                   dtype=dtype, device=device) # (-1, and -3 is not correct)
+    ycspline_natural = torch.tensor( # obtained using scipy's CubicSpline and quad
+                     [[0.0, 1.5639104372355428, 3.6221791255289135, 7.2068053596614945, 8.4994887166897, 13.11119534565217],
+                      [0.0, 0.43834626234132584, 1.3733074753173484, 3.724083215796897, 5.494693230049832, 9.181717209378409]],
+                      dtype=dtype, device=device)
 
-    methods = ["trapz"]
-    options = [{}]
-    ytrues = [ycumsum_trapz]
+    methods = ["trapz", "cspline"]
+    options = [{}, {"bc_type": "natural"}]
+    ytrues = [ycumsum_trapz, ycspline_natural]
 
     for method, option, ytrue in zip(methods, options, ytrues):
-        print(method)
+        print(method) # to indicate which method fails
         def getval(x, y, tpe):
             quad = SQuad(x, method=method, **option)
             if tpe == "cumsum":
