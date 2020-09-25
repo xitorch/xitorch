@@ -3,6 +3,8 @@
 `xitorch` is a PyTorch-based library of differentiable functions and functionals that
 can be widely used in scientific computing applications as well as deep learning.
 
+The documentation can be found at: https://xitorch.readthedocs.io/
+
 ## Modules
 
 * [`linalg`](xitorch/linalg/): Linear algebra and sparse linear algebra module
@@ -12,7 +14,7 @@ can be widely used in scientific computing applications as well as deep learning
 ## Requirements
 
 * python 3.6 or higher
-* pytorch 1.5 or higher (install [here](https://pytorch.org/))
+* pytorch 1.6 or higher (install [here](https://pytorch.org/))
 
 ## Getting started
 
