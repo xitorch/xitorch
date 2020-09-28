@@ -10,7 +10,7 @@ from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, rootfinder_solve
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
-          M:Union[LinearOperator,None]=None, posdef=False,
+          M:Union[LinearOperator,None]=None,
           bck_options:Mapping[str,Any]={},
           method:Union[str,None]=None,
           **fwd_options):
@@ -87,13 +87,13 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         mparams = M.getlinopparams() if M is not None else []
         na = len(params)
         return solve_torchfcn.apply(
-            A, B, E, M, posdef,
+            A, B, E, M,
             fwd_options, bck_options,
             na, *params, *mparams)
 
 class solve_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, B, E, M, posdef,
+    def forward(ctx, A, B, E, M,
                 fwd_options, bck_options,
                 na, *all_params):
         # A: (*BA, nr, nr)
@@ -120,9 +120,9 @@ class solve_torchfcn(torch.autograd.Function):
         elif method == "custom_exactsolve":
             x = custom_exactsolve(A, params, B, E=E, M=M, mparams=mparams, **config)
         elif method == "gmres":
-            x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
+            x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, **config)
         elif method in ["lbfgs", "broyden"]:
-            x = rootfinder_solve(method, A, params, B, E=E, M=M, mparams=mparams, posdef=posdef, **config)
+            x = rootfinder_solve(method, A, params, B, E=E, M=M, mparams=mparams, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % config["method"])
 
@@ -130,7 +130,6 @@ class solve_torchfcn(torch.autograd.Function):
         ctx.M = M
         ctx.E = E
         ctx.x = x
-        ctx.posdef = posdef
         ctx.params = params
         ctx.mparams = mparams
         ctx.na = na
@@ -146,7 +145,7 @@ class solve_torchfcn(torch.autograd.Function):
         AT = ctx.A.H # (*BA, nr, nr)
         MT = ctx.M.H if ctx.M is not None else None # (*BM, nr, nr)
         with AT.uselinopparams(*ctx.params), MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
-            v = solve(AT, grad_x, ctx.E, MT, posdef=ctx.posdef,
+            v = solve(AT, grad_x, ctx.E, MT,
                 fwd_options=ctx.bck_config, bck_options=ctx.bck_config) # (*BABEM, nr, ncols)
         grad_B = v
 
@@ -182,7 +181,7 @@ class solve_torchfcn(torch.autograd.Function):
                 grad_outputs=(v,),
                 create_graph=torch.is_grad_enabled())
 
-        return (None, grad_B, grad_E, None, None, None, None, None,
+        return (None, grad_B, grad_E, None, None, None, None,
                 *grad_params, *grad_mparams)
 
 def custom_exactsolve(A, params, B, E=None,
