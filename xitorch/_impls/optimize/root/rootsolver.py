@@ -72,6 +72,7 @@ def _nonlin_solver(fcn, x0, params, method,
     eta_threshold = 0.1
     eta = 1e-3
 
+    converge = False
     for i in range(maxiter):
         tol = min(eta, eta * y_norm)
         dx = -jacobian.solve(y, tol=tol)
@@ -100,6 +101,7 @@ def _nonlin_solver(fcn, x0, params, method,
             if i < 10 or i % 10 == 0 or to_stop:
                 print("%6d: |dx|=%.3e, |df|=%.3e" % (i, dx_norm, dy.norm()))
         if to_stop:
+            converge = True
             break
 
         # adjust forcing parameters for inexact solve
@@ -113,6 +115,10 @@ def _nonlin_solver(fcn, x0, params, method,
         y_norm = y_norm_new
         x = xnew
         y = ynew
+    if not converge:
+        msg = "The rootfinder does not converge after %d iterations. " + \
+              "|dx|=%.3e, |df|=%.3e"
+        warnings.warn(msg % (maxiter, dx_norm, dy.norm()))
     return x.reshape(xshape)
 
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',)) # takes only the signature
