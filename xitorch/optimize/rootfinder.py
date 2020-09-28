@@ -60,6 +60,23 @@ def rootfinder(
         :math:`\mathbf{0} = \mathbf{f}(\mathbf{y},\\theta)`
         with shape ``(*ny)``
 
+    Example
+    -------
+    .. testsetup:: root1
+
+        import torch
+        from xitorch.optimize import rootfinder
+
+    .. doctest:: root1
+
+        >>> def func1(y, A):  # example function
+        ...     return torch.tanh(A @ y + 0.1) + y / 2.0
+        >>> A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
+        >>> y0 = torch.zeros((2,1))  # zeros as the initial guess
+        >>> yroot = rootfinder(func1, y0, params=(A,))
+        >>> print(yroot)
+        tensor([[-0.0459],
+                [-0.0663]], grad_fn=<_RootFinderBackward>)
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
@@ -110,6 +127,24 @@ def equilibrium(
         The solution which satisfies
         :math:`\mathbf{y} = \mathbf{f}(\mathbf{y},\\theta)`
         with shape ``(*ny)``
+
+    Example
+    -------
+    .. testsetup:: equil1
+
+        import torch
+        from xitorch.optimize import equilibrium
+
+    .. doctest:: equil1
+
+        >>> def func1(y, A):  # example function
+        ...     return torch.tanh(A @ y + 0.1) + y / 2.0
+        >>> A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
+        >>> y0 = torch.zeros((2,1))  # zeros as the initial guess
+        >>> yequil = equilibrium(func1, y0, params=(A,))
+        >>> print(yequil)
+        tensor([[ 0.2313],
+                [-0.5957]], grad_fn=<_RootFinderBackward>)
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
@@ -160,6 +195,24 @@ def minimize(
     -------
     torch.tensor
         The solution of the minimization with shape ``(*ny)``
+
+    Example
+    -------
+    .. testsetup:: root1
+
+        import torch
+        from xitorch.optimize import minimize
+
+    .. doctest:: root1
+
+        >>> def func1(y, A):  # example function
+        ...     return torch.sum((A @ y)**2 + y / 2.0)
+        >>> A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
+        >>> y0 = torch.zeros((2,1))  # zeros as the initial guess
+        >>> ymin = minimize(func1, y0, params=(A,))
+        >>> print(ymin)
+        tensor([[-0.0519],
+                [-0.2684]], grad_fn=<_RootFinderBackward>)
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
