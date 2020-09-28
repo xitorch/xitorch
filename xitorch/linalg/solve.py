@@ -1,18 +1,18 @@
 import torch
 import warnings
-from typing import Union, Any, Mapping
+from typing import Union, Any, Mapping, Optional
 import numpy as np
 from xitorch import LinearOperator
 from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.misc import set_default_option, dummy_context_manager
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
-from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, rootfinder_solve
+from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, broyden1_solve, _get_batchdims
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Union[LinearOperator,None]=None,
           bck_options:Mapping[str,Any]={},
-          method:Union[str,None]=None,
+          method:Optional[str]=None,
           **fwd_options):
     r"""
     Performing iterative method to solve the equation
@@ -54,7 +54,8 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     bck_options: dict
         Options of the iterative solver in the backward calculation.
     method: str or None
-        Indicating the method of solve. If None, it will select ``exactsolve``.
+        The method of linear equation solver. If ``None``, it will choose
+        ``"exactsolve"`` or ``"broyden1"`` depending on the size
     **fwd_options
         Method-specific options (see method below)
     """
@@ -76,24 +77,23 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
             M.check()
 
     if method is None:
-        method = "exactsolve" # TODO: do a proper method selection based on the size
+        method = "exactsolve" if A.shape[-1] < 10 else "broyden1"
 
     if method == "exactsolve":
         return exactsolve(A, B, E, M)
     else:
-        fwd_options["method"] = method
         # get the unique parameters of A
         params = A.getlinopparams()
         mparams = M.getlinopparams() if M is not None else []
         na = len(params)
         return solve_torchfcn.apply(
-            A, B, E, M,
+            A, B, E, M, method,
             fwd_options, bck_options,
             na, *params, *mparams)
 
 class solve_torchfcn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, A, B, E, M,
+    def forward(ctx, A, B, E, M, method,
                 fwd_options, bck_options,
                 na, *all_params):
         # A: (*BA, nr, nr)
@@ -112,8 +112,6 @@ class solve_torchfcn(torch.autograd.Function):
         ctx.bck_config = set_default_option({
         }, bck_options)
 
-        method = config["method"].lower()
-
         if torch.all(B == 0): # special case
             dims = (*_get_batchdims(A, B, E, M), *B.shape[-2:])
             x = torch.zeros(dims, dtype=B.dtype, device=B.device)
@@ -121,10 +119,10 @@ class solve_torchfcn(torch.autograd.Function):
             x = custom_exactsolve(A, params, B, E=E, M=M, mparams=mparams, **config)
         elif method == "gmres":
             x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, **config)
-        elif method in ["lbfgs", "broyden"]:
-            x = rootfinder_solve(method, A, params, B, E=E, M=M, mparams=mparams, **config)
+        elif method == "broyden1":
+            x = broyden1_solve(A, params, B, E=E, M=M, mparams=mparams, **config)
         else:
-            raise RuntimeError("Unknown solve method: %s" % config["method"])
+            raise RuntimeError("Unknown solve method: %s" % method)
 
         ctx.A = A
         ctx.M = M
@@ -181,7 +179,7 @@ class solve_torchfcn(torch.autograd.Function):
                 grad_outputs=(v,),
                 create_graph=torch.is_grad_enabled())
 
-        return (None, grad_B, grad_E, None, None, None, None,
+        return (None, grad_B, grad_E, None, None, None, None, None,
                 *grad_params, *grad_mparams)
 
 def custom_exactsolve(A, params, B, E=None,
@@ -195,6 +193,7 @@ def custom_exactsolve(A, params, B, E=None,
 
 # docstring completion
 _solve_methods = {
+    "broyden1": broyden1_solve,
     "exactsolve": exactsolve,
     "gmres": wrap_gmres
 }

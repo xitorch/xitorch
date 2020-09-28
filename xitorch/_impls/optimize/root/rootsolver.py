@@ -21,7 +21,7 @@ def _nonlin_solver(fcn, x0, params, method,
     Keyword arguments
     -----------------
     alpha: float or None
-        The initial inverse Jacobian is ``-1/alpha``
+        The initial guess of Jacobian is ``-1/alpha``
     max_rank: int or None
         The maximum rank of inverse Jacobian approximation. If ``None``, it
         is ``inf``.
@@ -118,7 +118,7 @@ def _nonlin_solver(fcn, x0, params, method,
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',)) # takes only the signature
 def broyden1(fcn, x0, params=(), **kwargs):
     """
-    Solve the root finder using the first Broyden method [1]_.
+    Solve the root finder or linear equation using the first Broyden method [1]_.
     It can be used to solve minimization by finding the root of the
     function's gradient.
 

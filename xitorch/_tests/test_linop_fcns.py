@@ -259,7 +259,7 @@ def test_solve_A_methods():
     dtype = torch.float64
     ashape = (na, na)
     bshape = (2, na, na)
-    methods = ["gmres", "lbfgs"]
+    methods = ["gmres", "broyden1"]
     for method in methods:
         fwd_options = {"method": method}
 

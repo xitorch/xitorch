@@ -1,10 +1,11 @@
 import warnings
+import functools
 from typing import Union
 import torch
 import numpy as np
 from xitorch import LinearOperator
 from scipy.sparse.linalg import gmres
-from xitorch._impls.optimize.rootfinder import lbfgs, broyden
+from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch._utils.misc import dummy_context_manager
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 
@@ -62,6 +63,10 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[],
         res = res.transpose(-1,-2) # (nbatch, na, ncols)
         return res
 
+@functools.wraps(broyden1)
+def broyden1_solve(A, params, B, E=None, M=None, mparams=[], **options):
+    return rootfinder_solve("broyden1", A, params, B, E, M, mparams, **options)
+
 def rootfinder_solve(alg, A, params, B, E=None, M=None, mparams=[], **options):
     # using rootfinder algorithm
     with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
@@ -84,10 +89,8 @@ def rootfinder_solve(alg, A, params, B, E=None, M=None, mparams=[], **options):
         batchdims = _get_batchdims(A, B, E, M)
         x0 = torch.zeros((*batchdims, nr*ncols), dtype=A.dtype, device=A.device)
 
-        if alg == "lbfgs":
-            x = lbfgs(fcn_rootfinder, x0, **options)
-        elif alg == "broyden":
-            x = broyden(fcn_rootfinder, x0, **options)
+        if alg == "broyden1":
+            x = broyden1(fcn_rootfinder, x0, **options)
         else:
             raise RuntimeError("Unknown method %s" % alg)
         x = x.reshape(*x.shape[:-1], nr, ncols)
