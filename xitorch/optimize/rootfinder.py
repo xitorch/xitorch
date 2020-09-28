@@ -47,7 +47,7 @@ def rootfinder(
     params : list
         List of any other parameters to be put in ``fcn``
     bck_options : dict
-        Method-specific options for the backward solve
+        Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
         Rootfinder method.
     **fwd_options
@@ -115,7 +115,7 @@ def equilibrium(
     params : list
         List of any other parameters to be put in ``fcn``
     bck_options : dict
-        Method-specific options for the backward solve
+        Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
         Rootfinder method.
     **fwd_options
@@ -185,7 +185,7 @@ def minimize(
     params: list
         List of any other parameters to be put in ``fcn``
     bck_options: dict
-        Method-specific options for the backward solve.
+        Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method: str or None
         Minimization method.
     **fwd_options

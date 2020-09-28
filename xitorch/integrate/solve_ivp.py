@@ -19,8 +19,9 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
               method:Union[str,None]=None,
               **fwd_options) -> torch.Tensor:
     """
-    Solve the initial value problem (IVP) which given the initial value
-    :math:`\mathbf{y_0}`, the function then solves
+    Solve the initial value problem (IVP) or also commonly known as ordinary
+    differential equations (ODE), where given the initial value :math:`\mathbf{y_0}`,
+    it then solves
 
     .. math::
 
