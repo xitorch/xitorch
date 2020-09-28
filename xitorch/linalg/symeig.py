@@ -10,7 +10,7 @@ from xitorch._utils.tensor import ortho
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch._impls.linalg.symeig import exacteig, davidson
 
-__all__ = ["lsymeig", "usymeig", "symeig"]
+__all__ = ["lsymeig", "usymeig", "symeig", "svd"]
 
 def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
         M:Union[LinearOperator,None]=None,
@@ -30,7 +30,7 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         bck_options:Mapping[str,Any]={},
         method:Union[str,None]=None,
         **fwd_options):
-    """
+    r"""
     Obtain ``neig`` lowest eigenvalues and eigenvectors of a linear operator,
 
     .. math::
@@ -60,13 +60,14 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         Method-specific options for :func:`solve` which used in backpropagation
         calculation.
     method: str or None
-        Method for the eigendecomposition. If None, it will choose exacteig.
+        Method for the eigendecomposition. If ``None``, it will choose
+        ``"exacteig"``.
     **fwd_options
         Method-specific options (see method section below).
 
     Returns
     -------
-    tuple of tensors
+    tuple of tensors (eigenvalues, eigenvectors)
         It will return eigenvalues and eigenvectors with shapes respectively
         ``(*BAM, neig)`` and ``(*BAM, na, neig)``, where ``*BAM`` is the
         broadcasted shape of ``*BA`` and ``*BM``.
@@ -98,6 +99,94 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
         return symeig_torchfcn.apply(A, neig, mode, M,
             fwd_options, bck_options,
             na, *params, *mparams)
+
+def svd(A:LinearOperator, k:Union[int,None]=None,
+        mode:str="uppest", bck_options:Mapping[str,Any]={},
+        method:Union[str,None]=None,
+        **fwd_options):
+    r"""
+    Perform the singular value decomposition (SVD):
+
+    .. math::
+
+        \mathbf{A} = \mathbf{U\Sigma V}^H
+
+    where :math:`\mathbf{U}` and :math:`\mathbf{V}` are semi-unitary matrix and
+    :math:`\mathbf{\Sigma}` is a diagonal matrix containing real non-negative
+    numbers.
+
+    Arguments
+    ---------
+    A: xitorch.LinearOperator
+        The linear operator to be decomposed. It has a shape of ``(*BA, m, n)``
+        where ``(*BA)`` is the batched dimension of ``A``.
+    k: int or None
+        The number of decomposition obtained. If ``None``, it will be
+        ``min(*A.shape[-2:])``
+    mode: str
+        ``"lowest"`` or ``"uppermost"``/``"uppest"``. If ``"lowest"``,
+        it will take the lowest ``k`` decomposition.
+        If ``"uppest"``, it will take the uppermost ``k``.
+    bck_options: dict
+        Method-specific options for :func:`solve` which used in backpropagation
+        calculation.
+    method: str or None
+        Method for the svd (same options for :func:`symeig`). If ``None``,
+        it will choose ``"exacteig"``.
+    **fwd_options
+        Method-specific options (see method section below).
+
+    Returns
+    -------
+    tuple of tensors (u, s, vh)
+        It will return ``u, s, vh`` with shapes respectively
+        ``(*BA, m, k)``, ``(*BA, k)``, and ``(*BA, k, n)``.
+
+    Note
+    ----
+    It is a naive implementation of symmetric eigendecomposition of ``A.H @ A``
+    or ``A @ A.H`` (depending which one is cheaper)
+
+    Warnings
+    --------
+    * If ``s`` contains very small numbers or degenerate values, the
+      calculation and its gradient might be inaccurate.
+    * The second derivative through U or V might be unstable.
+      Extra care must be taken.
+    """
+    # A: (*BA, m, n)
+    # adapted from scipy.sparse.linalg.svds
+
+    if is_debug_enabled():
+        A.check()
+    BA = A.shape[:-2]
+
+    m = A.shape[-2]
+    n = A.shape[-1]
+    if m < n:
+        AAsym = A.matmul(A.H, is_hermitian=True)
+        min_nm = m
+    else:
+        AAsym = A.H.matmul(A, is_hermitian=True)
+        min_nm = n
+
+    eivals, eivecs = symeig(AAsym, k, mode,
+        bck_options=bck_options, method=method,
+        **fwd_options) # (*BA, k) and (*BA, min(mn), k)
+
+    # clamp the eigenvalues to a small positive values to avoid numerical
+    # instability
+    eivals = torch.clamp(eivals, min=0.0)
+    s = torch.sqrt(eivals) # (*BA, k)
+    s = torch.clamp(s, min=1e-12)
+    if m < n:
+        u = eivecs # (*BA, m, k)
+        v = A.rmm(u) / s.unsqueeze(-2) # (*BA, n, k)
+    else:
+        v = eivecs # (*BA, n, k)
+        u = A.mm(v) / s.unsqueeze(-2) # (*BA, m, k)
+    vh = v.transpose(-2, -1)
+    return u, s, vh
 
 class symeig_torchfcn(torch.autograd.Function):
     @staticmethod
@@ -207,3 +296,4 @@ _symeig_methods = {
 }
 ignore_kwargs = ["M", "mparams"]
 symeig.__doc__ = get_methods_docstr(symeig, _symeig_methods, ignore_kwargs)
+svd.__doc__ = get_methods_docstr(svd, _symeig_methods)

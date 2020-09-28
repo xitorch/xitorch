@@ -28,7 +28,8 @@
     "desc": "(sparse) linear algebra operations",
     "api": {
       "solve": "",
-      "symeig": ""
+      "symeig": "",
+      "svd": ""
     }
   },
   "xitorch.interpolate": {

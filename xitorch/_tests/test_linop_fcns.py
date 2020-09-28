@@ -3,7 +3,7 @@ import torch
 import pytest
 from torch.autograd import gradcheck, gradgradcheck
 from xitorch import LinearOperator
-from xitorch.linalg.symeig import lsymeig, symeig
+from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
 
@@ -163,6 +163,41 @@ def test_symeig_A_large_methods():
         ax = linop1.mm(eigvecs)
         xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
         assert torch.allclose(ax, xe)
+
+############## svd #############
+def test_svd_A():
+    torch.manual_seed(seed)
+    shapes = [(4,3), (2,1,3,4)]
+    # only 2 of methods, because both gradient implementations are covered
+    methods = ["exacteig", "custom_exacteig"]
+    for shape, method in itertools.product(shapes, methods):
+        mat1 = torch.rand(shape, dtype=torch.float64)
+        mat1 = mat1.requires_grad_()
+        linop1 = LinearOperator.m(mat1, is_hermitian=False)
+        fwd_options = {"method": method}
+
+        min_mn = min(shape[-1], shape[-2])
+        for k in [min_mn]:
+            u, s, vh = svd(linop1, k=k, **fwd_options) # u: (..., m, k), s: (..., k), vh: (..., k, n)
+            assert list(u.shape) == list([*linop1.shape[:-1], k])
+            assert list(s.shape) == list([*linop1.shape[:-2], k])
+            assert list(vh.shape) == list([*linop1.shape[:-2], k, linop1.shape[-1]])
+
+            if k == min_mn:
+                assert torch.allclose(mat1, u @ torch.diag_embed(s) @ vh)
+            else:
+                pass
+
+            def svd_fcn(amat, only_s=False):
+                alinop = LinearOperator.m(amat, is_hermitian=False)
+                u_, s_, vh_ = svd(alinop, k=k, **fwd_options)
+                if only_s:
+                    return s_
+                else:
+                    return u_, s_, vh_
+
+            gradcheck(svd_fcn, (mat1,))
+            gradgradcheck(svd_fcn, (mat1, True))
 
 ############## solve ##############
 def test_solve_nonsquare_err():

@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from scipy.sparse.linalg import LinearOperator as spLinearOperator
 from xitorch._core.editable_module import EditableModule
 from xitorch.debug.modes import is_debug_enabled
+from xitorch._utils.bcast import get_bcasted_dims
 
 __all__ = ["LinearOperator"]
 
@@ -64,7 +65,8 @@ class LinearOperator(EditableModule):
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
             dtype:Union[torch.dtype,None] = None,
-            device:Union[torch.device,None] = None) -> None:
+            device:Union[torch.device,None] = None,
+            _suppress_hermit_warning:bool = False) -> None:
 
         super(LinearOperator, self).__init__()
         if len(shape) < 2:
@@ -85,7 +87,7 @@ class LinearOperator(EditableModule):
         self._is_fullmatrix_implemented = self.__check_if_implemented("_fullmatrix")
         if not self._is_mv_implemented:
             raise RuntimeError("LinearOperator must have at least ._mv() method implemented")
-        if self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
+        if not _suppress_hermit_warning and self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
             warnings.warn("The LinearOperator is Hermitian with implemented rmv or rmm. We will use the mv and mm methods instead")
 
         # caches
@@ -343,6 +345,13 @@ class LinearOperator(EditableModule):
     def H(self):
         return AdjointLinearOperator(self)
 
+    ############# special functions ################
+    def matmul(self, b, is_hermitian:bool=False):
+        # returns linear operator that represents self @ b
+        if self.shape[-1] != b.shape[-2]:
+            raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (a.shape, b.shape))
+        return MatmulLinearOp(self, b, is_hermitian=is_hermitian)
+
     ############# properties ################
     @property
     def dtype(self) -> torch.dtype:
@@ -419,6 +428,7 @@ class LinearOperator(EditableModule):
         base_method = getattr(LinearOperator, methodname)
         return this_method is not base_method
 
+############## special linear operators ##############
 class AdjointLinearOperator(LinearOperator):
     def __init__(self, obj:LinearOperator):
         super(AdjointLinearOperator, self).__init__(
@@ -443,6 +453,29 @@ class AdjointLinearOperator(LinearOperator):
     @property
     def H(self):
         return self.obj
+
+class MatmulLinearOp(LinearOperator):
+    def __init__(self, a:LinearOperator, b:LinearOperator, is_hermitian:bool=False):
+        shape = (*get_bcasted_dims(a.shape[:-2], b.shape[:-2]), a.shape[-2], b.shape[-1])
+        super(MatmulLinearOp, self).__init__(
+            shape = shape,
+            is_hermitian = is_hermitian,
+            dtype = a.dtype,
+            device = a.device,
+            _suppress_hermit_warning = True,
+        )
+        self.a = a
+        self.b = b
+
+    def _mv(self, x:torch.Tensor) -> torch.Tensor:
+        return self.a._mv(self.b._mv(x))
+
+    def _rmv(self, x:torch.Tensor) -> torch.Tensor:
+        return self.b.rmv(self.a.rmv(x))
+
+    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+        return self.a._getparamnames(prefix=prefix+"a.") + \
+               self.b._getparamnames(prefix=prefix+"b.")
 
 # distinguishing the classes of Hermitian and non-Hermitian matrices to suppress
 # the warnings about redundant implementation of rmm and rmv
