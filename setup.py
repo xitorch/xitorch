@@ -1,9 +1,14 @@
 import os
 from setuptools import setup, find_packages
 
+verfile = os.path.abspath(os.path.join("xitorch", "version.py"))
+version = {"__file__": verfile}
+with open(verfile, "r") as fp:
+    exec(fp.read(), version)
+
 setup(
     name='xitorch',
-    version="0.0.1",
+    version=version["get_version"](),
     description='Pytorch-based linear algebra library for large matrix',
     url='https://github.com/mfkasim91/xitorch',
     author='mfkasim91',
