@@ -7,15 +7,17 @@ from xitorch._utils.fd import finite_differences
 
 __all__ = ["device_dtype_float_test", "get_diagonally_dominant_class"]
 
-def device_dtype_float_test(only64=False, onlycpu=False):
+def device_dtype_float_test(only64=False, onlycpu=False, additional_kwargs={}):
     dtypes = [torch.float, torch.float64]
     devices = [torch.device("cpu"), torch.device("cuda")]
     if only64:
         dtypes = [torch.float64]
     if onlycpu or not torch.cuda.is_available():
         devices = [torch.device("cpu")]
-    params = [*itertools.product(dtypes, devices)]
-    return pytest.mark.parametrize("dtype,device", params)
+    kwargs_vals = additional_kwargs.values()
+    argnames = ",".join(["dtype", "device"] + list(additional_kwargs.keys()))
+    params = [*itertools.product(dtypes, devices, *kwargs_vals)]
+    return pytest.mark.parametrize(argnames, params)
 
 def get_diagonally_dominant_class(na):
     class Acls(xt.Module):

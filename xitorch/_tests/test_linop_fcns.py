@@ -46,84 +46,88 @@ def test_lsymeig_mismatch_err(dtype, device):
     except RuntimeError:
         pass
 
-@device_dtype_float_test(only64=True)
-def test_lsymeig_A(dtype, device):
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "shape": [(4,4), (2,4,4), (2,3,4,4)],
+    "method": ["exacteig", "custom_exacteig"], # only 2 of methods, because both gradient implementations are covered
+})
+def test_lsymeig_A(dtype, device, shape, method):
     torch.manual_seed(seed)
-    shapes = [(4,4), (2,4,4), (2,3,4,4)]
-    # only 2 of methods, because both gradient implementations are covered
-    methods = ["exacteig", "custom_exacteig"]
-    for shape, method in itertools.product(shapes, methods):
-        mat1 = torch.rand(shape, dtype=dtype, device=device)
-        mat1 = mat1 + mat1.transpose(-2,-1)
-        mat1 = mat1.requires_grad_()
-        linop1 = LinearOperator.m(mat1, True)
-        fwd_options = {"method": method}
+    mat1 = torch.rand(shape, dtype=dtype, device=device)
+    mat1 = mat1 + mat1.transpose(-2,-1)
+    mat1 = mat1.requires_grad_()
+    linop1 = LinearOperator.m(mat1, True)
+    fwd_options = {"method": method}
 
-        for neig in [2,shape[-1]]:
-            eigvals, eigvecs = lsymeig(linop1, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
-            assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
-            assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
+    for neig in [2,shape[-1]]:
+        eigvals, eigvecs = lsymeig(linop1, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
+        assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
+        assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
 
-            ax = linop1.mm(eigvecs)
-            xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
-            assert torch.allclose(ax, xe)
+        ax = linop1.mm(eigvecs)
+        xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
+        assert torch.allclose(ax, xe)
 
-            # only perform gradcheck if neig is full, to reduce the computational cost
-            if neig == shape[-1]:
-                def lsymeig_fcn(amat):
-                    amat = (amat + amat.transpose(-2,-1)) * 0.5 # symmetrize
-                    alinop = LinearOperator.m(amat, is_hermitian=True)
-                    eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, **fwd_options)
-                    return eigvals_, eigvecs_
+        # only perform gradcheck if neig is full, to reduce the computational cost
+        if neig == shape[-1]:
+            def lsymeig_fcn(amat):
+                amat = (amat + amat.transpose(-2,-1)) * 0.5 # symmetrize
+                alinop = LinearOperator.m(amat, is_hermitian=True)
+                eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, **fwd_options)
+                return eigvals_, eigvecs_
 
-                gradcheck(lsymeig_fcn, (mat1,))
-                gradgradcheck(lsymeig_fcn, (mat1,))
+            gradcheck(lsymeig_fcn, (mat1,))
+            gradgradcheck(lsymeig_fcn, (mat1,))
 
-@device_dtype_float_test(only64=True)
-def test_lsymeig_AM(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "ashape": [(3,3), (2,3,3), (2,1,3,3)],
+    "mshape": [(3,3), (2,3,3), (2,1,3,3)],
+    "method": ["exacteig", "custom_exacteig"], # only 2 of methods, because both gradient implementations are covered
+})
+def test_lsymeig_AM(dtype, device, ashape, mshape, method):
     torch.manual_seed(seed)
-    shapes = [(3,3), (2,3,3), (2,1,3,3)]
-    # only 2 of methods, because both gradient implementations are covered
-    methods = ["exacteig", "custom_exacteig"]
-    for ashape,mshape,method in itertools.product(shapes, shapes, methods):
-        mata = torch.rand(ashape, dtype=dtype, device=device)
-        matm = torch.rand(mshape, dtype=dtype, device=device) + \
-               torch.eye(mshape[-1], dtype=dtype, device=device) # make sure it's not singular
-        mata = mata + mata.transpose(-2,-1)
-        matm = matm + matm.transpose(-2,-1)
-        mata = mata.requires_grad_()
-        matm = matm.requires_grad_()
-        linopa = LinearOperator.m(mata, True)
-        linopm = LinearOperator.m(matm, True)
-        fwd_options = {"method": method}
+    mata = torch.rand(ashape, dtype=dtype, device=device)
+    matm = torch.rand(mshape, dtype=dtype, device=device) + \
+           torch.eye(mshape[-1], dtype=dtype, device=device) # make sure it's not singular
+    mata = mata + mata.transpose(-2,-1)
+    matm = matm + matm.transpose(-2,-1)
+    mata = mata.requires_grad_()
+    matm = matm.requires_grad_()
+    linopa = LinearOperator.m(mata, True)
+    linopm = LinearOperator.m(matm, True)
+    fwd_options = {"method": method}
 
-        na = ashape[-1]
-        bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
-        for neig in [2,ashape[-1]]:
-            eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, **fwd_options) # eigvals: (..., neig)
-            assert list(eigvals.shape) == list([*bshape, neig])
-            assert list(eigvecs.shape) == list([*bshape, na, neig])
+    na = ashape[-1]
+    bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
+    for neig in [2,ashape[-1]]:
+        eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, **fwd_options) # eigvals: (..., neig)
+        assert list(eigvals.shape) == list([*bshape, neig])
+        assert list(eigvecs.shape) == list([*bshape, na, neig])
 
-            ax = linopa.mm(eigvecs)
-            mxe = linopm.mm(torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1)))
-            assert torch.allclose(ax, mxe)
+        ax = linopa.mm(eigvecs)
+        mxe = linopm.mm(torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1)))
+        assert torch.allclose(ax, mxe)
 
-            # only perform gradcheck if neig is full, to reduce the computational cost
-            if neig == ashape[-1]:
-                def lsymeig_fcn(amat, mmat):
-                    # symmetrize
-                    amat = (amat + amat.transpose(-2,-1)) * 0.5
-                    mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
-                    alinop = LinearOperator.m(amat, is_hermitian=True)
-                    mlinop = LinearOperator.m(mmat, is_hermitian=True)
-                    eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, **fwd_options)
-                    return eigvals_, eigvecs_
+        # only perform gradcheck if neig is full, to reduce the computational cost
+        if neig == ashape[-1]:
+            def lsymeig_fcn(amat, mmat):
+                # symmetrize
+                amat = (amat + amat.transpose(-2,-1)) * 0.5
+                mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+                alinop = LinearOperator.m(amat, is_hermitian=True)
+                mlinop = LinearOperator.m(mmat, is_hermitian=True)
+                eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, **fwd_options)
+                return eigvals_, eigvecs_
 
-                gradcheck(lsymeig_fcn, (mata, matm))
-                gradgradcheck(lsymeig_fcn, (mata, matm))
+            gradcheck(lsymeig_fcn, (mata, matm))
+            gradgradcheck(lsymeig_fcn, (mata, matm))
 
-@device_dtype_float_test(only64=True)
-def test_symeig_A_large_methods(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "shape": [(1000,1000), (2,1000,1000), (2,3,1000,1000)],
+    "method": ["davidson"], # list the methods here
+    "mode": ["uppermost", "lowest"],
+})
+def test_symeig_A_large_methods(dtype, device, shape, method, mode):
     torch.manual_seed(seed)
     class ALarge(LinearOperator):
         def __init__(self, shape, dtype, device):
@@ -145,68 +149,62 @@ def test_symeig_A_large_methods(dtype, device):
         def _getparamnames(self, prefix=""):
             return [prefix+"b"]
 
-    na = 1000
-    shapes = [(na,na), (2,na,na), (2,3,na,na)]
-    # list the methods here
-    methods = ["davidson"]
-    modes = ["uppermost", "lowest"]
     neig = 2
-    for shape, method, mode in itertools.product(shapes, methods, modes):
-        linop1 = ALarge(shape, dtype=dtype, device=device)
-        fwd_options = {"method": method, "min_eps": 1e-8}
+    na = shape[-1]
+    linop1 = ALarge(shape, dtype=dtype, device=device)
+    fwd_options = {"method": method, "min_eps": 1e-8}
 
-        eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
+    eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
 
-        # the matrix's eigenvalues will be around arange(na)
-        if mode == "lowest":
-            assert (eigvals < neig * 2).all()
-        elif mode == "uppermost":
-            assert (eigvals > na - neig * 2).all()
+    # the matrix's eigenvalues will be around arange(na)
+    if mode == "lowest":
+        assert (eigvals < neig * 2).all()
+    elif mode == "uppermost":
+        assert (eigvals > na - neig * 2).all()
 
-        assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
-        assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
+    assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
+    assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
 
-        ax = linop1.mm(eigvecs)
-        xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
-        assert torch.allclose(ax, xe)
+    ax = linop1.mm(eigvecs)
+    xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
+    assert torch.allclose(ax, xe)
 
 ############## svd #############
-@device_dtype_float_test(only64=True)
-def test_svd_A(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "shape": [(4,3), (2,1,3,4)],
+    "method": ["exacteig", "custom_exacteig"],
+})
+def test_svd_A(dtype, device, shape, method):
     torch.manual_seed(seed)
-    shapes = [(4,3), (2,1,3,4)]
-    # only 2 of methods, because both gradient implementations are covered
-    methods = ["exacteig", "custom_exacteig"]
-    for shape, method in itertools.product(shapes, methods):
-        mat1 = torch.rand(shape, dtype=dtype, device=device)
-        mat1 = mat1.requires_grad_()
-        linop1 = LinearOperator.m(mat1, is_hermitian=False)
-        fwd_options = {"method": method}
+    mat1 = torch.rand(shape, dtype=dtype, device=device)
+    mat1 = mat1.requires_grad_()
+    linop1 = LinearOperator.m(mat1, is_hermitian=False)
+    fwd_options = {"method": method}
 
-        min_mn = min(shape[-1], shape[-2])
-        for k in [min_mn]:
-            u, s, vh = svd(linop1, k=k, **fwd_options) # u: (..., m, k), s: (..., k), vh: (..., k, n)
-            assert list(u.shape) == list([*linop1.shape[:-1], k])
-            assert list(s.shape) == list([*linop1.shape[:-2], k])
-            assert list(vh.shape) == list([*linop1.shape[:-2], k, linop1.shape[-1]])
+    min_mn = min(shape[-1], shape[-2])
+    for k in [min_mn]:
+        u, s, vh = svd(linop1, k=k, **fwd_options) # u: (..., m, k), s: (..., k), vh: (..., k, n)
+        assert list(u.shape) == list([*linop1.shape[:-1], k])
+        assert list(s.shape) == list([*linop1.shape[:-2], k])
+        assert list(vh.shape) == list([*linop1.shape[:-2], k, linop1.shape[-1]])
 
-            keye = torch.zeros((*shapes[:-2], k, k), dtype=dtype, device=device) + \
-                   torch.eye(k, dtype=dtype, device=device)
-            assert torch.allclose(u.transpose(-2,-1) @ u, keye)
-            assert torch.allclose(vh @ vh.transpose(-2, -1), keye)
-            if k == min_mn:
-                assert torch.allclose(mat1, u @ torch.diag_embed(s) @ vh)
+        keye = torch.zeros((*shape[:-2], k, k), dtype=dtype, device=device) + \
+               torch.eye(k, dtype=dtype, device=device)
+        assert torch.allclose(u.transpose(-2,-1) @ u, keye)
+        assert torch.allclose(vh @ vh.transpose(-2, -1), keye)
+        if k == min_mn:
+            assert torch.allclose(mat1, u @ torch.diag_embed(s) @ vh)
 
-            def svd_fcn(amat, only_s=False):
-                alinop = LinearOperator.m(amat, is_hermitian=False)
-                u_, s_, vh_ = svd(alinop, k=k, **fwd_options)
-                if only_s:
-                    return s_
-                else:
-                    return u_, s_, vh_
+        def svd_fcn(amat, only_s=False):
+            alinop = LinearOperator.m(amat, is_hermitian=False)
+            u_, s_, vh_ = svd(alinop, k=k, **fwd_options)
+            if only_s:
+                return s_
+            else:
+                return u_, s_, vh_
 
-            gradcheck(svd_fcn, (mat1,))
-            gradgradcheck(svd_fcn, (mat1, True))
+        gradcheck(svd_fcn, (mat1,))
+        gradgradcheck(svd_fcn, (mat1, True))
 
 ############## solve ##############
 @device_dtype_float_test()
@@ -254,181 +252,180 @@ def test_solve_mismatch_err(dtype, device):
         except RuntimeError:
             pass
 
-@device_dtype_float_test(only64=True)
-def test_solve_A(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "ashape": [(2,2), (2,2,2), (2,1,2,2)],
+    "bshape": [(2,2), (2,2,2), (2,1,2,2)],
+    "method": ["exactsolve", "custom_exactsolve"],
+    "hermit": [False, True],
+})
+def test_solve_A(dtype, device, ashape, bshape, method, hermit):
     torch.manual_seed(seed)
-    na = 2
-    shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    # custom exactsolve to check the backward implementation
-    methods = ["exactsolve", "custom_exactsolve"]
-    # hermitian check here to make sure the gradient propagated symmetrically
-    hermits = [False, True]
-    for ashape, bshape, method, hermit in itertools.product(shapes, shapes, methods, hermits):
-        print(ashape, bshape, method, hermit)
-        checkgrad = method.endswith("exactsolve")
+    na = ashape[-1]
+    checkgrad = method.endswith("exactsolve")
 
-        ncols = bshape[-1]-1
-        bshape = [*bshape[:-1], ncols]
-        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
-        fwd_options = {"method": method, "min_eps": 1e-9}
-        bck_options = {"method": method}
+    ncols = bshape[-1]-1
+    bshape = [*bshape[:-1], ncols]
+    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
+    fwd_options = {"method": method, "min_eps": 1e-9}
+    bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
-               torch.eye(ashape[-1], dtype=dtype, device=device)
-        bmat = torch.rand(bshape, dtype=dtype, device=device)
-        if hermit:
-            amat = (amat + amat.transpose(-2,-1)) * 0.5
+    amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+           torch.eye(ashape[-1], dtype=dtype, device=device)
+    bmat = torch.rand(bshape, dtype=dtype, device=device)
+    if hermit:
+        amat = (amat + amat.transpose(-2,-1)) * 0.5
 
-        amat = amat.requires_grad_()
-        bmat = bmat.requires_grad_()
+    amat = amat.requires_grad_()
+    bmat = bmat.requires_grad_()
 
-        def solvefcn(amat, bmat):
-            # is_hermitian=hermit is required to force the hermitian status in numerical gradient
-            alinop = LinearOperator.m(amat, is_hermitian=hermit)
-            x = solve(A=alinop, B=bmat,
-                **fwd_options,
-                bck_options=bck_options)
-            return x
+    def solvefcn(amat, bmat):
+        # is_hermitian=hermit is required to force the hermitian status in numerical gradient
+        alinop = LinearOperator.m(amat, is_hermitian=hermit)
+        x = solve(A=alinop, B=bmat,
+            **fwd_options,
+            bck_options=bck_options)
+        return x
 
-        x = solvefcn(amat, bmat)
-        assert list(x.shape) == xshape
+    x = solvefcn(amat, bmat)
+    assert list(x.shape) == xshape
 
-        ax = LinearOperator.m(amat).mm(x)
-        assert torch.allclose(ax, bmat)
+    ax = LinearOperator.m(amat).mm(x)
+    assert torch.allclose(ax, bmat)
 
-        if checkgrad:
-            gradcheck(solvefcn, (amat, bmat))
-            gradgradcheck(solvefcn, (amat, bmat))
+    if checkgrad:
+        gradcheck(solvefcn, (amat, bmat))
+        gradgradcheck(solvefcn, (amat, bmat))
 
-@device_dtype_float_test(only64=True)
-def test_solve_A_methods(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "method": ["gmres", "broyden1"],
+})
+def test_solve_A_methods(dtype, device, method):
     torch.manual_seed(seed)
     na = 3
     ashape = (na, na)
     bshape = (2, na, na)
-    methods = ["gmres", "broyden1"]
-    for method in methods:
-        fwd_options = {"method": method}
+    fwd_options = {"method": method}
 
-        ncols = bshape[-1]-1
-        bshape = [*bshape[:-1], ncols]
-        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
+    ncols = bshape[-1]-1
+    bshape = [*bshape[:-1], ncols]
+    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
 
-        amat = torch.rand(ashape, dtype=dtype, device=device) + \
-               torch.eye(ashape[-1], dtype=dtype, device=device)
-        bmat = torch.rand(bshape, dtype=dtype, device=device)
-        amat = amat + amat.transpose(-2,-1)
+    amat = torch.rand(ashape, dtype=dtype, device=device) + \
+           torch.eye(ashape[-1], dtype=dtype, device=device)
+    bmat = torch.rand(bshape, dtype=dtype, device=device)
+    amat = amat + amat.transpose(-2,-1)
 
-        amat = amat.requires_grad_()
-        bmat = bmat.requires_grad_()
+    amat = amat.requires_grad_()
+    bmat = bmat.requires_grad_()
 
-        def solvefcn(amat, bmat):
-            alinop = LinearOperator.m(amat)
-            x = solve(A=alinop, B=bmat, **fwd_options)
-            return x
+    def solvefcn(amat, bmat):
+        alinop = LinearOperator.m(amat)
+        x = solve(A=alinop, B=bmat, **fwd_options)
+        return x
 
-        x = solvefcn(amat, bmat)
-        assert list(x.shape) == xshape
+    x = solvefcn(amat, bmat)
+    assert list(x.shape) == xshape
 
-        ax = LinearOperator.m(amat).mm(x)
-        assert torch.allclose(ax, bmat)
+    ax = LinearOperator.m(amat).mm(x)
+    assert torch.allclose(ax, bmat)
 
-@device_dtype_float_test(only64=True)
-def test_solve_AE(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "ashape": [(2,2), (2,2,2), (2,1,2,2)],
+    "bshape": [(2,2), (2,2,2), (2,1,2,2)],
+    "eshape": [(2,2), (2,2,2), (2,1,2,2)],
+    "method": ["exactsolve", "custom_exactsolve"],
+})
+def test_solve_AE(dtype, device, ashape, bshape, eshape, method):
     torch.manual_seed(seed)
-    na = 2
-    shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
-    for ashape, bshape, eshape, method in itertools.product(shapes, shapes, shapes, methods):
-        print(ashape, bshape, eshape, method)
-        checkgrad = method.endswith("exactsolve")
+    na = ashape[-1]
+    checkgrad = method.endswith("exactsolve")
 
-        ncols = bshape[-1]-1
-        bshape = [*bshape[:-1], ncols]
-        eshape = [*eshape[:-2], ncols]
-        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1])) + [na, ncols]
-        fwd_options = {"method": method}
-        bck_options = {"method": method}
+    ncols = bshape[-1]-1
+    bshape = [*bshape[:-1], ncols]
+    eshape = [*eshape[:-2], ncols]
+    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1])) + [na, ncols]
+    fwd_options = {"method": method}
+    bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
-               torch.eye(ashape[-1], dtype=dtype, device=device)
-        bmat = torch.rand(bshape, dtype=dtype, device=device)
-        emat = torch.rand(eshape, dtype=dtype, device=device)
+    amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+           torch.eye(ashape[-1], dtype=dtype, device=device)
+    bmat = torch.rand(bshape, dtype=dtype, device=device)
+    emat = torch.rand(eshape, dtype=dtype, device=device)
 
-        amat = amat.requires_grad_()
-        bmat = bmat.requires_grad_()
-        emat = emat.requires_grad_()
+    amat = amat.requires_grad_()
+    bmat = bmat.requires_grad_()
+    emat = emat.requires_grad_()
 
-        def solvefcn(amat, bmat, emat):
-            alinop = LinearOperator.m(amat)
-            x = solve(A=alinop, B=bmat, E=emat,
-                      **fwd_options,
-                      bck_options=bck_options)
-            return x
+    def solvefcn(amat, bmat, emat):
+        alinop = LinearOperator.m(amat)
+        x = solve(A=alinop, B=bmat, E=emat,
+                  **fwd_options,
+                  bck_options=bck_options)
+        return x
 
-        x = solvefcn(amat, bmat, emat)
-        assert list(x.shape) == xshape
+    x = solvefcn(amat, bmat, emat)
+    assert list(x.shape) == xshape
 
-        ax = LinearOperator.m(amat).mm(x)
-        xe = torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2))
-        assert torch.allclose(ax - xe, bmat)
+    ax = LinearOperator.m(amat).mm(x)
+    xe = torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2))
+    assert torch.allclose(ax - xe, bmat)
 
-        # grad check only performed at AEM, to save time
-        # if checkgrad:
-        #     gradcheck(solvefcn, (amat, bmat, emat))
-        #     gradgradcheck(solvefcn, (amat, bmat, emat))
+    # grad check only performed at AEM, to save time
+    # if checkgrad:
+    #     gradcheck(solvefcn, (amat, bmat, emat))
+    #     gradgradcheck(solvefcn, (amat, bmat, emat))
 
-@device_dtype_float_test(only64=True)
-def test_solve_AEM(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "abeshape": [(2,2), (2,2,2), (2,1,2,2)],
+    "mshape": [(2,2), (2,2,2), (2,1,2,2)],
+    "method": ["exactsolve", "custom_exactsolve"],
+})
+def test_solve_AEM(dtype, device, abeshape, mshape, method):
     torch.manual_seed(seed)
-    na = 2
-    shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    methods = ["exactsolve", "custom_exactsolve"]
-    for abeshape, mshape, method in itertools.product(shapes, shapes, methods):
-        ashape = abeshape
-        bshape = abeshape
-        eshape = abeshape
-        print(abeshape, mshape, method)
-        checkgrad = method.endswith("exactsolve")
+    na = abeshape[-1]
+    ashape = abeshape
+    bshape = abeshape
+    eshape = abeshape
+    checkgrad = method.endswith("exactsolve")
 
-        ncols = bshape[-1]-1
-        bshape = [*bshape[:-1], ncols]
-        eshape = [*eshape[:-2], ncols]
-        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1], mshape[:-2])) + [na, ncols]
-        fwd_options = {"method": method, "min_eps": 1e-9}
-        bck_options = {"method": method} # exactsolve at backward just to test the forward solve
+    ncols = bshape[-1]-1
+    bshape = [*bshape[:-1], ncols]
+    eshape = [*eshape[:-2], ncols]
+    xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1], mshape[:-2])) + [na, ncols]
+    fwd_options = {"method": method, "min_eps": 1e-9}
+    bck_options = {"method": method} # exactsolve at backward just to test the forward solve
 
-        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
-               torch.eye(ashape[-1], dtype=dtype, device=device)
-        mmat = torch.rand(mshape, dtype=dtype, device=device) * 0.1 + \
-               torch.eye(mshape[-1], dtype=dtype, device=device) * 0.5
-        bmat = torch.rand(bshape, dtype=dtype, device=device)
-        emat = torch.rand(eshape, dtype=dtype, device=device)
+    amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+           torch.eye(ashape[-1], dtype=dtype, device=device)
+    mmat = torch.rand(mshape, dtype=dtype, device=device) * 0.1 + \
+           torch.eye(mshape[-1], dtype=dtype, device=device) * 0.5
+    bmat = torch.rand(bshape, dtype=dtype, device=device)
+    emat = torch.rand(eshape, dtype=dtype, device=device)
+    mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+
+    amat = amat.requires_grad_()
+    mmat = mmat.requires_grad_()
+    bmat = bmat.requires_grad_()
+    emat = emat.requires_grad_()
+
+    def solvefcn(amat, mmat, bmat, emat):
         mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+        alinop = LinearOperator.m(amat)
+        mlinop = LinearOperator.m(mmat)
+        x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
+            **fwd_options,
+            bck_options=bck_options)
+        return x
 
-        amat = amat.requires_grad_()
-        mmat = mmat.requires_grad_()
-        bmat = bmat.requires_grad_()
-        emat = emat.requires_grad_()
+    x = solvefcn(amat, mmat, bmat, emat)
+    assert list(x.shape) == xshape
 
-        def solvefcn(amat, mmat, bmat, emat):
-            mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
-            alinop = LinearOperator.m(amat)
-            mlinop = LinearOperator.m(mmat)
-            x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
-                **fwd_options,
-                bck_options=bck_options)
-            return x
+    ax = LinearOperator.m(amat).mm(x)
+    mxe = LinearOperator.m(mmat).mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
+    y = ax - mxe
+    assert torch.allclose(y, bmat)
 
-        x = solvefcn(amat, mmat, bmat, emat)
-        assert list(x.shape) == xshape
-
-        ax = LinearOperator.m(amat).mm(x)
-        mxe = LinearOperator.m(mmat).mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
-        y = ax - mxe
-        assert torch.allclose(y, bmat)
-
-        # gradient checker
-        if checkgrad:
-            gradcheck(solvefcn, (amat, mmat, bmat, emat))
-            gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
+    # gradient checker
+    if checkgrad:
+        gradcheck(solvefcn, (amat, mmat, bmat, emat))
+        gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
