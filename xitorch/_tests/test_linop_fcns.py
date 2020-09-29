@@ -8,6 +8,8 @@ from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
 
 seed = 12345
+dtype = torch.float64
+device = torch.device("cpu")
 
 ############## lsymeig ##############
 def test_lsymeig_nonhermit_err():
@@ -171,7 +173,7 @@ def test_svd_A():
     # only 2 of methods, because both gradient implementations are covered
     methods = ["exacteig", "custom_exacteig"]
     for shape, method in itertools.product(shapes, methods):
-        mat1 = torch.rand(shape, dtype=torch.float64)
+        mat1 = torch.rand(shape, dtype=dtype)
         mat1 = mat1.requires_grad_()
         linop1 = LinearOperator.m(mat1, is_hermitian=False)
         fwd_options = {"method": method}
@@ -183,10 +185,11 @@ def test_svd_A():
             assert list(s.shape) == list([*linop1.shape[:-2], k])
             assert list(vh.shape) == list([*linop1.shape[:-2], k, linop1.shape[-1]])
 
+            keye = torch.zeros((*shapes[:-2], k, k), dtype=dtype, device=device) + torch.eye(k, dtype=dtype, device=device)
+            assert torch.allclose(u.transpose(-2,-1) @ u, keye)
+            assert torch.allclose(vh @ vh.transpose(-2, -1), keye)
             if k == min_mn:
                 assert torch.allclose(mat1, u @ torch.diag_embed(s) @ vh)
-            else:
-                pass
 
             def svd_fcn(amat, only_s=False):
                 alinop = LinearOperator.m(amat, is_hermitian=False)

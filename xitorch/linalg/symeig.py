@@ -178,13 +178,13 @@ def svd(A:LinearOperator, k:Union[int,None]=None,
     # instability
     eivals = torch.clamp(eivals, min=0.0)
     s = torch.sqrt(eivals) # (*BA, k)
-    s = torch.clamp(s, min=1e-12)
+    sdiv = torch.clamp(s, min=1e-12).unsqueeze(-2) # (*BA, 1, k)
     if m < n:
         u = eivecs # (*BA, m, k)
-        v = A.rmm(u) / s.unsqueeze(-2) # (*BA, n, k)
+        v = A.rmm(u) / sdiv # (*BA, n, k)
     else:
         v = eivecs # (*BA, n, k)
-        u = A.mm(v) / s.unsqueeze(-2) # (*BA, m, k)
+        u = A.mm(v) / sdiv # (*BA, m, k)
     vh = v.transpose(-2, -1)
     return u, s, vh
 
