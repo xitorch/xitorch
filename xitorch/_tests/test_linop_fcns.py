@@ -6,15 +6,15 @@ from xitorch import LinearOperator
 from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
+from xitorch._tests.utils import device_dtype_float_test
 
 seed = 12345
-dtype = torch.float64
-device = torch.device("cpu")
 
 ############## lsymeig ##############
-def test_lsymeig_nonhermit_err():
+@device_dtype_float_test()
+def test_lsymeig_nonhermit_err(dtype, device):
     torch.manual_seed(seed)
-    mat = torch.rand((3,3))
+    mat = torch.rand((3,3), dtype=dtype, device=device)
     linop = LinearOperator.m(mat, False)
     linop2 = LinearOperator.m(mat+mat.transpose(-2,-1), True)
 
@@ -30,10 +30,11 @@ def test_lsymeig_nonhermit_err():
     except RuntimeError:
         pass
 
-def test_lsymeig_mismatch_err():
+@device_dtype_float_test()
+def test_lsymeig_mismatch_err(dtype, device):
     torch.manual_seed(seed)
-    mat1 = torch.rand((3,3))
-    mat2 = torch.rand((2,2))
+    mat1 = torch.rand((3,3), dtype=dtype, device=device)
+    mat2 = torch.rand((2,2), dtype=dtype, device=device)
     mat1 = mat1 + mat1.transpose(-2,-1)
     mat2 = mat2 + mat2.transpose(-2,-1)
     linop1 = LinearOperator.m(mat1, True)
@@ -45,13 +46,14 @@ def test_lsymeig_mismatch_err():
     except RuntimeError:
         pass
 
-def test_lsymeig_A():
+@device_dtype_float_test(only64=True)
+def test_lsymeig_A(dtype, device):
     torch.manual_seed(seed)
     shapes = [(4,4), (2,4,4), (2,3,4,4)]
     # only 2 of methods, because both gradient implementations are covered
     methods = ["exacteig", "custom_exacteig"]
     for shape, method in itertools.product(shapes, methods):
-        mat1 = torch.rand(shape, dtype=torch.float64)
+        mat1 = torch.rand(shape, dtype=dtype, device=device)
         mat1 = mat1 + mat1.transpose(-2,-1)
         mat1 = mat1.requires_grad_()
         linop1 = LinearOperator.m(mat1, True)
@@ -77,15 +79,16 @@ def test_lsymeig_A():
                 gradcheck(lsymeig_fcn, (mat1,))
                 gradgradcheck(lsymeig_fcn, (mat1,))
 
-def test_lsymeig_AM():
+@device_dtype_float_test(only64=True)
+def test_lsymeig_AM(dtype, device):
     torch.manual_seed(seed)
     shapes = [(3,3), (2,3,3), (2,1,3,3)]
     # only 2 of methods, because both gradient implementations are covered
     methods = ["exacteig", "custom_exacteig"]
-    dtype = torch.float64
     for ashape,mshape,method in itertools.product(shapes, shapes, methods):
-        mata = torch.rand(ashape, dtype=dtype)
-        matm = torch.rand(mshape, dtype=dtype) + torch.eye(mshape[-1], dtype=dtype) # make sure it's not singular
+        mata = torch.rand(ashape, dtype=dtype, device=device)
+        matm = torch.rand(mshape, dtype=dtype, device=device) + \
+               torch.eye(mshape[-1], dtype=dtype, device=device) # make sure it's not singular
         mata = mata + mata.transpose(-2,-1)
         matm = matm + matm.transpose(-2,-1)
         mata = mata.requires_grad_()
@@ -119,15 +122,17 @@ def test_lsymeig_AM():
                 gradcheck(lsymeig_fcn, (mata, matm))
                 gradgradcheck(lsymeig_fcn, (mata, matm))
 
-def test_symeig_A_large_methods():
+@device_dtype_float_test(only64=True)
+def test_symeig_A_large_methods(dtype, device):
     torch.manual_seed(seed)
     class ALarge(LinearOperator):
-        def __init__(self, shape, dtype):
+        def __init__(self, shape, dtype, device):
             super(ALarge, self).__init__(shape,
                 is_hermitian=True,
-                dtype=dtype)
+                dtype=dtype,
+                device=device)
             na = shape[-1]
-            self.b = torch.arange(na, dtype=dtype).repeat(*shape[:-2], 1)
+            self.b = torch.arange(na, dtype=dtype, device=device).repeat(*shape[:-2], 1)
 
         def _mv(self, x):
             # x: (*BX, na)
@@ -146,9 +151,8 @@ def test_symeig_A_large_methods():
     methods = ["davidson"]
     modes = ["uppermost", "lowest"]
     neig = 2
-    dtype = torch.float64
     for shape, method, mode in itertools.product(shapes, methods, modes):
-        linop1 = ALarge(shape, dtype=dtype)
+        linop1 = ALarge(shape, dtype=dtype, device=device)
         fwd_options = {"method": method, "min_eps": 1e-8}
 
         eigvals, eigvecs = symeig(linop1, mode=mode, neig=neig, **fwd_options) # eigvals: (..., neig), eigvecs: (..., na, neig)
@@ -167,13 +171,14 @@ def test_symeig_A_large_methods():
         assert torch.allclose(ax, xe)
 
 ############## svd #############
-def test_svd_A():
+@device_dtype_float_test(only64=True)
+def test_svd_A(dtype, device):
     torch.manual_seed(seed)
     shapes = [(4,3), (2,1,3,4)]
     # only 2 of methods, because both gradient implementations are covered
     methods = ["exacteig", "custom_exacteig"]
     for shape, method in itertools.product(shapes, methods):
-        mat1 = torch.rand(shape, dtype=dtype)
+        mat1 = torch.rand(shape, dtype=dtype, device=device)
         mat1 = mat1.requires_grad_()
         linop1 = LinearOperator.m(mat1, is_hermitian=False)
         fwd_options = {"method": method}
@@ -185,7 +190,8 @@ def test_svd_A():
             assert list(s.shape) == list([*linop1.shape[:-2], k])
             assert list(vh.shape) == list([*linop1.shape[:-2], k, linop1.shape[-1]])
 
-            keye = torch.zeros((*shapes[:-2], k, k), dtype=dtype, device=device) + torch.eye(k, dtype=dtype, device=device)
+            keye = torch.zeros((*shapes[:-2], k, k), dtype=dtype, device=device) + \
+                   torch.eye(k, dtype=dtype, device=device)
             assert torch.allclose(u.transpose(-2,-1) @ u, keye)
             assert torch.allclose(vh @ vh.transpose(-2, -1), keye)
             if k == min_mn:
@@ -203,13 +209,14 @@ def test_svd_A():
             gradgradcheck(svd_fcn, (mat1, True))
 
 ############## solve ##############
-def test_solve_nonsquare_err():
+@device_dtype_float_test()
+def test_solve_nonsquare_err(dtype, device):
     torch.manual_seed(seed)
-    mat = torch.rand((3,2))
-    mat2 = torch.rand((3,3))
+    mat = torch.rand((3,2), dtype=dtype, device=device)
+    mat2 = torch.rand((3,3), dtype=dtype, device=device)
     linop = LinearOperator.m(mat)
     linop2 = LinearOperator.m(mat2)
-    B = torch.rand(3,1)
+    B = torch.rand((3,1), dtype=dtype, device=device)
 
     try:
         res = solve(linop, B)
@@ -223,18 +230,19 @@ def test_solve_nonsquare_err():
     except RuntimeError:
         pass
 
-def test_solve_mismatch_err():
+@device_dtype_float_test()
+def test_solve_mismatch_err(dtype, device):
     torch.manual_seed(seed)
     shapes = [
         #   A      B      M
         ([(3,3), (2,1), (3,3)], "the B shape does not match with A"),
         ([(3,3), (3,2), (2,2)], "the M shape does not match with A"),
     ]
-    dtype = torch.float64
     for (ashape, bshape, mshape), msg in shapes:
-        amat = torch.rand(ashape, dtype=dtype)
-        bmat = torch.rand(bshape, dtype=dtype)
-        mmat = torch.rand(mshape, dtype=dtype) + torch.eye(mshape[-1], dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype, device=device)
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
+        mmat = torch.rand(mshape, dtype=dtype, device=device) + \
+               torch.eye(mshape[-1], dtype=dtype, device=device)
         amat = amat + amat.transpose(-2,-1)
         mmat = mmat + mmat.transpose(-2,-1)
 
@@ -246,11 +254,11 @@ def test_solve_mismatch_err():
         except RuntimeError:
             pass
 
-def test_solve_A():
+@device_dtype_float_test(only64=True)
+def test_solve_A(dtype, device):
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    dtype = torch.float64
     # custom exactsolve to check the backward implementation
     methods = ["exactsolve", "custom_exactsolve"]
     # hermitian check here to make sure the gradient propagated symmetrically
@@ -265,8 +273,9 @@ def test_solve_A():
         fwd_options = {"method": method, "min_eps": 1e-9}
         bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
-        bmat = torch.rand(bshape, dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+               torch.eye(ashape[-1], dtype=dtype, device=device)
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
         if hermit:
             amat = (amat + amat.transpose(-2,-1)) * 0.5
 
@@ -291,10 +300,10 @@ def test_solve_A():
             gradcheck(solvefcn, (amat, bmat))
             gradgradcheck(solvefcn, (amat, bmat))
 
-def test_solve_A_methods():
+@device_dtype_float_test(only64=True)
+def test_solve_A_methods(dtype, device):
     torch.manual_seed(seed)
     na = 3
-    dtype = torch.float64
     ashape = (na, na)
     bshape = (2, na, na)
     methods = ["gmres", "broyden1"]
@@ -305,8 +314,9 @@ def test_solve_A_methods():
         bshape = [*bshape[:-1], ncols]
         xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
 
-        amat = torch.rand(ashape, dtype=dtype) + torch.eye(ashape[-1], dtype=dtype)
-        bmat = torch.rand(bshape, dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype, device=device) + \
+               torch.eye(ashape[-1], dtype=dtype, device=device)
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
         amat = amat + amat.transpose(-2,-1)
 
         amat = amat.requires_grad_()
@@ -323,12 +333,12 @@ def test_solve_A_methods():
         ax = LinearOperator.m(amat).mm(x)
         assert torch.allclose(ax, bmat)
 
-def test_solve_AE():
+@device_dtype_float_test(only64=True)
+def test_solve_AE(dtype, device):
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
     methods = ["exactsolve", "custom_exactsolve"] # custom exactsolve to check the backward implementation
-    dtype = torch.float64
     for ashape, bshape, eshape, method in itertools.product(shapes, shapes, shapes, methods):
         print(ashape, bshape, eshape, method)
         checkgrad = method.endswith("exactsolve")
@@ -340,9 +350,10 @@ def test_solve_AE():
         fwd_options = {"method": method}
         bck_options = {"method": method}
 
-        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
-        bmat = torch.rand(bshape, dtype=dtype)
-        emat = torch.rand(eshape, dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+               torch.eye(ashape[-1], dtype=dtype, device=device)
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
+        emat = torch.rand(eshape, dtype=dtype, device=device)
 
         amat = amat.requires_grad_()
         bmat = bmat.requires_grad_()
@@ -367,11 +378,11 @@ def test_solve_AE():
         #     gradcheck(solvefcn, (amat, bmat, emat))
         #     gradgradcheck(solvefcn, (amat, bmat, emat))
 
-def test_solve_AEM():
+@device_dtype_float_test(only64=True)
+def test_solve_AEM(dtype, device):
     torch.manual_seed(seed)
     na = 2
     shapes = [(na,na), (2,na,na), (2,1,na,na)]
-    dtype = torch.float64
     methods = ["exactsolve", "custom_exactsolve"]
     for abeshape, mshape, method in itertools.product(shapes, shapes, methods):
         ashape = abeshape
@@ -387,10 +398,12 @@ def test_solve_AEM():
         fwd_options = {"method": method, "min_eps": 1e-9}
         bck_options = {"method": method} # exactsolve at backward just to test the forward solve
 
-        amat = torch.rand(ashape, dtype=dtype) * 0.1 + torch.eye(ashape[-1], dtype=dtype)
-        mmat = torch.rand(mshape, dtype=dtype) * 0.1 + torch.eye(mshape[-1], dtype=dtype) * 0.5
-        bmat = torch.rand(bshape, dtype=dtype)
-        emat = torch.rand(eshape, dtype=dtype)
+        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+               torch.eye(ashape[-1], dtype=dtype, device=device)
+        mmat = torch.rand(mshape, dtype=dtype, device=device) * 0.1 + \
+               torch.eye(mshape[-1], dtype=dtype, device=device) * 0.5
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
+        emat = torch.rand(eshape, dtype=dtype, device=device)
         mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
 
         amat = amat.requires_grad_()
