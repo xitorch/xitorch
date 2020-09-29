@@ -1,3 +1,4 @@
+import itertools
 import torch
 import xitorch as xt
 import pytest
@@ -13,14 +14,8 @@ def device_dtype_float_test(only64=False, onlycpu=False):
         dtypes = [torch.float64]
     if onlycpu or not torch.cuda.is_available():
         devices = [torch.device("cpu")]
-
-    def device_dtype_float_test_fcn(fcn):
-        def fcn_all():
-            for dtype in dtypes:
-                for device in devices:
-                    fcn(dtype, device)
-        return fcn_all
-    return device_dtype_float_test_fcn
+    params = [*itertools.product(dtypes, devices)]
+    return pytest.mark.parametrize("dtype,device", params)
 
 def get_diagonally_dominant_class(na):
     class Acls(xt.Module):
