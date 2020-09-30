@@ -1,3 +1,4 @@
+from typing import Optional, Sequence
 import torch
 from xitorch._core.editable_module import EditableModule
 from xitorch._impls.interpolate.interp_1d import CubicSpline1D
@@ -18,11 +19,15 @@ class Interp1D(EditableModule):
         The values at the given position with shape ``(*BY, nr)``.
         If ``None``, it must be supplied during ``__call__``
     method: str or None
-        Interpolation method
+        Interpolation method. If None, it will choose ``"cspline"``.
     **fwd_options
         Method-specific options (see method section below)
     """
-    def __init__(self, x, y=None, method=None, **fwd_options):
+    def __init__(self,
+            x:torch.Tensor,
+            y:Optional[torch.Tensor]=None,
+            method:Optional[str]=None,
+            **fwd_options):
         if method is None:
             method = "cspline"
         if method == "cspline":
@@ -30,7 +35,7 @@ class Interp1D(EditableModule):
         else:
             raise RuntimeError("Unknown interp1d method: %s" % method)
 
-    def __call__(self, xq, y=None):
+    def __call__(self, xq:torch.Tensor, y:Optional[torch.Tensor]=None) -> torch.Tensor:
         """
         Arguments
         ----------------
@@ -49,7 +54,7 @@ class Interp1D(EditableModule):
         """
         return self.obj(xq, y)
 
-    def getparamnames(self, methodname, prefix=""):
+    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         """"""
         return [prefix+"obj."+c for c in self.obj.getparamnames()]
 
