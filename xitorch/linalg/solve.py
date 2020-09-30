@@ -10,10 +10,10 @@ from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, broyden1_solve, _get_batchdims
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
-          M:Union[LinearOperator,None]=None,
+          M:Optional[LinearOperator]=None,
           bck_options:Mapping[str,Any]={},
           method:Optional[str]=None,
-          **fwd_options):
+          **fwd_options) -> torch.Tensor:
     r"""
     Performing iterative method to solve the equation
 
@@ -39,9 +39,9 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         A linear operator that takes an input ``X`` and produce the vectors in the same
         space as ``B``.
         It should have the shape of ``(*BA, na, na)``
-    B: torch.tensor
+    B: torch.Tensor
         The tensor on the right hand side with shape ``(*BB, na, ncols)``
-    E: torch.tensor or None
+    E: torch.Tensor or None
         If a tensor, it will solve :math:`\mathbf{AX-MXE = B}`.
         It will be regarded as the diagonal of the matrix.
         Otherwise, it just solves :math:`\mathbf{AX = B}` and ``M`` is ignored.
@@ -58,6 +58,11 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         ``"exactsolve"`` or ``"broyden1"`` depending on the size
     **fwd_options
         Method-specific options (see method below)
+
+    Returns
+    -------
+    torch.Tensor
+        The tensor :math:`\mathbf{X}` that satisfies :math:`\mathbf{AX-MXE=B}`.
     """
     assert_runtime(A.shape[-1] == A.shape[-2], "The linear operator A must have a square shape")
     assert_runtime(A.shape[-1] == B.shape[-2], "Mismatch shape of A & B (A: %s, B: %s)" % (A.shape, B.shape))
@@ -117,7 +122,7 @@ class solve_torchfcn(torch.autograd.Function):
             x = torch.zeros(dims, dtype=B.dtype, device=B.device)
         elif method == "custom_exactsolve":
             x = custom_exactsolve(A, params, B, E=E, M=M, mparams=mparams, **config)
-        elif method == "gmres":
+        elif method == "scipy_gmres":
             x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, **config)
         elif method == "broyden1":
             x = broyden1_solve(A, params, B, E=E, M=M, mparams=mparams, **config)
@@ -195,7 +200,7 @@ def custom_exactsolve(A, params, B, E=None,
 _solve_methods = {
     "broyden1": broyden1_solve,
     "exactsolve": exactsolve,
-    "gmres": wrap_gmres
+    "scipy_gmres": wrap_gmres
 }
 ignore_kwargs = ["E", "M", "mparams"]
 solve.__doc__ = get_methods_docstr(solve, _solve_methods, ignore_kwargs)

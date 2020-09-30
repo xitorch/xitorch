@@ -1,5 +1,5 @@
 import torch
-from typing import Union, Mapping, Any
+from typing import Union, Mapping, Any, Optional, Tuple
 import functools
 from xitorch import LinearOperator
 from xitorch.linalg.solve import solve
@@ -12,24 +12,25 @@ from xitorch._impls.linalg.symeig import exacteig, davidson
 
 __all__ = ["lsymeig", "usymeig", "symeig", "svd"]
 
-def lsymeig(A:LinearOperator, neig:Union[int,None]=None,
-        M:Union[LinearOperator,None]=None,
+def lsymeig(A:LinearOperator, neig:Optional[int]=None,
+        M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        **fwd_options):
-    return symeig(A, neig, "lowest", M, **fwd_options, bck_options=bck_options)
+        method:Optional[str]=None,
+        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
+    return symeig(A, neig, "lowest", M, method=method, bck_options=bck_options, **fwd_options)
 
-def usymeig(A:LinearOperator, neig:Union[int,None]=None,
-        M:Union[LinearOperator,None]=None,
+def usymeig(A:LinearOperator, neig:Optional[int]=None,
+        M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
-    return symeig(A, neig, "uppest", M, **fwd_options, bck_options=bck_options)
+        method:Optional[str]=None,
+        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
+    return symeig(A, neig, "uppest", M, method=method, bck_options=bck_options, **fwd_options)
 
-def symeig(A:LinearOperator, neig:Union[int,None]=None,
-        mode:str="lowest", M:Union[LinearOperator,None]=None,
+def symeig(A:LinearOperator, neig:Optional[int]=None,
+        mode:str="lowest", M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
+        method:Optional[str]=None,
+        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""
     Obtain ``neig`` lowest eigenvalues and eigenvectors of a linear operator,
 
@@ -100,10 +101,10 @@ def symeig(A:LinearOperator, neig:Union[int,None]=None,
             fwd_options, bck_options,
             na, *params, *mparams)
 
-def svd(A:LinearOperator, k:Union[int,None]=None,
+def svd(A:LinearOperator, k:Optional[int]=None,
         mode:str="uppest", bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
+        method:Optional[str]=None,
+        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""
     Perform the singular value decomposition (SVD):
 
