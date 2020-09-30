@@ -112,7 +112,7 @@ class FullRankMatrix(object):
         self.mat = torch.eye(size, dtype=dtype, device=device)
         self.mat *= alpha
         for i in range(len(cns)):
-            self.mat += torch.outer(cns[i], dns[i])
+            self.mat += torch.ger(cns[i], dns[i])
 
     def mv(self, v):
         res = torch.matmul(self.mat, v)
@@ -122,7 +122,7 @@ class FullRankMatrix(object):
         return torch.matmul(self.mat.T, v)
 
     def append(self, c, d):
-        self.mat += torch.outer(c, d)
+        self.mat += torch.ger(c, d)
         return self
 
     def reduce(self, max_rank, **kwargs):
