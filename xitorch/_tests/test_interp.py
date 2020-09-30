@@ -4,16 +4,18 @@ from torch.autograd import gradcheck, gradgradcheck
 from xitorch.interpolate.interp1 import Interp1D
 from xitorch._tests.utils import device_dtype_float_test
 
-@device_dtype_float_test(only64=True)
-def test_interp1_cspline(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "bc_type": ["clamped", "natural", "not-a-knot", None]
+})
+def test_interp1_cspline(dtype, device, bc_type):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
-    bc_type = "clamped"
     x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
     y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
     y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
                        [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
-    xq1 = torch.linspace(0, 1, 10, **dtype_device_kwargs).requires_grad_()
-    xq2 = torch.linspace(0, 1, 4, **dtype_device_kwargs).requires_grad_()
+    # points are well inside to avoid extrapolation in numerical gradient calculations
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs).requires_grad_()
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs).requires_grad_()
 
     # true results (obtained from scipy.interpolate.CubicSpline)
     # from scipy.interpolate import CubicSpline
@@ -22,21 +24,49 @@ def test_interp1_cspline(dtype, device):
     # print("yq21:", CubicSpline(x.detach(), y2[1].detach(), bc_type=bc_type)(xq1.detach()))
     # print("yq22:", CubicSpline(x.detach(), y2[1].detach(), bc_type=bc_type)(xq2.detach()))
 
-    yq11_true = torch.tensor([1.        , 1.10966822, 1.65764362, 2.08516021, 1.40964624, 1.04718761,
-                              1.52146065, 2.19990128, 2.49291361, 2.5       ],
-                              **dtype_device_kwargs)
-    yq12_true = torch.tensor([1.        , 2.08516021, 1.52146065, 2.5       ], **dtype_device_kwargs)
-    yq21_true = torch.tensor([[1.        , 1.10966822, 1.65764362, 2.08516021, 1.40964624, 1.04718761,
-                               1.52146065, 2.19990128, 2.49291361, 2.5       ],
-                              [0.8       , 0.75490137, 1.45269956, 2.13861483, 0.8463294,  0.57694735,
-                               2.06124231, 3.20656708, 2.2875088,  1.2       ]],
-                               **dtype_device_kwargs)
-    yq22_true = torch.tensor([[1.        , 2.08516021, 1.52146065, 2.5       ],
-                              [0.8       , 2.13861483, 2.06124231, 1.2       ]],
-                              **dtype_device_kwargs)
+    # get the y_trues from scipy
+    if bc_type == "clamped":
+        yq11_true = torch.tensor([1.01599131, 1.23547394, 1.85950467, 2.02868906, 1.37102567, 1.04108172,
+                                  1.42061722, 2.04849297, 2.4435166 , 2.5061722 ],
+                                  **dtype_device_kwargs)
+        yq12_true = torch.tensor([1.01599131, 2.02868906, 1.42061722, 2.5061722 ], **dtype_device_kwargs)
+        yq21_true = torch.tensor([[1.01599131, 1.23547394, 1.85950467, 2.02868906, 1.37102567, 1.04108172,
+                                   1.42061722, 2.04849297, 2.4435166 , 2.5061722 ],
+                                  [0.76740145, 0.85220436, 1.79469225, 2.01628631, 0.78122407, 0.53357346,
+                                   1.80606846, 3.07316928, 2.80705394, 1.48568465]],
+                                   **dtype_device_kwargs)
+        yq22_true = torch.tensor([[1.01599131, 2.02868906, 1.42061722, 2.5061722 ],
+                                  [0.76740145, 2.01628631, 1.80606846, 1.48568465]],
+                                  **dtype_device_kwargs)
+    elif bc_type == "not-a-knot" or bc_type is None: # default choice
+        yq11_true = torch.tensor([0.66219741, 1.06231845, 1.8959342 , 2.01058952, 1.36963168, 1.02084725,
+                                  1.33918614, 1.97824847, 2.56027129, 2.70749165],
+                                  **dtype_device_kwargs)
+        yq12_true = torch.tensor([0.66219741, 2.01058952, 1.33918614, 2.70749165], **dtype_device_kwargs)
+        yq21_true = torch.tensor([[0.66219741, 1.06231845, 1.8959342 , 2.01058952, 1.36963168, 1.02084725,
+                                   1.33918614, 1.97824847, 2.56027129, 2.70749165],
+                                  [-0.01262521 , 0.47242487 , 1.87087507 , 1.99610601 , 0.81846828 , 0.39785058,
+                                    1.33699082 , 2.68769477 , 3.43433639 , 2.56128965]],
+                                   **dtype_device_kwargs)
+        yq22_true = torch.tensor([[0.66219741, 2.01058952, 1.33918614, 2.70749165],
+                                  [-0.01262521,  1.99610601,  1.33699082,  2.56128965]],
+                                  **dtype_device_kwargs)
+    elif bc_type == "natural":
+        yq11_true = torch.tensor([1.03045416, 1.24263582, 1.85784168, 2.03025785, 1.37277695, 1.03808008,
+                                  1.41177844, 2.04167374, 2.45428693, 2.52449066],
+                                  **dtype_device_kwargs)
+        yq12_true = torch.tensor([1.03045416, 2.03025785, 1.41177844, 2.52449066], **dtype_device_kwargs)
+        yq21_true = torch.tensor([[1.03045416, 1.24263582, 1.85784168, 2.03025785, 1.37277695, 1.03808008,
+                                   1.41177844, 2.04167374, 2.45428693, 2.52449066],
+                                  [0.70073217, 0.82102504, 1.79853565, 2.02728778, 0.8104202 , 0.46318855,
+                                   1.57916384, 2.89143794, 3.09930603, 1.98521859]],
+                                   **dtype_device_kwargs)
+        yq22_true = torch.tensor([[1.03045416, 2.03025785, 1.41177844, 2.52449066],
+                                  [0.70073217, 2.02728778, 1.57916384, 1.98521859]],
+                                  **dtype_device_kwargs)
 
     def interp(x, y, xq):
-        return Interp1D(x, y, method="cspline", bc_type=bc_type, extrap="mirror")(xq)
+        return Interp1D(x, y, method="cspline", bc_type=bc_type)(xq)
 
     yq11 = interp(x, y1, xq1)
     yq12 = interp(x, y1, xq2)
@@ -47,13 +77,17 @@ def test_interp1_cspline(dtype, device):
     # xx = torch.linspace(0, 1, 1000, **dtype_device_kwargs)
     # xx2 = torch.linspace(-1, 2, 1000, **dtype_device_kwargs)
     # plt.plot(xx2, interp(x, y1, xx2).detach().numpy())
-    # plt.plot(xx, CubicSpline(x.detach(), y1.detach(), bc_type="clamped")(xx.detach()))
+    # plt.plot(xx, CubicSpline(x.detach(), y1.detach(), bc_type=bc_type)(xx.detach()))
     # plt.plot(x.detach(), y1.detach(), 'x')
     # plt.show()
     assert torch.allclose(yq11, yq11_true)
     assert torch.allclose(yq12, yq12_true)
     assert torch.allclose(yq21, yq21_true)
     assert torch.allclose(yq22, yq22_true)
+
+    # skip the gradient check if bc_type is None
+    if bc_type is None:
+        return
 
     gradcheck(interp, (x, y1, xq1))
     gradcheck(interp, (x, y1, xq2))

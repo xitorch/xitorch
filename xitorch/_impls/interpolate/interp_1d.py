@@ -69,10 +69,11 @@ class CubicSpline1D(BaseInterp1D):
     bc_type: str or None
         Boundary condition:
 
+        * ``"not-a-knot"``: The first and second segments are the same polynomial
         * ``"natural"``: 2nd grad at the boundaries are 0
         * ``"clamped"``: 1st grad at the boundaries are 0
 
-        If ``None``, it will choose ``"natural"``
+        If ``None``, it will choose ``"not-a-knot"``
 
     extrap: int, float, 1-element torch.Tensor, str, or None
         Extrapolation option:
@@ -107,7 +108,7 @@ class CubicSpline1D(BaseInterp1D):
 
         # get the default extrapolation method and boundary condition
         if bc_type is None:
-            bc_type = "natural"
+            bc_type = "not-a-knot"
         extrap = check_and_get_extrap(extrap, bc_type)
         super(CubicSpline1D, self).__init__(x, y, extrap=extrap)
 
@@ -115,7 +116,7 @@ class CubicSpline1D(BaseInterp1D):
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
-        bc_types = ["natural", "clamped"]
+        bc_types = ["natural", "clamped", "not-a-knot"]
         if bc_type not in bc_types:
             raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))
         self.bc_type = bc_type
@@ -205,10 +206,12 @@ class CubicSpline1D(BaseInterp1D):
 
 def check_and_get_extrap(extrap, bc_type):
     if extrap is None:
-        return {
-            "natural": "nan",
-            "clamped": "mirror",
-        }[bc_type]
+        try:
+            return {
+                "clamped": "mirror",
+            }[bc_type]
+        except KeyError:
+            return "nan"
     return extrap
 
 def check_periodic_value(y):
@@ -273,13 +276,39 @@ def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
     matrudiag[...,:] = udiagr
     matrldiag[...,:] = ldiagr
 
-    if bc_type == "clamped":
+    # modify the matrices according to the boundary conditions
+    if bc_type == "natural":
+        pass # set to be natural
+    elif bc_type == "clamped":
         spline_mat[...,0,:] = 0.
         spline_mat[...,0,0] = 1.
         spline_mat[...,-1,:] = 0.
         spline_mat[...,-1,-1] = 1.
         matr[...,0,:] = 0.
         matr[...,-1,:] = 0.
+    elif bc_type == "not-a-knot":
+        dxinv00_sq = dxinv0[...,0]**2
+        dxinv01_sq = dxinv0[...,1]**2
+        dxinv0n_sq = dxinv0[...,-1]**2
+        dxinv0nm1_sq = dxinv0[...,-2]**2
+        dxinv00_3 = dxinv0[...,0] * dxinv00_sq
+        dxinv01_3 = dxinv0[...,1] * dxinv01_sq
+        dxinv0n_3 = dxinv0[...,-1] * dxinv0n_sq
+        dxinv0nm1_3 = dxinv0[...,-2] * dxinv0nm1_sq
+        spline_mat[...,0,0] = dxinv00_sq
+        spline_mat[...,0,1] = dxinv00_sq - dxinv01_sq
+        spline_mat[...,0,2] = -dxinv01_sq
+        spline_mat[...,-1,-1] = -dxinv0n_sq
+        spline_mat[...,-1,-2] = dxinv0nm1_sq - dxinv0n_sq
+        spline_mat[...,-1,-3] = dxinv0nm1_sq
+        matr[...,0,0] = 2 * (-dxinv00_3)
+        matr[...,0,1] = 2 * (dxinv00_3 + dxinv01_3)
+        matr[...,0,2] = 2 * (-dxinv01_3)
+        matr[...,-1,-1] = 2 * (-dxinv0n_3)
+        matr[...,-1,-2] = 2 * (dxinv0n_3 + dxinv0nm1_3)
+        matr[...,-1,-3] = 2 * (-dxinv0nm1_3)
+    else:
+        raise RuntimeError("Unknown boundary condition: %s" % bc_type)
 
     # solve the matrix inverse
     spline_mat_inv, _ = torch.solve(matr, spline_mat)
