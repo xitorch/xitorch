@@ -47,7 +47,7 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[],
     # convert the numpy/scipy
     with A.uselinopparams(*params):
         op = A.scipy_linalg_op()
-        B_np = B.detach().numpy()
+        B_np = B.detach().cpu().numpy()
         res_np = np.empty(B.shape, dtype=np.float64)
         for i in range(nbatch):
             for j in range(ncols):
