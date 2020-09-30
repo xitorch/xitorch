@@ -107,6 +107,7 @@ def test_rootfinder(dtype, device, clss):
     nr = 3
     nbatch = 2
     fwd_options = {
+        "method": "broyden1",
         "f_tol": 1e-9,
         "alpha": -0.5,
     }
@@ -141,6 +142,7 @@ def test_equil(dtype, device, clss):
     nr = 3
     nbatch = 2
     fwd_options = {
+        "method": "broyden1",
         "f_tol": 1e-9,
         "alpha": -0.5,
     }
@@ -175,6 +177,7 @@ def test_rootfinder_with_params(dtype, device, bias_is_tensor):
     nr = 3
     nbatch = 2
     fwd_options = {
+        "method": "broyden1",
         "f_tol": 1e-9,
         "alpha": -0.5,
     }
@@ -217,6 +220,7 @@ def test_minimize(dtype, device, clss):
     bias = torch.zeros((nbatch, nr)).to(dtype)
     y0 = torch.randn((nbatch, nr)).to(dtype)
     fwd_options = {
+        "method": "broyden1",
         "max_niter": 50,
         "f_tol": 1e-9,
         "alpha": -0.5,

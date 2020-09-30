@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Iterable, Mapping, Any, Sequence, Union
+from typing import Callable, Mapping, Any, Optional, List
 import torch
 import numpy as np
 import scipy.optimize
@@ -21,19 +21,19 @@ __all__ = ["equilibrium", "rootfinder", "minimize"]
 def rootfinder(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:Sequence[Any]=[],
+        params:List[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
-    """
+        method:Optional[str]=None,
+        **fwd_options) -> torch.Tensor:
+    r"""
     Solving the rootfinder equation of a given function,
 
     .. math::
 
-        \mathbf{0} = \mathbf{f}(\mathbf{y}, \\theta)
+        \mathbf{0} = \mathbf{f}(\mathbf{y}, \theta)
 
     where :math:`\mathbf{f}` is a function that can be non-linear and
-    produce output of the same shape of :math:`\mathbf{y}`, and :math:`\\theta`
+    produce output of the same shape of :math:`\mathbf{y}`, and :math:`\theta`
     is other parameters required in the function.
     The output of this block is :math:`\mathbf{y}`
     that produces the :math:`\mathbf{0}` as the output.
@@ -49,7 +49,7 @@ def rootfinder(
     bck_options : dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
-        Rootfinder method.
+        Rootfinder method. If None, it will choose ``"broyden1"``.
     **fwd_options
         Method-specific options (see method section)
 
@@ -57,7 +57,7 @@ def rootfinder(
     -------
     torch.tensor
         The solution which satisfies
-        :math:`\mathbf{0} = \mathbf{f}(\mathbf{y},\\theta)`
+        :math:`\mathbf{0} = \mathbf{f}(\mathbf{y},\theta)`
         with shape ``(*ny)``
 
     Example
@@ -89,19 +89,19 @@ def rootfinder(
 def equilibrium(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:Sequence[Any]=[],
+        params:List[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
-    """
+        method:Optional[str]=None,
+        **fwd_options) -> torch.Tensor:
+    r"""
     Solving the equilibrium equation of a given function,
 
     .. math::
 
-        \mathbf{y} = \mathbf{f}(\mathbf{y}, \\theta)
+        \mathbf{y} = \mathbf{f}(\mathbf{y}, \theta)
 
     where :math:`\mathbf{f}` is a function that can be non-linear and
-    produce output of the same shape of :math:`\mathbf{y}`, and :math:`\\theta`
+    produce output of the same shape of :math:`\mathbf{y}`, and :math:`\theta`
     is other parameters required in the function.
     The output of this block is :math:`\mathbf{y}`
     that produces the same :math:`\mathbf{y}` as the output.
@@ -117,7 +117,7 @@ def equilibrium(
     bck_options : dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
-        Rootfinder method.
+        Rootfinder method. If None, it will choose ``"broyden1"``.
     **fwd_options
         Method-specific options (see method section)
 
@@ -125,7 +125,7 @@ def equilibrium(
     -------
     torch.tensor
         The solution which satisfies
-        :math:`\mathbf{y} = \mathbf{f}(\mathbf{y},\\theta)`
+        :math:`\mathbf{y} = \mathbf{f}(\mathbf{y},\theta)`
         with shape ``(*ny)``
 
     Example
@@ -162,16 +162,16 @@ def equilibrium(
 def minimize(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:Sequence[Any]=[],
+        params:List[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
+        method:Optional[str]=None,
         **fwd_options) -> torch.Tensor:
-    """
+    r"""
     Solve the unbounded minimization problem:
 
     .. math::
 
-        \mathbf{y^*} = \\arg\min_\mathbf{y} f(\mathbf{y}, \\theta)
+        \mathbf{y^*} = \arg\min_\mathbf{y} f(\mathbf{y}, \theta)
 
     to find the best :math:`\mathbf{y}` that minimizes the output of the
     function :math:`f`.
@@ -187,7 +187,7 @@ def minimize(
     bck_options: dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method: str or None
-        Minimization method.
+        Minimization method. If None, it will choose ``"broyden1"``.
     **fwd_options
         Method-specific options (see method section)
 
