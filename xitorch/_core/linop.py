@@ -1,5 +1,5 @@
 import inspect
-from typing import Sequence, Optional
+from typing import Sequence, Optional, List
 import warnings
 import traceback
 import torch
@@ -104,7 +104,7 @@ class LinearOperator(EditableModule):
             (",".join([str(s) for s in self.shape]))
 
     @abstractmethod
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         """
         List the self's parameters that affecting the ``LinearOperator``.
         This is for the derivative purpose.
@@ -333,7 +333,7 @@ class LinearOperator(EditableModule):
             rmatmat=lambda v: self.rmm(to_tensor(v)).detach().numpy(),
         )
 
-    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         """"""
         # just to remove the docstring from EditableModule because user
         # does not need to know about this function
@@ -354,7 +354,7 @@ class LinearOperator(EditableModule):
     def matmul(self, b, is_hermitian:bool=False):
         # returns linear operator that represents self @ b
         if self.shape[-1] != b.shape[-2]:
-            raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (a.shape, b.shape))
+            raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (self.shape, b.shape))
         return MatmulLinearOp(self, b, is_hermitian=is_hermitian)
 
     ############# properties ################
@@ -452,7 +452,7 @@ class AdjointLinearOperator(LinearOperator):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.obj._mv(x)
 
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         return self.obj._getparamnames(prefix=prefix+"obj.")
 
     @property
@@ -478,7 +478,7 @@ class MatmulLinearOp(LinearOperator):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         return self.b.rmv(self.a.rmv(x))
 
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         return self.a._getparamnames(prefix=prefix+"a.") + \
                self.b._getparamnames(prefix=prefix+"b.")
 
@@ -510,7 +510,7 @@ class _MatrixNonHermitLinOp(LinearOperator):
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         return [prefix+"mat"]
 
 class _MatrixHermitLinOp(LinearOperator):
@@ -533,7 +533,7 @@ class _MatrixHermitLinOp(LinearOperator):
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat
 
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         return [prefix+"mat"]
 
     @property
@@ -631,8 +631,3 @@ def checklinop(linop:LinearOperator) -> None:
     for (rmv_xshape, rmv_yshape) in zip(rmv_xshapes, rmv_yshapes):
         runtest("rmv", rmv_xshape, rmv_yshape)
         runtest("rmm", (*rmv_xshape, r), (*rmv_yshape, r))
-
-if __name__ == "__main__":
-    mat = torch.tensor([[1.2, 3.4], [2.1, 5.6]])
-    matlinop = _MatrixLinOp(mat)
-    matlinop.check()

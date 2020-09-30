@@ -2,14 +2,14 @@ import torch
 import warnings
 from typing import Callable, List, Any, Union, Sequence
 from xitorch import LinearOperator
-from xitorch._core.pure_function import get_pure_function, make_sibling
+from xitorch._core.pure_function import get_pure_function, make_sibling, PureFunction
 from xitorch._utils.assertfuncs import assert_type
 from xitorch._utils.misc import TensorNonTensorSeparator
 
 __all__ = ["jac", "hess"]
 
 def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
-        idxs:Union[None,int,Sequence[int]]=None) -> List[LinearOperator]:
+        idxs:Union[None,int,Sequence[int]]=None) -> Union[LinearOperator, List]:
     """
     Returns the LinearOperator that acts as the jacobian of the params.
     The shape of LinearOperator is (nout, nin) where `nout` and `nin` are the
@@ -39,11 +39,11 @@ def jac(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
     pfcn = get_pure_function(fcn)
     res = [_Jac(pfcn, params, idx) for idx in idxs_list]
     if isinstance(idxs, int):
-        res = res[0]
+        return res[0]
     return res
 
 def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
-        idxs:Union[None,int,Sequence[int]]=None) -> List[LinearOperator]:
+        idxs:Union[None,int,Sequence[int]]=None) -> Union[LinearOperator, List]:
     """
     Returns the LinearOperator that acts as the Hessian of the params.
     The shape of LinearOperator is (nin, nin) where `nin` is the
@@ -91,11 +91,11 @@ def hess(fcn:Callable[...,torch.Tensor], params:Sequence[Any],
         res.append(hs)
 
     if isinstance(idxs, int):
-        res = res[0]
+        return res[0]
     return res
 
 class _Jac(LinearOperator):
-    def __init__(self, fcn:Callable[...,torch.Tensor],
+    def __init__(self, fcn:PureFunction,
             params:Sequence[Any], idx:int, is_hermitian=False) -> None:
 
         # TODO: check if fcn has kwargs
@@ -137,7 +137,7 @@ class _Jac(LinearOperator):
         self.id_params_tensor = [id(param) for param in self.params_tensor]
         self.id_objparams_tensor = [id(param) for param in self.objparams]
 
-    def _getparamnames(self, prefix:str="") -> Sequence[str]:
+    def _getparamnames(self, prefix:str="") -> List[str]:
         return [prefix+"yparam"] + \
                [prefix+("params_tensor[%d]"%i) for i in range(len(self.params_tensor))] + \
                [prefix+("objparams[%d]"%i) for i in range(len(self.objparams))]
@@ -161,12 +161,12 @@ class _Jac(LinearOperator):
 
         gy1 = gy.reshape(-1, self.nin) # (nbatch, nin)
         nbatch = gy1.shape[0]
-        dfdyfs = []
+        dfdyfs_list = []
         for i in range(nbatch):
             dfdyf, = torch.autograd.grad(dfdy, (v,), grad_outputs=gy1[i].reshape(self.inshape),
                 retain_graph=True, create_graph=torch.is_grad_enabled()) # (*nout)
-            dfdyfs.append(dfdyf.unsqueeze(0))
-        dfdyfs = torch.cat(dfdyfs, dim=0) # (nbatch, *nout)
+            dfdyfs_list.append(dfdyf.unsqueeze(0))
+        dfdyfs = torch.cat(dfdyfs_list, dim=0) # (nbatch, *nout)
 
         res = dfdyfs.reshape(*gy.shape[:-1], self.nout) # (..., nout)
         res = connect_graph(res, self.params_tensor)
@@ -186,12 +186,12 @@ class _Jac(LinearOperator):
 
         gout1 = gout.reshape(-1, self.nout) # (nbatch, nout)
         nbatch = gout1.shape[0]
-        dfdy = []
+        dfdy_list = []
         for i in range(nbatch):
             one_dfdy, = torch.autograd.grad(yout, (yparam,), grad_outputs=gout1[i].reshape(self.outshape),
                 retain_graph=True, create_graph=torch.is_grad_enabled()) # (*nin)
-            dfdy.append(one_dfdy.unsqueeze(0))
-        dfdy = torch.cat(dfdy, dim=0) # (nbatch, *nin)
+            dfdy_list.append(one_dfdy.unsqueeze(0))
+        dfdy = torch.cat(dfdy_list, dim=0) # (nbatch, *nin)
 
         res = dfdy.reshape(*gout.shape[:-1], self.nin) # (..., nin)
         res = connect_graph(res, self.params_tensor)

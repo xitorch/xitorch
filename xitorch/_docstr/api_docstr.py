@@ -1,6 +1,11 @@
 import inspect
+from typing import Union, Any, Mapping, Sequence, Optional, Callable, List, \
+    Generator, Tuple, ItemsView, ClassVar
 
-def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
+def get_methods_docstr(
+        cls_or_func:Callable,
+        methods:Union[Sequence[Callable],Mapping[str,Any]],
+        ignore_kwargs:Optional[List[str]]=None) -> str:
     """
     Get the full docstring of a class or a function. Full docstring is the
     main docstring of the class or function plus docstrings of the methods
@@ -32,7 +37,7 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
 
             {mainname}(..., {kwargs_sig})
     """
-    res = cls_or_func.__doc__
+    res = cls_or_func.__doc__ or ""
     mainname = cls_or_func.__name__
 
     def_ignore_kwargs = ["params"]
@@ -41,7 +46,7 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
     ignore_kwargs = ignore_kwargs + def_ignore_kwargs
 
     if isinstance(methods, dict):
-        generator = methods.items()
+        generator = methods.items()  # type: Union[ItemsView[str, Any], Generator[Tuple[str, Any], None, None]]
     elif isinstance(methods, list):
         generator = ((method.__name__, method) for method in methods)
     else:
@@ -67,7 +72,7 @@ def get_methods_docstr(cls_or_func, methods, ignore_kwargs=None):
             res = res + method_doc
     return res
 
-def _get_default_parameters(parameters, ignore_kwargs):
+def _get_default_parameters(parameters, ignore_kwargs:Sequence[str]):
     empty = inspect.Parameter.empty
     for paramname in parameters:
         if paramname in ignore_kwargs:
@@ -78,5 +83,5 @@ def _get_default_parameters(parameters, ignore_kwargs):
         defval = defval if not isinstance(defval, str) else '"%s"'%defval
         yield paramname, defval
 
-def _add_indent(s, indent):
+def _add_indent(s:str, indent:str) -> str:
     return "\n".join([indent+line for line in s.split("\n")])

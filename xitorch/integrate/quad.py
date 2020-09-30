@@ -62,13 +62,14 @@ def quad(
     fwd_options["method"] = method
 
     out = fcn(xl, *params)
-    is_tuple_out = not isinstance(out, torch.Tensor)
-    if not is_tuple_out:
+    if isinstance(out, torch.Tensor):
         dtype = out.dtype
         device = out.device
+        is_tuple_out = False
     elif len(out) > 0:
         dtype = out[0].dtype
         device = out[0].device
+        is_tuple_out = True
     else:
         raise RuntimeError("The output of the fcn must be non-empty")
 

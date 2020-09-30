@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Optional, List
 import torch
 from xitorch._core.editable_module import EditableModule
 from xitorch._impls.interpolate.interp_1d import CubicSpline1D
@@ -54,7 +54,7 @@ class Interp1D(EditableModule):
         """
         return self.obj(xq, y)
 
-    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         """"""
         return [prefix+"obj."+c for c in self.obj.getparamnames()]
 

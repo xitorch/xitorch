@@ -2,7 +2,7 @@ import torch
 from xitorch._core.editable_module import EditableModule
 from xitorch._impls.integrate.samples_quad import CubicSplineSQuad, TrapzSQuad, SimpsonSQuad
 from xitorch._docstr.api_docstr import get_methods_docstr
-from typing import Optional, Sequence
+from typing import Optional, List
 
 __all__ = ["SQuad"]
 
@@ -106,7 +106,7 @@ class SQuad(EditableModule):
             res = res.transpose(dim, -1)
         return res
 
-    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         """"""
         return self.getparamnames(methodname, prefix=prefix+"obj.")
 

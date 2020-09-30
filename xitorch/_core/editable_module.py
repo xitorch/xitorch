@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import copy
 import traceback as tb
 import torch
-from typing import Sequence, Union, Mapping, Sequence, Dict
+from typing import Sequence, Union, Mapping, Sequence, Dict, List
 from xitorch._utils.exceptions import GetSetParamsError
 from xitorch._utils.attr import get_attr, set_attr, del_attr
 
@@ -36,7 +36,7 @@ class EditableModule(object):
         return len(params)
 
     @abstractmethod
-    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
+    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         """
         This method should list tensor names that affect the output of the
         method with name indicated in ``methodname``.
@@ -85,7 +85,7 @@ class EditableModule(object):
         """
         pass
 
-    def getuniqueparams(self, methodname:str) -> Sequence[torch.Tensor]:
+    def getuniqueparams(self, methodname:str) -> List[torch.Tensor]:
         allparams = self.getparams(methodname)
         idxs = self._get_unique_params_idxs(methodname, allparams)
         return [allparams[i] for i in idxs]
@@ -117,9 +117,9 @@ class EditableModule(object):
             allparams = self.getparams(methodname)
 
         # get the unique ids
-        ids = [] # type: Sequence[int]
+        ids = [] # type: List[int]
         idxs = []
-        idx_map = [] # type: Sequence[Sequence[int]]
+        idx_map = [] # type: List[List[int]]
         for i in range(len(allparams)):
             param = allparams[i]
             id_param = id(param)

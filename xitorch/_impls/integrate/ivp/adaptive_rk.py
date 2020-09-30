@@ -1,5 +1,6 @@
 import torch
 import functools
+from typing import Optional
 
 __all__ = ["rk23_adaptive", "rk45_adaptive"]
 
@@ -19,12 +20,12 @@ def rk_step(func, t, y, f, h, abck):
     return ynew, fnew
 
 class RKAdaptiveStepSolver(object):
-    A = None
-    B = None
-    C = None
-    E = None
-    n_stages = None
-    error_estimator_order = None
+    A:Optional[torch.Tensor] = None
+    B:Optional[torch.Tensor] = None
+    C:Optional[torch.Tensor] = None
+    E:Optional[torch.Tensor] = None
+    n_stages:Optional[int] = None
+    error_estimator_order:Optional[int] = None
 
     def __init__(self, atol, rtol):
         self.atol = atol
@@ -177,5 +178,5 @@ def rk45_adaptive(fcn, ts, y0, params, **kwargs):
     return _rk_adaptive(fcn, ts, y0, params, RK45, **kwargs)
 
 # complete the docstring
-rk23_adaptive.__doc__ += _rk_adaptive.__doc__
-rk45_adaptive.__doc__ += _rk_adaptive.__doc__
+rk23_adaptive.__doc__ += _rk_adaptive.__doc__  # type: ignore
+rk45_adaptive.__doc__ += _rk_adaptive.__doc__  # type: ignore

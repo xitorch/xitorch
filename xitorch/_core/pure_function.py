@@ -163,7 +163,7 @@ def get_pure_function(fcn:Callable[...,Any]) -> PureFunction:
     return _get_pure_function(fcn)
 
 def _get_pure_function(
-        fcn:Callable[...,Any],
+        fcn,
         fcntocall:Optional[Callable[...,Any]]=None) -> PureFunction:
     if not inspect.ismethod(fcn) and not inspect.isfunction(fcn) and not isinstance(fcn, PureFunction):
         if hasattr(fcn, "__call__"):

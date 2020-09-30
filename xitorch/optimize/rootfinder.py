@@ -237,12 +237,7 @@ def minimize(
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, fcn:Callable[...,torch.Tensor],
-            y0:torch.Tensor,
-            options:Mapping[str,Any],
-            bck_options:Mapping[str,Any],
-            nparams:int,
-            *allparams) -> torch.Tensor:
+    def forward(ctx, fcn, y0, options, bck_options, nparams, *allparams):
 
         # set default options
         config = options
@@ -271,7 +266,7 @@ class _RootFinder(torch.autograd.Function):
         return y
 
     @staticmethod
-    def backward(ctx, grad_yout:torch.Tensor):
+    def backward(ctx, grad_yout):
         param_sep = ctx.param_sep
         yout = ctx.saved_tensors[0]
         nparams = ctx.nparams

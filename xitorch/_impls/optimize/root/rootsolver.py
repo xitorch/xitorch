@@ -138,7 +138,7 @@ def broyden1(fcn, x0, params=(), **kwargs):
     return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 
 # set the docstring of the functions
-broyden1.__doc__ += _nonlin_solver.__doc__
+broyden1.__doc__ += _nonlin_solver.__doc__  # type: ignore
 
 def _safe_norm(v):
     if not torch.isfinite(v).all():
