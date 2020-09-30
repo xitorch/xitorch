@@ -327,10 +327,10 @@ class LinearOperator(EditableModule):
         to_tensor = lambda x: torch.tensor(x, dtype=self.dtype, device=self.device)
         return spLinearOperator(
             shape=self.shape,
-            matvec =lambda v: self.mv (to_tensor(v)).detach().numpy(),
-            rmatvec=lambda v: self.rmv(to_tensor(v)).detach().numpy(),
-            matmat =lambda v: self.mm (to_tensor(v)).detach().numpy(),
-            rmatmat=lambda v: self.rmm(to_tensor(v)).detach().numpy(),
+            matvec =lambda v: self.mv (to_tensor(v)).detach().cpu().numpy(),
+            rmatvec=lambda v: self.rmv(to_tensor(v)).detach().cpu().numpy(),
+            matmat =lambda v: self.mm (to_tensor(v)).detach().cpu().numpy(),
+            rmatmat=lambda v: self.rmm(to_tensor(v)).detach().cpu().numpy(),
         )
 
     def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
