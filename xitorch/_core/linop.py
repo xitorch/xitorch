@@ -1,5 +1,5 @@
 import inspect
-from typing import Sequence, Union
+from typing import Sequence, Optional
 import warnings
 import traceback
 import torch
@@ -25,7 +25,7 @@ class LinearOperator(EditableModule):
     and ``._getparamnames()`` methods implemented at the very least.
     """
     @classmethod
-    def m(cls, mat:torch.Tensor, is_hermitian:Union[bool,None]=None):
+    def m(cls, mat:torch.Tensor, is_hermitian:Optional[bool]=None):
         """
         Class method to wrap a matrix into ``LinearOperator``.
 
@@ -36,6 +36,11 @@ class LinearOperator(EditableModule):
         is_hermitian: bool or None
             Indicating if the matrix is Hermitian. If ``None``, the symmetry
             will be checked. If supplied as a bool, there is no check performed.
+
+        Returns
+        -------
+        LinearOperator
+            Linear operator object that represents the matrix.
 
         Example
         -------
@@ -64,8 +69,8 @@ class LinearOperator(EditableModule):
 
     def __init__(self, shape:Sequence[int],
             is_hermitian:bool = False,
-            dtype:Union[torch.dtype,None] = None,
-            device:Union[torch.device,None] = None,
+            dtype:Optional[torch.dtype] = None,
+            device:Optional[torch.device] = None,
             _suppress_hermit_warning:bool = False) -> None:
 
         super(LinearOperator, self).__init__()
@@ -94,7 +99,7 @@ class LinearOperator(EditableModule):
         self._matrix_defined = False
         self._matrix = torch.tensor([])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "xitorch.LinearOperator with shape: (%s)" % \
             (",".join([str(s) for s in self.shape]))
 
@@ -391,7 +396,7 @@ class LinearOperator(EditableModule):
         return self._is_fullmatrix_implemented
 
     ############ debug functions ##############
-    def check(self, warn:Union[bool,None]=None) -> None:
+    def check(self, warn:Optional[bool]=None) -> None:
         """
         Perform checks to make sure the ``LinearOperator`` behaves as a proper
         linear operator.

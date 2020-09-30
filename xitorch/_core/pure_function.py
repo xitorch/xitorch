@@ -1,5 +1,6 @@
 import torch
 import inspect
+from typing import Callable, Any, Optional
 from xitorch._utils.attr import get_attr, set_attr, del_attr
 from xitorch._core.editable_module import EditableModule
 from contextlib import contextmanager
@@ -128,7 +129,7 @@ class FunctionPureFunction(PureFunction):
         try: yield
         finally: pass
 
-def make_sibling(pfunc):
+def make_sibling(pfunc:Callable[...,Any]) -> Callable[[Callable[...,Any]], PureFunction]:
     """
     Used as a decor to mark the decorated function as a sibling method of the
     input ``pfunc``.
@@ -144,7 +145,7 @@ def make_sibling(pfunc):
         return new_pfunc
     return decor
 
-def get_pure_function(fcn):
+def get_pure_function(fcn:Callable[...,Any]) -> PureFunction:
     """
     Get the pure function form of the function or method ``fcn``.
 
@@ -161,7 +162,9 @@ def get_pure_function(fcn):
     """
     return _get_pure_function(fcn)
 
-def _get_pure_function(fcn, fcntocall=None):
+def _get_pure_function(
+        fcn:Callable[...,Any],
+        fcntocall:Optional[Callable[...,Any]]=None) -> PureFunction:
     if not inspect.ismethod(fcn) and not inspect.isfunction(fcn) and not isinstance(fcn, PureFunction):
         if hasattr(fcn, "__call__"):
             fcn = fcn.__call__

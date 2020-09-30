@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import copy
 import traceback as tb
 import torch
-from typing import Sequence, Union, Mapping, List, Dict
+from typing import Sequence, Union, Mapping, Sequence, Dict
 from xitorch._utils.exceptions import GetSetParamsError
 from xitorch._utils.attr import get_attr, set_attr, del_attr
 
@@ -36,7 +36,7 @@ class EditableModule(object):
         return len(params)
 
     @abstractmethod
-    def getparamnames(self, methodname, prefix="") -> List[str]:
+    def getparamnames(self, methodname:str, prefix:str="") -> Sequence[str]:
         """
         This method should list tensor names that affect the output of the
         method with name indicated in ``methodname``.
@@ -50,6 +50,11 @@ class EditableModule(object):
         prefix: str
             The prefix to be appended in front of the parameters name.
             This usually contains the dots.
+
+        Returns
+        -------
+        Sequence of string
+            Sequence of name of parameters affecting the output of the method.
 
         Raises
         ------
@@ -102,7 +107,7 @@ class EditableModule(object):
             allparams:Union[Sequence[torch.Tensor],None]=None) -> Sequence[int]:
 
         if not hasattr(self, "_unique_params_idxs"):
-            self._unique_params_idxs = {} # type: Dict[str,List[int]]
+            self._unique_params_idxs = {} # type: Dict[str,Sequence[int]]
             self._unique_params_maps = {}
             self._number_of_params = {}
 
@@ -112,9 +117,9 @@ class EditableModule(object):
             allparams = self.getparams(methodname)
 
         # get the unique ids
-        ids = [] # type: List[int]
+        ids = [] # type: Sequence[int]
         idxs = []
-        idx_map = [] # type: List[List[int]]
+        idx_map = [] # type: Sequence[Sequence[int]]
         for i in range(len(allparams)):
             param = allparams[i]
             id_param = id(param)
@@ -315,7 +320,7 @@ class EditableModule(object):
             warnings.warn(msg, stacklevel=3)
 
     def __list_operating_params(self, method, *args, **kwargs):
-        # List the tensors used in executing the method by calling the method
+        # Sequence the tensors used in executing the method by calling the method
         # and see which parameters are connected in the backward graph
 
         # get all the tensors recursively
@@ -429,9 +434,9 @@ def _get_tensors(obj, prefix="", max_depth=20):
     Returns
     -------
     * res: list of torch.Tensor
-        List of tensors collected recursively in the object.
+        Sequence of tensors collected recursively in the object.
     * name: list of str
-        List of names of the collected tensors.
+        Sequence of names of the collected tensors.
     """
 
     # get the tensors recursively towards torch.nn.Module
@@ -455,7 +460,7 @@ def _set_tensors(obj, all_params, max_depth=20):
     * obj: an instance
         The object user wants to traverse down
     * all_params: list of torch.Tensor
-        List of tensors to be put in the object.
+        Sequence of tensors to be put in the object.
     * max_depth: int
         Maximum recursive depth to avoid infinitely running program.
         If the maximum depth is reached, then raise a RecursionError.
