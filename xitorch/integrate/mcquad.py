@@ -1,4 +1,5 @@
 import torch
+from typing import Union, Sequence, Any, Callable, Optional, Mapping
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
@@ -8,16 +9,21 @@ from xitorch._docstr.api_docstr import get_methods_docstr
 
 __all__ = ["mcquad"]
 
-def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
-        bck_options={},
-        method=None,
-        **fwd_options):
-    """
+def mcquad(
+        ffcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
+        log_pfcn:Callable[...,torch.Tensor],
+        x0:torch.Tensor,
+        fparams:Sequence[Any]=[],
+        pparams:Sequence[Any]=[],
+        bck_options:Mapping[str,Any]={},
+        method:Optional[str]=None,
+        **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
+    r"""
     Performing monte carlo quadrature to calculate the expectation value:
 
     .. math::
 
-       \mathbb{E}_p[f] = \\frac{\int f(\mathbf{x},\\theta_f) p(\mathbf{x},\\theta_p)\\ \mathrm{d}\mathbf{x} }{ \int p(\mathbf{x},\\theta_p)\\ \mathrm{d}\mathbf{x} }
+       \mathbb{E}_p[f] = \frac{\int f(\mathbf{x},\theta_f) p(\mathbf{x},\theta_p)\ \mathrm{d}\mathbf{x} }{ \int p(\mathbf{x},\theta_p)\ \mathrm{d}\mathbf{x} }
 
     Arguments
     ---------
@@ -31,14 +37,14 @@ def mcquad(ffcn, log_pfcn, x0, fparams, pparams,
         Tensor with any size as the initial position.
         The call ``ffcn(x0,*fparams)`` must work.
     fparams: list
-        List of any other parameters for ``ffcn``.
+        Sequence of any other parameters for ``ffcn``.
     pparams: list
-        List of any other parameters for ``gfcn``.
+        Sequence of any other parameters for ``gfcn``.
     bck_options: dict
         Options for the backward mcquad operation. Unspecified fields will be
         taken from ``fwd_options``.
     method: str or None
-        Monte Carlo quadrature method.
+        Monte Carlo quadrature method. If None, it will choose ``"mh"``.
     **fwd_options: dict
         Method-specific options (see method section below).
 

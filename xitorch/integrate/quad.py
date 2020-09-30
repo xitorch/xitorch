@@ -1,7 +1,7 @@
 import math
 from abc import abstractmethod
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence, List
+from typing import Callable, Union, Mapping, Any, Sequence, Optional
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
@@ -13,19 +13,19 @@ from xitorch.debug.modes import is_debug_enabled
 __all__ = ["quad"]
 
 def quad(
-        fcn:Union[Callable[...,torch.Tensor], Callable[...,List[torch.Tensor]]],
+        fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
         xl:Union[float,int,torch.Tensor],
         xu:Union[float,int,torch.Tensor],
         params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Union[str,None]=None,
-        **fwd_options):
-    """
+        method:Optional[str]=None,
+        **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
+    r"""
     Calculate the quadrature:
 
     .. math::
 
-        y = \int_{x_l}^{x_u} f(x, \\theta)\\ \mathrm{d}x
+        y = \int_{x_l}^{x_u} f(x, \theta)\ \mathrm{d}x
 
     Arguments
     ---------
@@ -37,17 +37,17 @@ def quad(
     xu: float, int or 1-element torch.Tensor
         The upper bound of the integration.
     params: list
-        List of any other parameters for the function ``fcn``.
+        Sequence of any other parameters for the function ``fcn``.
     bck_options: dict
         Options for the backward quadrature method.
     method: str or None
-        Quadrature method.
+        Quadrature method. If None, it will choose ``"leggauss"``.
     **fwd_options
         Method-specific options (see method section).
 
     Returns
     -------
-    torch.tensor
+    torch.tensor or a list of tensors
         The quadrature results with shape ``(*nout)`` or list of tensors.
     """
     # perform implementation check if debug mode is enabled

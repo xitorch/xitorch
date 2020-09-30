@@ -1,5 +1,5 @@
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence
+from typing import Callable, Union, Mapping, Any, Sequence, Optional
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
@@ -11,21 +11,21 @@ from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["solve_ivp"]
 
-def solve_ivp(fcn:Callable[...,torch.Tensor],
+def solve_ivp(fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
               ts:torch.Tensor,
               y0:torch.Tensor,
               params:Sequence[Any]=[],
               bck_options:Mapping[str,Any]={},
-              method:Union[str,None]=None,
-              **fwd_options) -> torch.Tensor:
-    """
+              method:Optional[str]=None,
+              **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
+    r"""
     Solve the initial value problem (IVP) or also commonly known as ordinary
     differential equations (ODE), where given the initial value :math:`\mathbf{y_0}`,
     it then solves
 
     .. math::
 
-        \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t} \mathbf{f}(t', \mathbf{y}, \\theta)\\ \mathrm{d}t'
+        \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t} \mathbf{f}(t', \mathbf{y}, \theta)\ \mathrm{d}t'
 
     Arguments
     ---------
@@ -43,18 +43,18 @@ def solve_ivp(fcn:Callable[...,torch.Tensor],
         The initial value of ``y``, i.e. ``y(t[0]) == y0``.
         It is a tensor with shape ``(*ny)`` or a list of tensors.
     params: list
-        List of other parameters required in the function.
+        Sequence of other parameters required in the function.
     bck_options: dict
         Options for the backward solve_ivp method. If not specified, it will
         take the same options as fwd_options.
     method: str or None
-        Initial value problem solver.
+        Initial value problem solver. If None, it will choose ``"rk45"``.
     **fwd_options
         Method-specific option (see method section below).
 
     Returns
     -------
-    torch.tensor
+    torch.tensor or a list of tensors
         The values of ``y`` for each time step in ``ts``.
         It is a tensor with shape ``(nt,*ny)`` or a list of tensors
     """

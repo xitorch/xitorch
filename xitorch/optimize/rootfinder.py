@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Mapping, Any, Optional, List
+from typing import Callable, Mapping, Any, Optional, Sequence
 import torch
 import numpy as np
 import scipy.optimize
@@ -21,7 +21,7 @@ __all__ = ["equilibrium", "rootfinder", "minimize"]
 def rootfinder(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:List[Any]=[],
+        params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
         method:Optional[str]=None,
         **fwd_options) -> torch.Tensor:
@@ -45,7 +45,7 @@ def rootfinder(
     y0 : torch.tensor
         Initial guess of the solution with shape ``(*ny)``
     params : list
-        List of any other parameters to be put in ``fcn``
+        Sequence of any other parameters to be put in ``fcn``
     bck_options : dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
@@ -89,7 +89,7 @@ def rootfinder(
 def equilibrium(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:List[Any]=[],
+        params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
         method:Optional[str]=None,
         **fwd_options) -> torch.Tensor:
@@ -113,7 +113,7 @@ def equilibrium(
     y0 : torch.tensor
         Initial guess of the solution with shape ``(*ny)``
     params : list
-        List of any other parameters to be put in ``fcn``
+        Sequence of any other parameters to be put in ``fcn``
     bck_options : dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method : str or None
@@ -162,7 +162,7 @@ def equilibrium(
 def minimize(
         fcn:Callable[...,torch.Tensor],
         y0:torch.Tensor,
-        params:List[Any]=[],
+        params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
         method:Optional[str]=None,
         **fwd_options) -> torch.Tensor:
@@ -183,7 +183,7 @@ def minimize(
     y0: torch.tensor
         Initial guess of the solution with shape ``(*ny)``
     params: list
-        List of any other parameters to be put in ``fcn``
+        Sequence of any other parameters to be put in ``fcn``
     bck_options: dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
     method: str or None
