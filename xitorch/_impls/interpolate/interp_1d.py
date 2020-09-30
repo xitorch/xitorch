@@ -143,7 +143,8 @@ class CubicSpline1D(BaseInterp1D):
 
         # find the index location of xq
         nr = x.shape[-1]
-        idxr = torch.searchsorted(x, xq, right=False) # (nrq)
+        # detaching due to PyTorch's issue #42328
+        idxr = torch.searchsorted(x.detach(), xq.detach(), right=False) # (nrq)
         idxr = torch.clamp(idxr, 1, nr-1)
         idxl = idxr - 1 # (nrq) from (0 to nr-2)
 
