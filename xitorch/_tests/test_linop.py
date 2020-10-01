@@ -128,3 +128,28 @@ def test_linop2_rmm():
 
     ymm = linop.rmm(rx)
     assert torch.allclose(ymm, torch.matmul(mat.T, rx))
+
+def test_linop_repr():
+    dtype = torch.float32
+    device = torch.device("cpu")
+    mat1 = torch.randn((2,3,2), dtype=dtype, device=device)
+    a = LinOp1(mat1)
+
+    arepr = ["LinearOperator", "LinOp1", "(2, 3, 2)", "float32", "cpu"]
+    _assert_str_contains(a.__repr__(), arepr)
+
+    b = a.H
+    brepr = arepr + ["AdjointLinearOperator", "(2, 2, 3)"]
+    _assert_str_contains(b.__repr__(), brepr)
+
+    c = b.matmul(a)
+    crepr = brepr + ["MatmulLinearOperator", "(2, 2, 2)"]
+    _assert_str_contains(c.__repr__(), crepr)
+
+    d = LinearOperator.m(mat1)
+    drepr = ["MatrixLinearOperator", "(2, 3, 2)"]
+    _assert_str_contains(d.__repr__(), drepr)
+
+def _assert_str_contains(s, slist):
+    for c in slist:
+        assert c in s

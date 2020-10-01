@@ -102,8 +102,8 @@ class LinearOperator(EditableModule):
         self._matrix = torch.tensor([])
 
     def __repr__(self) -> str:
-        return "xitorch.LinearOperator (%s) with shape: (%s)" % \
-            (self.__class__.__name__, _shape2str(self.shape))
+        return "LinearOperator (%s) with shape %s, dtype = %s, device = %s" % \
+            (self.__class__.__name__, _shape2str(self.shape), self.dtype, self.device)
 
     @abstractmethod
     def _getparamnames(self, prefix:str="") -> List[str]:
@@ -448,7 +448,8 @@ class AdjointLinearOperator(LinearOperator):
         self.obj = obj
 
     def __repr__(self):
-        return "AdjointLinearOperator of:\n * %s" % (_indent(self.obj.__repr__(), 3))
+        return "AdjointLinearOperator with shape %s of:\n - %s" % \
+            (_shape2str(self.shape), _indent(self.obj.__repr__(), 3))
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         if not self.obj.is_rmv_implemented:
@@ -479,8 +480,10 @@ class MatmulLinearOperator(LinearOperator):
         self.b = b
 
     def __repr__(self):
-        return "MatmulLinearOperator (shape: %s) of:\n * %s" % \
-            (_shape2str(self.shape), _indent(self.obj.__repr__(), 3))
+        return "MatmulLinearOperator with shape %s of:\n * %s\n * %s" % \
+            (_shape2str(self.shape),
+             _indent(self.a.__repr__(), 3),
+             _indent(self.b.__repr__(), 3))
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         return self.a._mv(self.b._mv(x))
@@ -505,8 +508,8 @@ class MatrixLinearOperator(LinearOperator):
         self.mat = mat
 
     def __repr__(self):
-        return "MatrixLinearOperator with matrix:\n   %s" % \
-            (_indent(self.mat.__repr__(), 3))
+        return "MatrixLinearOperator with shape %s:\n   %s" % \
+            (_shape2str(self.shape), _indent(self.mat.__repr__(), 3))
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
@@ -626,4 +629,4 @@ def _indent(s, nspace):
     return "\n".join(lines)
 
 def _shape2str(shape):
-    return ", ".join([str(s) for s in shape])
+    return "(%s)" % (", ".join([str(s) for s in shape]))
