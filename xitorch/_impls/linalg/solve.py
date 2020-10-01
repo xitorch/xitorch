@@ -80,7 +80,8 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
     Keyword arguments
     -----------------
     posdef: bool
-        Indicating if the operation :math:`\mathbf{AX-MXE}` a positive definite.
+        Indicating if the operation :math:`\mathbf{AX-MXE}` a positive
+        definite for all columns and batches.
     precond: LinearOperator or None
         LinearOperator for the preconditioning. If None, no preconditioner is
         applied.

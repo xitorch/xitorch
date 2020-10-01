@@ -56,7 +56,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         Options of the iterative solver in the backward calculation.
     method: str or None
         The method of linear equation solver. If ``None``, it will choose
-        ``"exactsolve"`` or ``"broyden1"`` depending on the size
+        ``"cg"``.
     **fwd_options
         Method-specific options (see method below)
 
@@ -201,10 +201,10 @@ def custom_exactsolve(A, params, B, E=None,
 
 # docstring completion
 _solve_methods = {
-    "broyden1": broyden1_solve,
-    "exactsolve": exactsolve,
-    "scipy_gmres": wrap_gmres,
     "cg": cg,
+    "exactsolve": exactsolve,
+    "broyden1": broyden1_solve,
+    "scipy_gmres": wrap_gmres,
 }
 ignore_kwargs = ["E", "M", "mparams"]
 solve.__doc__ = get_methods_docstr(solve, _solve_methods, ignore_kwargs)
