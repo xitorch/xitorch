@@ -7,7 +7,8 @@ from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.misc import set_default_option, dummy_context_manager
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
-from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, broyden1_solve, _get_batchdims
+from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
+    cg, broyden1_solve, _get_batchdims
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Optional[LinearOperator]=None,
@@ -126,6 +127,8 @@ class solve_torchfcn(torch.autograd.Function):
             x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, **config)
         elif method == "broyden1":
             x = broyden1_solve(A, params, B, E=E, M=M, mparams=mparams, **config)
+        elif method == "cg":
+            x = cg(A, params, B, E=E, M=M, mparams=mparams, **config)
         else:
             raise RuntimeError("Unknown solve method: %s" % method)
 
@@ -200,7 +203,8 @@ def custom_exactsolve(A, params, B, E=None,
 _solve_methods = {
     "broyden1": broyden1_solve,
     "exactsolve": exactsolve,
-    "scipy_gmres": wrap_gmres
+    "scipy_gmres": wrap_gmres,
+    "cg": cg,
 }
 ignore_kwargs = ["E", "M", "mparams"]
 solve.__doc__ = get_methods_docstr(solve, _solve_methods, ignore_kwargs)

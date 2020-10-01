@@ -297,7 +297,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
         gradgradcheck(solvefcn, (amat, bmat))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["scipy_gmres", "broyden1"],
+    "method": ["scipy_gmres", "broyden1", "cg"],
 })
 def test_solve_A_methods(dtype, device, method):
     torch.manual_seed(seed)

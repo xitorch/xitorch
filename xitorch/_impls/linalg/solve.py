@@ -1,6 +1,6 @@
 import warnings
 import functools
-from typing import Union
+from typing import Union, Optional, List, Callable, Tuple
 import torch
 import numpy as np
 from xitorch import LinearOperator
@@ -62,6 +62,103 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[],
         res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
         res = res.transpose(-1,-2) # (nbatch, na, ncols)
         return res
+
+def cg(A:LinearOperator, params:List, B:torch.Tensor,
+        E:Optional[torch.Tensor]=None,
+        M:Optional[LinearOperator]=None,
+        mparams:List=[],
+        posdef:bool=False,
+        precond:Optional[LinearOperator]=None,
+        max_niter:Optional[int]=None,
+        rtol:float=1e-6,
+        atol:float=1e-8,
+        eps:float=1e-12,
+        **unused):
+    r"""
+    Solve the linear equations using Conjugate-Gradient (CG) method.
+
+    Keyword arguments
+    -----------------
+    posdef: bool
+        Indicating if the operation :math:`\mathbf{AX-MXE}` a positive definite.
+    precond: LinearOperator or None
+        LinearOperator for the preconditioning. If None, no preconditioner is
+        applied.
+    max_niter: int or None
+        Maximum number of iteration. If None, it is set to ``int(1.2 * A.shape[-1])``
+    rtol: float
+        Relative tolerance for stopping condition w.r.t. norm of B
+    atol: float
+        Absolute tolerance for stopping condition w.r.t. norm of B
+    eps: float
+        Clip the denominator with this lower bound.
+    """
+
+    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+        nr = A.shape[-1]
+        ncols = B.shape[-1]
+        if max_niter is None:
+            max_niter = int(1.2 * nr)
+
+        # if B is all zeros, then return zeros
+        batchdims = _get_batchdims(A, B, E, M)
+        if torch.allclose(B, B*0, rtol=rtol, atol=atol):
+            x0 = torch.zeros((*batchdims, nr, ncols), dtype=A.dtype, device=A.device)
+            return x0
+
+        # setup the preconditioning and the matrix problem
+        precond_fcn = _setup_precond(precond)
+        A_fcn_temp, AT_fcn_temp, B_temp, col_swapped = _setup_linear_problem(A, B, E, M)
+        A_fcn, B2 = _setup_posdef_problem(A_fcn_temp, AT_fcn_temp, B_temp, posdef)
+
+        # get the stopping matrix
+        B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
+        stop_matrix = torch.max(rtol * B_norm, atol * torch.ones_like(B_norm)) # (*BB, 1, nc)
+
+        # prepare the initial guess (it's just all zeros)
+        x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
+        xk = torch.zeros(x0shape, dtype=A.dtype, device=A.device)
+
+        def _dot(r, z):
+            # r: (*BR, nr, nc)
+            # z: (*BR, nr, nc)
+            # return: (*BR, 1, nc)
+            return torch.einsum("...rc,...rc->...c", r, z).unsqueeze(-2)
+
+        rk = B2 - A_fcn(xk) # (*, nr, nc)
+        zk = precond_fcn(rk) # (*, nr, nc)
+        pk = zk # (*, nr, nc)
+        rkzk = _dot(rk, zk)
+        converge = False
+        for k in range(max_niter):
+            Apk = A_fcn(pk)
+            alphak = rkzk / torch.clamp(_dot(pk, Apk), min=eps)
+            xk_1 = xk + alphak * pk
+            rk_1 = rk - alphak * Apk # (*, nr, nc)
+
+            # check for the stopping condition
+            resid = B2 - A_fcn(xk_1)
+            resid_norm = resid.norm(dim=-2, keepdim=True)
+            if torch.all(resid_norm < stop_matrix):
+                converge = True
+                break
+
+            zk_1 = precond_fcn(rk_1)
+            rkzk_1 = _dot(rk_1, zk_1)
+            betak = rkzk_1 / torch.clamp(rkzk, min=eps)
+            pk_1 = zk_1 + betak * pk
+
+            # move to the next index
+            pk = pk_1
+            zk = zk_1
+            xk = xk_1
+            rk = rk_1
+            rkzk = rkzk_1
+
+        if not converge:
+            warnings.warn("Convergence is not achieved after %d iterations. "\
+                "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
+        return xk_1
 
 @functools.wraps(broyden1)
 def broyden1_solve(A, params, B, E=None, M=None, mparams=[], **options):
@@ -144,10 +241,74 @@ def _solve_ABE(A:torch.Tensor, B:torch.Tensor, E:torch.Tensor):
     r = r.transpose(0,-1).squeeze(0) # (*BAEM, na, ncols)
     return r
 
-def _get_batchdims(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None], M:Union[LinearOperator,None]):
+def _get_batchdims(A:LinearOperator, B:torch.Tensor,
+        E:Union[torch.Tensor,None],
+        M:Union[LinearOperator,None]):
+
     batchdims = [A.shape[:-2], B.shape[:-2]]
     if E is not None:
         batchdims.append(E.shape[:-1])
         if M is not None:
             batchdims.append(M.shape[:-2])
     return get_bcasted_dims(*batchdims)
+
+def _setup_precond(precond:Optional[LinearOperator]) -> Callable[[torch.Tensor], torch.Tensor]:
+    if precond is None:
+        precond_fcn = lambda x: x
+    elif isinstance(precond, LinearOperator):
+        precond_fcn = lambda x: precond.mm(x)
+    return precond_fcn
+
+def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
+        E:Optional[torch.Tensor], M:Optional[LinearOperator]) -> \
+        Tuple[Callable[[torch.Tensor],torch.Tensor],
+              Callable[[torch.Tensor],torch.Tensor],
+              torch.Tensor,
+              bool]:
+
+    if E is None:
+        A_fcn = lambda x: A.mm(x)
+        AT_fcn = lambda x: A.rmm(x)
+        return A_fcn, AT_fcn, B, False
+    else:
+        # A: (*BA, nr, nr) linop
+        # B: (*BB, nr, ncols)
+        # E: (*BE, ncols)
+        # M: (*BM, nr, nr) linop
+        if M is None:
+            BAs, BBs, BEs = normalize_bcast_dims(A.shape[:-2], B.shape[:-2], E.shape[:-1])
+        else:
+            BAs, BBs, BEs, BMs = normalize_bcast_dims(A.shape[:-2], B.shape[:-2],
+                                                      E.shape[:-1], M.shape[:-2])
+        E = E.view(*BEs, *E.shape[:-1])
+        E_new = E.unsqueeze(0).transpose(-1, 0).unsqueeze(-1) # (ncols, *BEs, 1, 1)
+        B = B.view(*BBs, *B.shape[:-2]) # (*BBs, nr, ncols)
+        B_new = B.unsqueeze(0).transpose(-1, 0) # (ncols, *BBs, nr, 1)
+
+        def A_fcn(x):
+            # x: (ncols, *BX, nr, 1)
+            Ax = A.mm(x) # (ncols, *BAX, nr, 1)
+            Mx = M.mm(x) if M is not None else x # (ncols, *BMX, nr, 1)
+            MxE = Mx * E_new # (ncols, *BMXE, nr, 1)
+            return Ax - MxE
+
+        def AT_fcn(x):
+            # x: (ncols, *BX, nr, 1)
+            ATx = A.rmm(x)
+            MTx = M.rmm(x) if M is not None else x
+            MTxE = MTx * E_new
+            return ATx - MTxE
+
+        return A_fcn, AT_fcn, B_new, True
+
+def _setup_posdef_problem(
+        A:Callable[[torch.Tensor],torch.Tensor],
+        AT:Callable[[torch.Tensor],torch.Tensor],
+        B:torch.Tensor, posdef:bool):
+    if posdef:
+        return A, B
+    else:
+        def A_new_fcn(x):
+            return AT(A(x))
+        Bnew = AT(B)
+        return A_new_fcn, Bnew
