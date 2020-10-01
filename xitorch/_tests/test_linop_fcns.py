@@ -272,15 +272,18 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
     amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
            torch.eye(ashape[-1], dtype=dtype, device=device)
     bmat = torch.rand(bshape, dtype=dtype, device=device)
-    if hermit:
-        amat = (amat + amat.transpose(-2,-1)) * 0.5
 
     amat = amat.requires_grad_()
     bmat = bmat.requires_grad_()
 
+    def prepare(amat):
+        if hermit:
+            return (amat + amat.transpose(-2,-1)) * 0.5
+        return amat
+
     def solvefcn(amat, bmat):
         # is_hermitian=hermit is required to force the hermitian status in numerical gradient
-        alinop = LinearOperator.m(amat, is_hermitian=hermit)
+        alinop = LinearOperator.m(prepare(amat), is_hermitian=hermit)
         x = solve(A=alinop, B=bmat,
             **fwd_options,
             bck_options=bck_options)
@@ -289,7 +292,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
     x = solvefcn(amat, bmat)
     assert list(x.shape) == xshape
 
-    ax = LinearOperator.m(amat).mm(x)
+    ax = LinearOperator.m(prepare(amat)).mm(x)
     assert torch.allclose(ax, bmat)
 
     if checkgrad:
