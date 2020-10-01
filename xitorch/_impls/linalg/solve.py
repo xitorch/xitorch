@@ -239,8 +239,8 @@ def _solve_ABE(A:torch.Tensor, B:torch.Tensor, E:torch.Tensor):
     # E: (*BE, ncols) matrix
     na = A.shape[-1]
     BA, BB, BE = normalize_bcast_dims(A.shape[:-2], B.shape[:-2], E.shape[:-1])
-    E = E.view(1, *BE, E.shape[-1]).transpose(0,-1) # (ncols, *BE, 1)
-    B = B.view(1, *BB, *B.shape[-2:]).transpose(0,-1) # (ncols, *BB, na, 1)
+    E = E.reshape(1, *BE, E.shape[-1]).transpose(0,-1) # (ncols, *BE, 1)
+    B = B.reshape(1, *BB, *B.shape[-2:]).transpose(0,-1) # (ncols, *BB, na, 1)
 
     # NOTE: The line below is very inefficient for large na and ncols
     AE = A - torch.diag_embed(E.repeat_interleave(repeats=na, dim=-1), dim1=-2, dim2=-1) # (ncols, *BAE, na, na)
@@ -286,9 +286,9 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         else:
             BAs, BBs, BEs, BMs = normalize_bcast_dims(A.shape[:-2], B.shape[:-2],
                                                       E.shape[:-1], M.shape[:-2])
-        E = E.view(*BEs, *E.shape[-1:])
+        E = E.reshape(*BEs, *E.shape[-1:])
         E_new = E.unsqueeze(0).transpose(-1, 0).unsqueeze(-1) # (ncols, *BEs, 1, 1)
-        B = B.view(*BBs, *B.shape[-2:]) # (*BBs, nr, ncols)
+        B = B.reshape(*BBs, *B.shape[-2:]) # (*BBs, nr, ncols)
         B_new = B.unsqueeze(0).transpose(-1, 0) # (ncols, *BBs, nr, 1)
 
         def A_fcn(x):

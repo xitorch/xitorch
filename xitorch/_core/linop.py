@@ -236,7 +236,7 @@ class LinearOperator(EditableModule):
             # move the last dimension to the very first dimension to be broadcasted
             if len(xbatchshape) < len(self._batchshape):
                 xbatchshape = [1]*(len(self._batchshape)-len(xbatchshape)) + xbatchshape
-            x1 = x.view(1, *xbatchshape, *x.shape[-2:])
+            x1 = x.reshape(1, *xbatchshape, *x.shape[-2:])
             xnew = x1.transpose(0, -1).squeeze(-1) # (r,...,q)
 
             # apply batched mv and restore the initial shape
@@ -306,7 +306,7 @@ class LinearOperator(EditableModule):
             # move the last dimension to the very first dimension to be broadcasted
             if len(xbatchshape) < len(self._batchshape):
                 xbatchshape = [1]*(len(self._batchshape)-len(xbatchshape)) + xbatchshape
-            x1 = x.view(1, *xbatchshape, *x.shape[-2:]) # (1,...,p,r)
+            x1 = x.reshape(1, *xbatchshape, *x.shape[-2:]) # (1,...,p,r)
             xnew = x1.transpose(0, -1).squeeze(-1) # (r,...,p)
 
             # apply batched mv and restore the initial shape

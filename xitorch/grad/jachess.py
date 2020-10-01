@@ -209,7 +209,7 @@ class _Jac(LinearOperator):
 def connect_graph(out, params):
     # just to have a dummy graph, in case there is a parameter that
     # is disconnected in calculating df/dy
-    return out + sum([p.view(-1)[0]*0 for p in params])
+    return out + sum([p.reshape(-1)[0]*0 for p in params])
 
 def _setup_idxs(idxs, params):
     if idxs is None:

@@ -225,7 +225,7 @@ class _SolveIVP(torch.autograd.Function):
 
         grad_y0 = states[dLdy_index] # dL/dy0, (*ny)
         if ts_requires_grad:
-            grad_ts = torch.cat(grad_ts).view(*ts.shape)
+            grad_ts = torch.cat(grad_ts).reshape(*ts.shape)
         grad_tensor_params = states[dLdp_slice]
         grad_ntensor_params = [None for _ in range(len(allparams)-ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)

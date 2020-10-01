@@ -8,7 +8,7 @@ class eig(torch.autograd.Function):
         if A.ndim == 2:
             A = A.unsqueeze(0)
         elif A.ndim > 3:
-            A = A.view(*A.shape[:-2], A.shape[-2], A.shape[-1])
+            A = A.reshape(*A.shape[:-2], A.shape[-2], A.shape[-1])
 
         nbatch = A.shape[0]
         evecs = torch.empty_like(A).to(A.device)
@@ -28,8 +28,8 @@ class eig(torch.autograd.Function):
             evals[i] = evalue
 
         # reshape the results
-        evecs = evecs.view(*Ashape)
-        evals = evals.view(*Ashape[:-1])
+        evecs = evecs.reshape(*Ashape)
+        evals = evals.reshape(*Ashape[:-1])
 
         ctx.evecs = evecs
         ctx.evals = evals
@@ -42,10 +42,10 @@ class eig(torch.autograd.Function):
         batchshape = grad_evals.shape[:-1]
         na = grad_evals.shape[-1]
 
-        dLde = grad_evals.view(-1,na) # (nbatch, na)
-        dLdU = grad_evecs.view(-1,na,na)
-        U = ctx.evecs.view(-1,na,na) # (nbatch,na,na)
-        Hcurly = ctx.evals.view(-1,na) # (nbatch,na)
+        dLde = grad_evals.reshape(-1,na) # (nbatch, na)
+        dLdU = grad_evecs.reshape(-1,na,na)
+        U = ctx.evecs.reshape(-1,na,na) # (nbatch,na,na)
+        Hcurly = ctx.evals.reshape(-1,na) # (nbatch,na)
         UT = U.transpose(-2,-1) # (nbatch,na,na)
 
         # calculate the contribution from grad_evals
@@ -70,8 +70,8 @@ class eig(torch.autograd.Function):
 
         # reshape the contributions
         shape = grad_evecs.shape
-        econtrib = econtrib.view(*shape)
-        Ucontrib = Ucontrib.view(*shape)
+        econtrib = econtrib.reshape(*shape)
+        Ucontrib = Ucontrib.reshape(*shape)
 
         return econtrib + Ucontrib
 

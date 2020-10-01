@@ -87,7 +87,7 @@ class WeightBasedSQuad(BaseSQuad):
         # x: (nx,)
         xshape = x.shape
         nx = xshape[-1]
-        x = x.view(-1, nx)
+        x = x.reshape(-1, nx)
         self.w = self.get_weights(x, **options) # (*, nx, nx)
 
     @abstractmethod
