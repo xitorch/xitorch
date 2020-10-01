@@ -54,6 +54,8 @@ def _applyfcn(obj, name, attrfcn, dictfcn, listfcn):
         elif isinstance(obj, list):
             return listfcn(obj, key)
         else:
-            raise TypeError("The parameter with [] must be either a dictionary or a list")
+            msg = "The parameter with [] must be either a dictionary or a list. "
+            msg += "Got type: %s" % type(obj)
+            raise TypeError(msg)
     else:
         return attrfcn(obj, name)
