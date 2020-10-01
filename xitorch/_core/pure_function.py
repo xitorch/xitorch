@@ -94,7 +94,7 @@ class TorchNNPureFunction(PureFunction):
             paramnames, obj_params = zip(*named_params)
         self.names = paramnames
         self.obj = obj
-        return obj_params
+        return list(obj_params)
 
     @contextmanager
     def _useobjparams(self, objparams):
