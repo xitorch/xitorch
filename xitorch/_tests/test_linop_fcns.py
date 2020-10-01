@@ -436,3 +436,47 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
     if checkgrad:
         gradcheck(solvefcn, (amat, mmat, bmat, emat))
         gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "method": ["broyden1", "cg"],
+})
+def test_solve_AEM_methods(dtype, device, method):
+    torch.manual_seed(seed)
+    na = 100
+    nc = na // 2
+
+    amshape = (na, na)
+    eshape = (nc,)
+    bshape = (2, na, nc)
+    options = {
+        "scipy_gmres": {},
+        "broyden1": {},
+        "cg": {
+            "rtol": 1e-8 # stringent rtol required to meet the torch.allclose tols
+        }
+    }[method]
+    fwd_options = {"method": method, **options}
+
+    amat = torch.rand(amshape, dtype=dtype, device=device) * 0.1 + \
+           torch.eye(amshape[-1], dtype=dtype, device=device)
+    mmat = torch.rand(amshape, dtype=dtype, device=device) * 0.05 + \
+           torch.eye(amshape[-1], dtype=dtype, device=device)
+    bmat = torch.rand(bshape, dtype=dtype, device=device) + 0.1
+    emat = torch.rand(eshape, dtype=dtype, device=device) * 0.1
+    amat = (amat + amat.transpose(-2,-1)) * 0.5
+    mmat = (mmat + mmat.transpose(-2,-1)) * 0.5
+
+    amat = amat.requires_grad_()
+    bmat = bmat.requires_grad_()
+    emat = emat.requires_grad_()
+
+    def solvefcn(amat, bmat, emat, mmat):
+        alinop = LinearOperator.m(amat)
+        mlinop = LinearOperator.m(mmat)
+        x = solve(A=alinop, B=bmat, E=emat, M=mlinop, **fwd_options)
+        return x
+
+    x = solvefcn(amat, bmat, emat, mmat)
+    ax = LinearOperator.m(amat).mm(x)
+    mxe = LinearOperator.m(mmat).mm(x) @ torch.diag_embed(emat)
+    assert torch.allclose(ax-mxe, bmat)

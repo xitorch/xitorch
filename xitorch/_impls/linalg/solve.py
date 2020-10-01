@@ -108,8 +108,7 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
 
         # setup the preconditioning and the matrix problem
         precond_fcn = _setup_precond(precond)
-        A_fcn_temp, AT_fcn_temp, B_temp, col_swapped = _setup_linear_problem(A, B, E, M)
-        A_fcn, B2 = _setup_posdef_problem(A_fcn_temp, AT_fcn_temp, B_temp, posdef)
+        A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, posdef)
 
         # get the stopping matrix
         B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
@@ -158,6 +157,9 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
         if not converge:
             warnings.warn("Convergence is not achieved after %d iterations. "\
                 "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
+        if col_swapped:
+            # x: (ncols, *, nr, 1)
+            xk_1 = xk_1.transpose(0, -1).squeeze(0) # (*, nr, ncols)
         return xk_1
 
 @functools.wraps(broyden1)
@@ -260,16 +262,15 @@ def _setup_precond(precond:Optional[LinearOperator]) -> Callable[[torch.Tensor],
     return precond_fcn
 
 def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
-        E:Optional[torch.Tensor], M:Optional[LinearOperator]) -> \
-        Tuple[Callable[[torch.Tensor],torch.Tensor],
-              Callable[[torch.Tensor],torch.Tensor],
-              torch.Tensor,
-              bool]:
+        E:Optional[torch.Tensor], M:Optional[LinearOperator],
+        posdef:bool) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
 
+    # get the linear operator (including the MXE part)
     if E is None:
         A_fcn = lambda x: A.mm(x)
         AT_fcn = lambda x: A.rmm(x)
-        return A_fcn, AT_fcn, B, False
+        B_new = B
+        col_swapped = False
     else:
         # A: (*BA, nr, nr) linop
         # B: (*BB, nr, ncols)
@@ -280,9 +281,9 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         else:
             BAs, BBs, BEs, BMs = normalize_bcast_dims(A.shape[:-2], B.shape[:-2],
                                                       E.shape[:-1], M.shape[:-2])
-        E = E.view(*BEs, *E.shape[:-1])
+        E = E.view(*BEs, *E.shape[-1:])
         E_new = E.unsqueeze(0).transpose(-1, 0).unsqueeze(-1) # (ncols, *BEs, 1, 1)
-        B = B.view(*BBs, *B.shape[:-2]) # (*BBs, nr, ncols)
+        B = B.view(*BBs, *B.shape[-2:]) # (*BBs, nr, ncols)
         B_new = B.unsqueeze(0).transpose(-1, 0) # (ncols, *BBs, nr, 1)
 
         def A_fcn(x):
@@ -299,16 +300,13 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
             MTxE = MTx * E_new
             return ATx - MTxE
 
-        return A_fcn, AT_fcn, B_new, True
+        col_swapped = True
 
-def _setup_posdef_problem(
-        A:Callable[[torch.Tensor],torch.Tensor],
-        AT:Callable[[torch.Tensor],torch.Tensor],
-        B:torch.Tensor, posdef:bool):
+    # get the linear operation if it is not a posdef (A -> AT.A)
     if posdef:
-        return A, B
+        return A_fcn, B_new, col_swapped
     else:
         def A_new_fcn(x):
-            return AT(A(x))
-        Bnew = AT(B)
-        return A_new_fcn, Bnew
+            return AT_fcn(A_fcn(x))
+        B2 = AT_fcn(B_new)
+        return A_new_fcn, B2, col_swapped
