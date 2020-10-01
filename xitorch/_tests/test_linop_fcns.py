@@ -301,19 +301,26 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
 })
 def test_solve_A_methods(dtype, device, method):
     torch.manual_seed(seed)
-    na = 3
+    na = 100
     ashape = (na, na)
     bshape = (2, na, na)
-    fwd_options = {"method": method}
+    options = {
+        "scipy_gmres": {},
+        "broyden1": {},
+        "cg": {
+            "rtol": 1e-8 # stringent rtol required to meet the torch.allclose tols
+        }
+    }[method]
+    fwd_options = {"method": method, **options}
 
     ncols = bshape[-1]-1
     bshape = [*bshape[:-1], ncols]
     xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2])) + [na, ncols]
 
-    amat = torch.rand(ashape, dtype=dtype, device=device) + \
+    amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
            torch.eye(ashape[-1], dtype=dtype, device=device)
-    bmat = torch.rand(bshape, dtype=dtype, device=device)
-    amat = amat + amat.transpose(-2,-1)
+    bmat = torch.rand(bshape, dtype=dtype, device=device) + 0.1
+    amat = (amat + amat.transpose(-2,-1)) * 0.5
 
     amat = amat.requires_grad_()
     bmat = bmat.requires_grad_()
