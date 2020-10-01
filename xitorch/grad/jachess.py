@@ -170,6 +170,7 @@ class _Jac(LinearOperator):
 
         res = dfdyfs.reshape(*gy.shape[:-1], self.nout) # (..., nout)
         res = connect_graph(res, self.params_tensor)
+        res = connect_graph(res, self.objparams)
         return res
 
     def _rmv(self, gout:torch.Tensor) -> torch.Tensor:
@@ -195,6 +196,7 @@ class _Jac(LinearOperator):
 
         res = dfdy.reshape(*gout.shape[:-1], self.nin) # (..., nin)
         res = connect_graph(res, self.params_tensor)
+        res = connect_graph(res, self.objparams)
         return res # (..., nin)
 
     def __param_tensors_unchanged(self):

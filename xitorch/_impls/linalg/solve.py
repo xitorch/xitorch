@@ -86,20 +86,30 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
         LinearOperator for the preconditioning. If None, no preconditioner is
         applied.
     max_niter: int or None
-        Maximum number of iteration. If None, it is set to ``int(1.2 * A.shape[-1])``
+        Maximum number of iteration. If None, it is set to ``int(1.5 * A.shape[-1])``
     rtol: float
         Relative tolerance for stopping condition w.r.t. norm of B
     atol: float
         Absolute tolerance for stopping condition w.r.t. norm of B
     eps: float
-        Clip the denominator with this lower bound.
+        Substitute the absolute zero in the algorithm's denominator with this
+        value to avoid nan.
     """
+    def _safedenom(r, eps):
+        r[r == 0] = eps
+        return r
+
+    def _dot(r, z):
+        # r: (*BR, nr, nc)
+        # z: (*BR, nr, nc)
+        # return: (*BR, 1, nc)
+        return torch.einsum("...rc,...rc->...c", r, z).unsqueeze(-2)
 
     with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
         nr = A.shape[-1]
         ncols = B.shape[-1]
         if max_niter is None:
-            max_niter = int(1.2 * nr)
+            max_niter = int(1.5 * nr)
 
         # if B is all zeros, then return zeros
         batchdims = _get_batchdims(A, B, E, M)
@@ -119,12 +129,6 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
         x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
         xk = torch.zeros(x0shape, dtype=A.dtype, device=A.device)
 
-        def _dot(r, z):
-            # r: (*BR, nr, nc)
-            # z: (*BR, nr, nc)
-            # return: (*BR, 1, nc)
-            return torch.einsum("...rc,...rc->...c", r, z).unsqueeze(-2)
-
         rk = B2 - A_fcn(xk) # (*, nr, nc)
         zk = precond_fcn(rk) # (*, nr, nc)
         pk = zk # (*, nr, nc)
@@ -132,7 +136,7 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
         converge = False
         for k in range(max_niter):
             Apk = A_fcn(pk)
-            alphak = rkzk / torch.clamp(_dot(pk, Apk), min=eps)
+            alphak = rkzk / _safedenom(_dot(pk, Apk), eps)
             xk_1 = xk + alphak * pk
             rk_1 = rk - alphak * Apk # (*, nr, nc)
 
@@ -145,7 +149,7 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
 
             zk_1 = precond_fcn(rk_1)
             rkzk_1 = _dot(rk_1, zk_1)
-            betak = rkzk_1 / torch.clamp(rkzk, min=eps)
+            betak = rkzk_1 / _safedenom(rkzk, eps)
             pk_1 = zk_1 + betak * pk
 
             # move to the next index

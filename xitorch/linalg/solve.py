@@ -83,7 +83,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
             M.check()
 
     if method is None:
-        method = "exactsolve" if A.shape[-1] < 10 else "broyden1"
+        method = "cg"
 
     if method == "exactsolve":
         return exactsolve(A, B, E, M)
