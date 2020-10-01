@@ -93,15 +93,16 @@ class LinearOperator(EditableModule):
         if not self._is_mv_implemented:
             raise RuntimeError("LinearOperator must have at least ._mv() method implemented")
         if not _suppress_hermit_warning and self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
-            warnings.warn("The LinearOperator is Hermitian with implemented rmv or rmm. We will use the mv and mm methods instead")
+            warnings.warn("The LinearOperator is Hermitian with implemented rmv or rmm. We will use the mv and mm methods instead",
+                stacklevel=2)
 
         # caches
         self._matrix_defined = False
         self._matrix = torch.tensor([])
 
     def __repr__(self) -> str:
-        return "xitorch.LinearOperator with shape: (%s)" % \
-            (",".join([str(s) for s in self.shape]))
+        return "xitorch.LinearOperator (%s) with shape: (%s)" % \
+            (self.__class__.__name__, _shape2str(self.shape))
 
     @abstractmethod
     def _getparamnames(self, prefix:str="") -> List[str]:
@@ -440,9 +441,13 @@ class AdjointLinearOperator(LinearOperator):
             shape = (*obj.shape[:-2], obj.shape[-1], obj.shape[-2]),
             is_hermitian = obj.is_hermitian,
             dtype = obj.dtype,
-            device = obj.device
+            device = obj.device,
+            _suppress_hermit_warning = True,
         )
         self.obj = obj
+
+    def __repr__(self):
+        return "AdjointLinearOperator of:\n * %s" % (_indent(self.obj.__repr__(), 3))
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         if not self.obj.is_rmv_implemented:
@@ -471,6 +476,10 @@ class MatmulLinearOp(LinearOperator):
         )
         self.a = a
         self.b = b
+
+    def __repr__(self):
+        return "MatmulLinearOp (shape: %s) of:\n * %s" % \
+            (_shape2str(self.shape), _indent(self.obj.__repr__(), 3))
 
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
         return self.a._mv(self.b._mv(x))
@@ -631,3 +640,13 @@ def checklinop(linop:LinearOperator) -> None:
     for (rmv_xshape, rmv_yshape) in zip(rmv_xshapes, rmv_yshapes):
         runtest("rmv", rmv_xshape, rmv_yshape)
         runtest("rmm", (*rmv_xshape, r), (*rmv_yshape, r))
+
+########### repr helper functions ###########
+def _indent(s, nspace):
+    # give indentation of the second line and next lines
+    spaces = " " * nspace
+    lines = [spaces + c if i > 0 else c for i,c in enumerate(s.split("\n"))]
+    return "\n".join(lines)
+
+def _shape2str(shape):
+    return ", ".join([str(s) for s in shape])
