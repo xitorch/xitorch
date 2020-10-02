@@ -40,7 +40,7 @@ class LinOp2(BaseLinOp):
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
 
     def _rmv(self, x):
-        return torch.matmul(self.mat.T, x.unsqueeze(-1)).squeeze(-1)
+        return torch.matmul(self.mat.transpose(-2,-1), x.unsqueeze(-1)).squeeze(-1)
 
 def test_linop0_err():
     mat = torch.rand((3,1,2))
@@ -84,7 +84,7 @@ def test_linop1_fullmatrix():
     linop_mat = linop.fullmatrix()
     assert torch.allclose(linop_mat, mat)
 
-def test_linop1_adj_err():
+def atest_linop1_adj_err():
     # see if an error is raised if .H.mv() is called without .rmv() implementation
     mat = torch.rand((2,4,2,3))
     xv = torch.rand((2,))
@@ -116,6 +116,21 @@ def test_linop1_adj_err():
     except RuntimeError:
         pass
 
+def test_linop1_rmm():
+    # test if rmv and rmm done correctly if not implemented
+    mat = torch.rand((2,4,2,3))
+    rx = torch.rand((2,3))
+    rxv = torch.rand((2,))
+
+    linop = LinOp1(mat)
+    ymv = linop.rmv(rxv)
+    ymv_true = torch.matmul(mat.transpose(-2,-1), rxv)
+    assert torch.allclose(ymv, ymv_true)
+
+    ymm = linop.rmm(rx)
+    ymm_true = torch.matmul(mat.transpose(-2,-1), rx)
+    assert torch.allclose(ymm, ymm_true)
+
 def test_linop2_rmm():
     # test if rmm done correctly if not implemented
     mat = torch.rand((2,4,2,3))
@@ -124,10 +139,10 @@ def test_linop2_rmm():
 
     linop = LinOp2(mat)
     ymv = linop.rmv(rxv)
-    assert torch.allclose(ymv, torch.matmul(mat.T, rxv))
+    assert torch.allclose(ymv, torch.matmul(mat.transpose(-2,-1), rxv))
 
     ymm = linop.rmm(rx)
-    assert torch.allclose(ymm, torch.matmul(mat.T, rx))
+    assert torch.allclose(ymm, torch.matmul(mat.transpose(-2,-1), rx))
 
 def test_linop_repr():
     dtype = torch.float32

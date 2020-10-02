@@ -143,8 +143,8 @@ class LinearOperator(EditableModule):
     def _rmv(self, x:torch.Tensor) -> torch.Tensor:
         """
         Abstract method to be implemented for transposed matrix-vector multiplication.
-        Optional, but will raise an error if not implemented but ``.rmv()``
-        is called.
+        Optional. If not implemented, it will use the adjoint trick to compute ``.rmv()``.
+        Usually implemented for efficiency reasons.
         """
         pass
 
@@ -274,7 +274,7 @@ class LinearOperator(EditableModule):
         if self._is_hermitian:
             return self._mv(x)
         elif not self._is_rmv_implemented:
-            raise RuntimeError("The ._rmv() must be implemented to call .rmv() method")
+            return self.__adjoint_rmv(x)
         return self._rmv(x)
 
     def rmm(self, x:torch.Tensor) -> torch.Tensor:
@@ -304,10 +304,9 @@ class LinearOperator(EditableModule):
         xbatchshape = list(x.shape[:-2])
         if self._is_rmm_implemented:
             return self._rmm(x)
-        elif not self._is_rmv_implemented:
-            raise RuntimeError("The ._rmv() or ._rmm() must be implemented to call .rmm() method")
         else:
             # use batched mv as mm
+            rmv = self._rmv if self._is_rmv_implemented else self.rmv
 
             # move the last dimension to the very first dimension to be broadcasted
             if len(xbatchshape) < len(self._batchshape):
@@ -316,7 +315,7 @@ class LinearOperator(EditableModule):
             xnew = x1.transpose(0, -1).squeeze(-1) # (r,...,p)
 
             # apply batched mv and restore the initial shape
-            ynew = self._rmv(xnew) # (r,...,q)
+            ynew = rmv(xnew) # (r,...,q)
             y = ynew.unsqueeze(-1).transpose(0,-1).squeeze(0) # (...,q,r)
             return y
 
@@ -436,6 +435,27 @@ class LinearOperator(EditableModule):
         print("Check linear operator done")
 
     ############ private functions #################
+    def __adjoint_rmv(self, xt:torch.Tensor) -> torch.Tensor:
+        # xt: (*BY, p)
+        # xdummy: (*BY, q)
+        # calculate the right matvec multiplication by using the adjoint trick
+
+        BY = xt.shape[:-1]
+        BA = self.shape[:-2]
+        BAY = get_bcasted_dims(BY, BA)
+
+        # calculate y = Ax
+        p, q = self.shape[-2:]
+        xdummy = torch.zeros((*BAY, q), dtype=xt.dtype, device=xt.device).requires_grad_()
+        with torch.enable_grad():
+            y = self.mv(xdummy) # (*BAY, p)
+
+        # calculate (dL/dx)^T = A^T (dL/dy)^T with (dL/dy)^T = xt
+        xt2 = xt.contiguous().expand_as(y) # (*BAY, p)
+        res = torch.autograd.grad(y, xdummy, grad_outputs=xt2,
+            create_graph=torch.is_grad_enabled())[0] # (*BAY, q)
+        return res
+
     def __check_if_implemented(self, methodname:str) -> bool:
         this_method = getattr(self, methodname).__func__
         base_method = getattr(LinearOperator, methodname)
