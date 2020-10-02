@@ -109,7 +109,7 @@ class _MCQuad(torch.autograd.Function):
 
         # select the method for the sampling
         if xsamples is None:
-            method = config["method"].lower()
+            method = config.pop("method")
             methods = {
                 "mh": mh,
                 "_dummy1d": dummy1d,

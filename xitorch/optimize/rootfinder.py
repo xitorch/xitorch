@@ -248,8 +248,7 @@ class _RootFinder(torch.autograd.Function):
 
         with fcn.useobjparams(objparams):
 
-            orig_method = config.pop("method")
-            method = orig_method.lower()
+            method = config.pop("method")
             methods = {
                 "broyden1": broyden1
             }

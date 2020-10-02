@@ -3,3 +3,4 @@ git+https://github.com/mfkasim91/xitorch#egg=xitorch
 sphinx>=3
 sphinx_rtd_theme
 jupyter-sphinx
+matplotlib

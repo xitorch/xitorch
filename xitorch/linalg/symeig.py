@@ -207,7 +207,7 @@ class symeig_torchfcn(torch.autograd.Function):
             # "method": ???
         }, bck_options)
 
-        method = config["method"].lower()
+        method = config.pop("method")
         with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
             methods = {
                 "davidson": davidson,

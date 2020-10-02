@@ -101,8 +101,7 @@ class _SolveIVP(torch.autograd.Function):
         params = allparams[:nparams]
         objparams = allparams[nparams:]
 
-        orig_method = config.pop("method")
-        method = orig_method.lower()
+        method = config.pop("method")
         methods = {
             "rk4": rk4_ivp,
             "rk38": rk38_ivp,

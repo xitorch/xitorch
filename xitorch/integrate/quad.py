@@ -131,7 +131,7 @@ class _Quadrature(torch.autograd.Function):
                 tl = xl
                 tu = xu
 
-            method = config["method"].lower()
+            method = config.pop("method")
             methods = {
                 "leggauss": leggauss
             }
