@@ -1,5 +1,5 @@
-Tutorial: using functionals
-===========================
+Using functionals
+=================
 
 xitorch contains functionals that are commonly used in scientific computing and
 deep learning, such as rootfinder and initial value problem solver.

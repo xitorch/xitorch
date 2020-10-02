@@ -1,5 +1,5 @@
-Tutorial: linear operator
-=========================
+Building a custom linear operator
+=================================
 
 xitorch provides some linear algebra operations that does not need the explicit
 matrix, such as :func:`xitorch.linalg.solve` and :func:`xitorch.linalg.symeig`.
