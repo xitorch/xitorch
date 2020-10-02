@@ -30,25 +30,23 @@ The first step is to write the function with :math:`\mathbf{x}` as the first arg
 as well as specifying the known parameters, i.e. :math:`\mathbf{A}` and
 :math:`\mathbf{b}`:
 
-.. doctest:: tut_functional1
+.. jupyter-execute::
 
-    >>> import torch
-    >>> def func1(x, A, b):
-    ...     return torch.tanh(A @ x + b) + x / 2.0
-    >>> A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
-    >>> b = torch.tensor([[0.3], [-0.2]]).requires_grad_()
+    import torch
+    def func1(x, A, b):
+        return torch.tanh(A @ x + b) + x / 2.0
+    A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
+    b = torch.tensor([[0.3], [-0.2]]).requires_grad_()
 
 Once the function and parameters have been defined, now we can call the
 functional with an initial guess of the root.
 
-.. doctest:: tut_functional1
+.. jupyter-execute::
 
-    >>> from xitorch.optimize import rootfinder
-    >>> x0 = torch.zeros((2,1))  # zeros as the initial guess
-    >>> xroot = rootfinder(func1, x0, params=(A, b))
-    >>> print(xroot)
-    tensor([[-0.2393],
-            [ 0.2088]], grad_fn=<_RootFinderBackward>)
+    from xitorch.optimize import rootfinder
+    x0 = torch.zeros((2,1))  # zeros as the initial guess
+    xroot = rootfinder(func1, x0, params=(A, b))
+    print(xroot)
 
 The function :func:`xitorch.optimize.rootfinder` and most other functionals
 in xitorch takes the similar argument patterns.
@@ -59,13 +57,11 @@ the function.
 The output of the functional can be used to calculate the first order and
 higher order derivatives.
 
-.. doctest:: tut_functional1
+.. jupyter-execute::
 
-    >>> dxdA, dxdb = torch.autograd.grad(xroot.sum(), (A, b), create_graph=True)  # first derivative
-    >>> grad2A, grad2b = torch.autograd.grad(dxdA.sum(), (A, b), create_graph=True)  # second derivative
-    >>> print(grad2A)
-    tensor([[-0.1431,  0.1084],
-            [-0.1720,  0.1303]], grad_fn=<AddBackward0>)
+    dxdA, dxdb = torch.autograd.grad(xroot.sum(), (A, b), create_graph=True)  # first derivative
+    grad2A, grad2b = torch.autograd.grad(dxdA.sum(), (A, b), create_graph=True)  # second derivative
+    print(grad2A)
 
 Methods of ``torch.nn.Module`` as input
 ---------------------------------------
@@ -82,42 +78,38 @@ to satisfy
 
 where now :math:`\mathbf{A}` and :math:`\mathbf{b}` are parameters in a ``torch.nn.Module``.
 
-.. doctest:: tut_functional2
+.. jupyter-execute::
 
-    >>> import torch
-    >>> class NNModule(torch.nn.Module):
-    ...     def __init__(self):
-    ...         super().__init__()
-    ...         self.A = torch.nn.Parameter(torch.tensor([[1.1, 0.4], [0.3, 0.8]]))
-    ...         self.b = torch.nn.Parameter(torch.tensor([[0.3], [-0.2]]))
-    ...
-    ...     def forward(self, x):  # also called in __call__
-    ...         return torch.tanh(self.A @ x + self.b) + x / 2.0
+    import torch
+    class NNModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.A = torch.nn.Parameter(torch.tensor([[1.1, 0.4], [0.3, 0.8]]))
+            self.b = torch.nn.Parameter(torch.tensor([[0.3], [-0.2]]))
+
+        def forward(self, x):  # also called in __call__
+            return torch.tanh(self.A @ x + self.b) + x / 2.0
 
 The functional can then be applied similarly with the previous case, but now
 without additional parameters
 
-.. doctest:: tut_functional2
+.. jupyter-execute::
 
-    >>> from xitorch.optimize import rootfinder
-    >>> module = NNModule()
-    >>> x0 = torch.zeros((2,1))  # zeros as the initial guess
-    >>> xroot = rootfinder(module.forward, x0, params=())  # module.forward only takes x
-    >>> print(xroot)
-    tensor([[-0.2393],
-            [ 0.2088]], grad_fn=<_RootFinderBackward>)
+    from xitorch.optimize import rootfinder
+    module = NNModule()
+    x0 = torch.zeros((2,1))  # zeros as the initial guess
+    xroot = rootfinder(module.forward, x0, params=())  # module.forward only takes x
+    print(xroot)
 
 The output of the rootfinder can also be used to calculate the first and higher
 order derivatives of the module's parameters
 
-.. doctest:: tut_functional2
+.. jupyter-execute::
 
-    >>> nnparams = list(module.parameters())  # (A, b)
-    >>> dxdA, dxdb = torch.autograd.grad(xroot.sum(), nnparams, create_graph=True)  # first derivative
-    >>> grad2A, grad2b = torch.autograd.grad(dxdA.sum(), nnparams, create_graph=True)  # second derivative
-    >>> print(grad2A)
-    tensor([[-0.1431,  0.1084],
-            [-0.1720,  0.1303]], grad_fn=<AddBackward0>)
+    nnparams = list(module.parameters())  # (A, b)
+    dxdA, dxdb = torch.autograd.grad(xroot.sum(), nnparams, create_graph=True)  # first derivative
+    grad2A, grad2b = torch.autograd.grad(dxdA.sum(), nnparams, create_graph=True)  # second derivative
+    print(grad2A)
 
 Methods of :class:`xitorch.EditableModule` as input
 ---------------------------------------------------
@@ -141,24 +133,24 @@ we don't have to compute it every time in the function.
 
 To do this with :class:`xitorch.EditableModule`, we can write something like
 
-.. doctest:: tut_functional3
+.. jupyter-execute::
 
-    >>> import torch
-    >>> import xitorch
-    >>> class MyModule(xitorch.EditableModule):
-    ...     def __init__(self, E, b):
-    ...         self.E = E
-    ...         self.A = E @ E @ E
-    ...         self.b = b
-    ...
-    ...     def forward(self, x):
-    ...         return torch.tanh(self.A @ x + self.b) + x / 2.0
-    ...
-    ...     def getparamnames(self, methodname, prefix=""):
-    ...         if methodname == "forward":
-    ...             return [prefix+"A", prefix+"b"]
-    ...         else:
-    ...             raise KeyError()
+    import torch
+    import xitorch
+    class MyModule(xitorch.EditableModule):
+        def __init__(self, E, b):
+            self.E = E
+            self.A = E @ E @ E
+            self.b = b
+
+        def forward(self, x):
+            return torch.tanh(self.A @ x + self.b) + x / 2.0
+
+        def getparamnames(self, methodname, prefix=""):
+            if methodname == "forward":
+                return [prefix+"A", prefix+"b"]
+            else:
+                raise KeyError()
 
 The biggest difference here is that in :class:`xitorch.EditableModule`, a method
 ``getparamnames`` must be implemented.
@@ -168,27 +160,23 @@ To check if the list of parameters written manually in ``getparamnames`` is corr
 
 To use the functional, it is similar to the previous test cases
 
-.. doctest:: tut_functional3
+.. jupyter-execute::
 
-    >>> from xitorch.optimize import rootfinder
-    >>> E = torch.tensor([[1.1, 0.4], [0.3, 0.9]]).requires_grad_()
-    >>> b = torch.tensor([[0.3], [-0.2]]).requires_grad_()
-    >>> mymodule = MyModule(E, b)
-    >>> x0 = torch.zeros((2,1))  # zeros as the initial guess
-    >>> xroot = rootfinder(mymodule.forward, x0, params=())  # .forward() only takes x
-    >>> print(xroot)
-    tensor([[-0.3132],
-            [ 0.3125]], grad_fn=<_RootFinderBackward>)
+    from xitorch.optimize import rootfinder
+    E = torch.tensor([[1.1, 0.4], [0.3, 0.9]]).requires_grad_()
+    b = torch.tensor([[0.3], [-0.2]]).requires_grad_()
+    mymodule = MyModule(E, b)
+    x0 = torch.zeros((2,1))  # zeros as the initial guess
+    xroot = rootfinder(mymodule.forward, x0, params=())  # .forward() only takes x
+    print(xroot)
 
 The output can then be used to get the derivatives with respect to direct parameters
 (:math:`\mathbf{A}` and :math:`\mathbf{b}`) as well as indirect parameters
 (:math:`\mathbf{E}`).
 
-.. doctest:: tut_functional3
+.. jupyter-execute::
 
-    >>> params = (mymodule.A, mymodule.b, mymodule.E)
-    >>> dxdA, dxdb, dxdE = torch.autograd.grad(xroot.sum(), params, create_graph=True)  # 1st deriv
-    >>> grad2A, grad2b, gradE = torch.autograd.grad(dxdE.sum(), params, create_graph=True)  # 2nd deriv
-    >>> print(grad2A)
-    tensor([[-0.3660,  0.3447],
-            [-0.4332,  0.4018]], grad_fn=<AddBackward0>)
+    params = (mymodule.A, mymodule.b, mymodule.E)
+    dxdA, dxdb, dxdE = torch.autograd.grad(xroot.sum(), params, create_graph=True)  # 1st deriv
+    grad2A, grad2b, gradE = torch.autograd.grad(dxdE.sum(), params, create_graph=True)  # 2nd deriv
+    print(grad2A)

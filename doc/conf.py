@@ -100,6 +100,7 @@ anonymize = True
 # ones.
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.coverage',
+    'jupyter_sphinx',
     'sphinx.ext.napoleon',
     'sphinx.ext.mathjax',
     'sphinx.ext.doctest',
