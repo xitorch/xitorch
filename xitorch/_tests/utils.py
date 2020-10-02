@@ -3,12 +3,12 @@ import torch
 import xitorch as xt
 import pytest
 import argparse
-from typing import Mapping, List, ClassVar
+from typing import Mapping, List, ClassVar, Callable
 
 __all__ = ["device_dtype_float_test"]
 
 def device_dtype_float_test(only64:int=False, onlycpu:bool=False,
-        additional_kwargs:Mapping[str,List]={}):
+        additional_kwargs:Mapping[str,List]={}) -> Callable:
     dtypes = [torch.float, torch.float64]
     devices = [torch.device("cpu"), torch.device("cuda")]
     if only64:
