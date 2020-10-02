@@ -1,11 +1,11 @@
 import torch
-from typing import Union, Mapping, Any, Optional, Tuple
+from typing import Union, Mapping, Any, Optional, Tuple, Callable
 import functools
 from xitorch import LinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._utils.assertfuncs import assert_runtime
-from xitorch._utils.misc import set_default_option, dummy_context_manager
+from xitorch._utils.misc import set_default_option, dummy_context_manager, get_method
 from xitorch._utils.tensor import ortho
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch._impls.linalg.symeig import exacteig, davidson
@@ -15,21 +15,21 @@ __all__ = ["lsymeig", "usymeig", "symeig", "svd"]
 def lsymeig(A:LinearOperator, neig:Optional[int]=None,
         M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     return symeig(A, neig, "lowest", M, method=method, bck_options=bck_options, **fwd_options)
 
 def usymeig(A:LinearOperator, neig:Optional[int]=None,
         M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     return symeig(A, neig, "uppest", M, method=method, bck_options=bck_options, **fwd_options)
 
 def symeig(A:LinearOperator, neig:Optional[int]=None,
         mode:str="lowest", M:Optional[LinearOperator]=None,
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""
     Obtain ``neig`` lowest eigenvalues and eigenvectors of a linear operator,
@@ -60,7 +60,7 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
     bck_options: dict
         Method-specific options for :func:`solve` which used in backpropagation
         calculation.
-    method: str or None
+    method: str or callable or None
         Method for the eigendecomposition. If ``None``, it will choose
         ``"exacteig"``.
     **fwd_options
@@ -82,6 +82,8 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
         mode = "uppest"
     if method is None: # TODO: do a proper method selection based on size
         method = "exacteig"
+    if neig is None:
+        neig = A.shape[-1]
 
     # perform expensive check if debug mode is enabled
     if is_debug_enabled():
@@ -103,7 +105,7 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
 
 def svd(A:LinearOperator, k:Optional[int]=None,
         mode:str="uppest", bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""
     Perform the singular value decomposition (SVD):
@@ -131,7 +133,7 @@ def svd(A:LinearOperator, k:Optional[int]=None,
     bck_options: dict
         Method-specific options for :func:`solve` which used in backpropagation
         calculation.
-    method: str or None
+    method: str or callable or None
         Method for the svd (same options for :func:`symeig`). If ``None``,
         it will choose ``"exacteig"``.
     **fwd_options
@@ -206,12 +208,13 @@ class symeig_torchfcn(torch.autograd.Function):
         }, bck_options)
 
         method = config["method"].lower()
-        if method == "davidson":
-            evals, evecs = davidson(A, params, neig, mode, M, mparams, **config)
-        elif method == "custom_exacteig":
-            evals, evecs = custom_exacteig(A, params, neig, mode, M, mparams, **config)
-        else:
-            raise RuntimeError("Unknown eigen decomposition method: %s" % config["method"])
+        with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+            methods = {
+                "davidson": davidson,
+                "custom_exacteig": custom_exacteig,
+            }
+            method_fcn = get_method("symeig", methods, method)
+            evals, evecs = method_fcn(A, neig, mode, M, **config)
 
         # save for the backward
         ctx.evals = evals # (*BAM, neig)
@@ -286,9 +289,8 @@ class symeig_torchfcn(torch.autograd.Function):
 
         return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
 
-def custom_exacteig(A, params, neig, mode, M=None, mparams=[], **options):
-    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
-        return exacteig(A, neig, mode, M)
+def custom_exacteig(A, neig, mode, M=None, **options):
+    return exacteig(A, neig, mode, M)
 
 # docstring completion
 _symeig_methods = {

@@ -1,10 +1,10 @@
 import inspect
-from typing import Callable, Mapping, Any, Optional, Sequence
+from typing import Callable, Mapping, Any, Optional, Sequence, Union
 import torch
 import numpy as np
 import scipy.optimize
 import xitorch as xt
-from xitorch._utils.misc import TensorNonTensorSeparator
+from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch.linalg.solve import solve
@@ -23,7 +23,7 @@ def rootfinder(
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solving the rootfinder equation of a given function,
@@ -48,7 +48,7 @@ def rootfinder(
         Sequence of any other parameters to be put in ``fcn``
     bck_options : dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
-    method : str or None
+    method : str or callable or None
         Rootfinder method. If None, it will choose ``"broyden1"``.
     **fwd_options
         Method-specific options (see method section)
@@ -91,7 +91,7 @@ def equilibrium(
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solving the equilibrium equation of a given function,
@@ -164,7 +164,7 @@ def minimize(
         y0:torch.Tensor,
         params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable]=None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solve the unbounded minimization problem:
@@ -186,7 +186,7 @@ def minimize(
         Sequence of any other parameters to be put in ``fcn``
     bck_options: dict
         Method-specific options for the backward solve (see :func:`xitorch.linalg.solve`)
-    method: str or None
+    method: str or callable or None
         Minimization method. If None, it will choose ``"broyden1"``.
     **fwd_options
         Method-specific options (see method section)
@@ -250,10 +250,11 @@ class _RootFinder(torch.autograd.Function):
 
             orig_method = config.pop("method")
             method = orig_method.lower()
-            if method == "broyden1":
-                y = broyden1(fcn, y0, params, **config)
-            else:
-                raise RuntimeError("Unknown rootfinder method: %s" % orig_method)
+            methods = {
+                "broyden1": broyden1
+            }
+            method_fcn = get_method("rootfinder", methods, method)
+            y = method_fcn(fcn, y0, params, **config)
 
         ctx.fcn = fcn
 

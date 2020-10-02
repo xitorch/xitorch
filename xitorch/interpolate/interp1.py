@@ -1,8 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, Union, Callable
 import torch
 from xitorch._core.editable_module import EditableModule
 from xitorch._impls.interpolate.interp_1d import CubicSpline1D
 from xitorch._docstr.api_docstr import get_methods_docstr
+from xitorch._utils.misc import get_method
 
 __all__ = ["Interp1D"]
 
@@ -18,7 +19,7 @@ class Interp1D(EditableModule):
     y: torch.Tensor or None
         The values at the given position with shape ``(*BY, nr)``.
         If ``None``, it must be supplied during ``__call__``
-    method: str or None
+    method: str or callable or None
         Interpolation method. If None, it will choose ``"cspline"``.
     **fwd_options
         Method-specific options (see method section below)
@@ -26,14 +27,15 @@ class Interp1D(EditableModule):
     def __init__(self,
             x:torch.Tensor,
             y:Optional[torch.Tensor]=None,
-            method:Optional[str]=None,
+            method:Union[str, Callable, None]=None,
             **fwd_options):
         if method is None:
             method = "cspline"
-        if method == "cspline":
-            self.obj = CubicSpline1D(x, y, **fwd_options)
-        else:
-            raise RuntimeError("Unknown interp1d method: %s" % method)
+        methods = {
+            "cspline": CubicSpline1D,
+        }
+        method_cls = get_method("Interp1D", methods, method)
+        self.obj = method_cls(x, y, **fwd_options)
 
     def __call__(self, xq:torch.Tensor, y:Optional[torch.Tensor]=None) -> torch.Tensor:
         """

@@ -1,14 +1,34 @@
 import contextlib
 import torch
+from typing import Mapping, Callable, Union, List, Optional, Dict
 
-def set_default_option(defopt, opt=None):
+def set_default_option(defopt:Dict, opt:Optional[Dict]=None) -> Dict:
     if opt is None:
         opt = {}
     defopt.update(opt)
     return defopt
 
-def extract_differentiable_tensors(model):
-    res = list(model.parameters())
+def get_method(algname:str,
+        methods:Mapping[str,Callable],
+        method:Union[str,Callable]) -> Callable:
+
+    if isinstance(method, str):
+        methodname = method.lower()
+        if methodname in methods:
+            return methods[methodname]
+        else:
+            raise RuntimeError("Unknown %s method: %s" % (algname, method))
+    elif hasattr(method, "__call__"):
+        return method
+    elif method is None:
+        assert False, "Internal assert failed, method in get_method is not supposed" \
+            "to be None. If this shows, then the corresponding function fails to " \
+            "set the default method"
+    else:
+        raise TypeError("Invalid method type: %s. Only str and callable are accepted." % type(method))
+
+def extract_differentiable_tensors(model:torch.nn.Module) -> List:
+    res = list(model.parameters())  # type:List
 
     # add differentiable and non-parameters attribute in the model
     for varname in model.__dict__:

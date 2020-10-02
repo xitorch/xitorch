@@ -9,7 +9,7 @@ from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch._utils.misc import dummy_context_manager
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 
-def wrap_gmres(A, params, B, E=None, M=None, mparams=[],
+def wrap_gmres(A, B, E=None, M=None,
         min_eps=1e-9,
         max_niter=None,
         **unused):
@@ -45,28 +45,26 @@ def wrap_gmres(A, params, B, E=None, M=None, mparams=[],
     B = B.transpose(-1,-2) # (nbatch, ncols, na)
 
     # convert the numpy/scipy
-    with A.uselinopparams(*params):
-        op = A.scipy_linalg_op()
-        B_np = B.detach().cpu().numpy()
-        res_np = np.empty(B.shape, dtype=np.float64)
-        for i in range(nbatch):
-            for j in range(ncols):
-                x, info = gmres(op, B_np[i,j,:], tol=min_eps, atol=1e-12, maxiter=max_niter)
-                if info > 0:
-                    msg = "The GMRES iteration does not converge to the desired value "\
-                          "(%.3e) after %d iterations" % \
-                          (config["min_eps"], info)
-                    warnings.warn(msg)
-                res_np[i,j,:] = x
+    op = A.scipy_linalg_op()
+    B_np = B.detach().cpu().numpy()
+    res_np = np.empty(B.shape, dtype=np.float64)
+    for i in range(nbatch):
+        for j in range(ncols):
+            x, info = gmres(op, B_np[i,j,:], tol=min_eps, atol=1e-12, maxiter=max_niter)
+            if info > 0:
+                msg = "The GMRES iteration does not converge to the desired value "\
+                      "(%.3e) after %d iterations" % \
+                      (config["min_eps"], info)
+                warnings.warn(msg)
+            res_np[i,j,:] = x
 
-        res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
-        res = res.transpose(-1,-2) # (nbatch, na, ncols)
-        return res
+    res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
+    res = res.transpose(-1,-2) # (nbatch, na, ncols)
+    return res
 
-def cg(A:LinearOperator, params:List, B:torch.Tensor,
+def cg(A:LinearOperator, B:torch.Tensor,
         E:Optional[torch.Tensor]=None,
         M:Optional[LinearOperator]=None,
-        mparams:List=[],
         posdef:bool=False,
         precond:Optional[LinearOperator]=None,
         max_niter:Optional[int]=None,
@@ -105,100 +103,98 @@ def cg(A:LinearOperator, params:List, B:torch.Tensor,
         # return: (*BR, 1, nc)
         return torch.einsum("...rc,...rc->...c", r, z).unsqueeze(-2)
 
-    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
-        nr = A.shape[-1]
-        ncols = B.shape[-1]
-        if max_niter is None:
-            max_niter = int(1.5 * nr)
+    nr = A.shape[-1]
+    ncols = B.shape[-1]
+    if max_niter is None:
+        max_niter = int(1.5 * nr)
 
-        # if B is all zeros, then return zeros
-        batchdims = _get_batchdims(A, B, E, M)
-        if torch.allclose(B, B*0, rtol=rtol, atol=atol):
-            x0 = torch.zeros((*batchdims, nr, ncols), dtype=A.dtype, device=A.device)
-            return x0
+    # if B is all zeros, then return zeros
+    batchdims = _get_batchdims(A, B, E, M)
+    if torch.allclose(B, B*0, rtol=rtol, atol=atol):
+        x0 = torch.zeros((*batchdims, nr, ncols), dtype=A.dtype, device=A.device)
+        return x0
 
-        # setup the preconditioning and the matrix problem
-        precond_fcn = _setup_precond(precond)
-        A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, posdef)
+    # setup the preconditioning and the matrix problem
+    precond_fcn = _setup_precond(precond)
+    A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, posdef)
 
-        # get the stopping matrix
-        B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
-        stop_matrix = torch.max(rtol * B_norm, atol * torch.ones_like(B_norm)) # (*BB, 1, nc)
+    # get the stopping matrix
+    B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
+    stop_matrix = torch.max(rtol * B_norm, atol * torch.ones_like(B_norm)) # (*BB, 1, nc)
 
-        # prepare the initial guess (it's just all zeros)
-        x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
-        xk = torch.zeros(x0shape, dtype=A.dtype, device=A.device)
+    # prepare the initial guess (it's just all zeros)
+    x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
+    xk = torch.zeros(x0shape, dtype=A.dtype, device=A.device)
 
-        rk = B2 - A_fcn(xk) # (*, nr, nc)
-        zk = precond_fcn(rk) # (*, nr, nc)
-        pk = zk # (*, nr, nc)
-        rkzk = _dot(rk, zk)
-        converge = False
-        for k in range(max_niter):
-            Apk = A_fcn(pk)
-            alphak = rkzk / _safedenom(_dot(pk, Apk), eps)
-            xk_1 = xk + alphak * pk
-            rk_1 = rk - alphak * Apk # (*, nr, nc)
+    rk = B2 - A_fcn(xk) # (*, nr, nc)
+    zk = precond_fcn(rk) # (*, nr, nc)
+    pk = zk # (*, nr, nc)
+    rkzk = _dot(rk, zk)
+    converge = False
+    for k in range(max_niter):
+        Apk = A_fcn(pk)
+        alphak = rkzk / _safedenom(_dot(pk, Apk), eps)
+        xk_1 = xk + alphak * pk
+        rk_1 = rk - alphak * Apk # (*, nr, nc)
 
-            # check for the stopping condition
-            resid = B2 - A_fcn(xk_1)
-            resid_norm = resid.norm(dim=-2, keepdim=True)
-            if torch.all(resid_norm < stop_matrix):
-                converge = True
-                break
+        # check for the stopping condition
+        resid = B2 - A_fcn(xk_1)
+        resid_norm = resid.norm(dim=-2, keepdim=True)
+        if torch.all(resid_norm < stop_matrix):
+            converge = True
+            break
 
-            zk_1 = precond_fcn(rk_1)
-            rkzk_1 = _dot(rk_1, zk_1)
-            betak = rkzk_1 / _safedenom(rkzk, eps)
-            pk_1 = zk_1 + betak * pk
+        zk_1 = precond_fcn(rk_1)
+        rkzk_1 = _dot(rk_1, zk_1)
+        betak = rkzk_1 / _safedenom(rkzk, eps)
+        pk_1 = zk_1 + betak * pk
 
-            # move to the next index
-            pk = pk_1
-            zk = zk_1
-            xk = xk_1
-            rk = rk_1
-            rkzk = rkzk_1
+        # move to the next index
+        pk = pk_1
+        zk = zk_1
+        xk = xk_1
+        rk = rk_1
+        rkzk = rkzk_1
 
-        if not converge:
-            warnings.warn("Convergence is not achieved after %d iterations. "\
-                "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
-        if col_swapped:
-            # x: (ncols, *, nr, 1)
-            xk_1 = xk_1.transpose(0, -1).squeeze(0) # (*, nr, ncols)
-        return xk_1
+    if not converge:
+        warnings.warn("Convergence is not achieved after %d iterations. "\
+            "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
+    if col_swapped:
+        # x: (ncols, *, nr, 1)
+        xk_1 = xk_1.transpose(0, -1).squeeze(0) # (*, nr, ncols)
+    return xk_1
 
 @functools.wraps(broyden1)
-def broyden1_solve(A, params, B, E=None, M=None, mparams=[], **options):
-    return rootfinder_solve("broyden1", A, params, B, E, M, mparams, **options)
+def broyden1_solve(A, B, E=None, M=None, **options):
+    return rootfinder_solve("broyden1", A, B, E, M, **options)
 
-def rootfinder_solve(alg, A, params, B, E=None, M=None, mparams=[], **options):
+def rootfinder_solve(alg, A, B, E=None, M=None, **options):
     # using rootfinder algorithm
-    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
-        nr = A.shape[-1]
-        ncols = B.shape[-1]
+    nr = A.shape[-1]
+    ncols = B.shape[-1]
 
-        # set up the function for the rootfinding
-        def fcn_rootfinder(xi):
-            # xi: (*BX, nr*ncols)
-            x = xi.reshape(*xi.shape[:-1], nr, ncols) # (*BX, nr, ncols)
-            y = A.mm(x) - B # (*BX, nr, ncols)
-            if E is not None:
-                MX = M.mm(x) if M is not None else x
-                MXE = MX * E.unsqueeze(-2)
-                y = y - MXE # (*BX, nr, ncols)
-            y = y.reshape(*xi.shape[:-1], -1) # (*BX, nr*ncols)
-            return y
+    # set up the function for the rootfinding
+    def fcn_rootfinder(xi):
+        # xi: (*BX, nr*ncols)
+        x = xi.reshape(*xi.shape[:-1], nr, ncols) # (*BX, nr, ncols)
+        y = A.mm(x) - B # (*BX, nr, ncols)
+        if E is not None:
+            MX = M.mm(x) if M is not None else x
+            MXE = MX * E.unsqueeze(-2)
+            y = y - MXE # (*BX, nr, ncols)
+        y = y.reshape(*xi.shape[:-1], -1) # (*BX, nr*ncols)
+        return y
 
-        # setup the initial guess (the batch dimension must be the largest)
-        batchdims = _get_batchdims(A, B, E, M)
-        x0 = torch.zeros((*batchdims, nr*ncols), dtype=A.dtype, device=A.device)
+    # setup the initial guess (the batch dimension must be the largest)
+    batchdims = _get_batchdims(A, B, E, M)
+    x0 = torch.zeros((*batchdims, nr*ncols), dtype=A.dtype, device=A.device)
 
-        if alg == "broyden1":
-            x = broyden1(fcn_rootfinder, x0, **options)
-        else:
-            raise RuntimeError("Unknown method %s" % alg)
-        x = x.reshape(*x.shape[:-1], nr, ncols)
-        return x
+    if alg == "broyden1":
+        x = broyden1(fcn_rootfinder, x0, **options)
+    else:
+        raise RuntimeError("Unknown method %s" % alg)
+    x = x.reshape(*x.shape[:-1], nr, ncols)
+    return x
 
 def exactsolve(A:LinearOperator, B:torch.Tensor,
                E:Union[torch.Tensor,None],

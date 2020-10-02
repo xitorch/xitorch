@@ -4,7 +4,8 @@ from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
 from xitorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
-from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
+    TensorPacker, get_method
 from xitorch._utils.tensor import convert_none_grads_to_zeros
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
@@ -16,7 +17,7 @@ def solve_ivp(fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.
               y0:torch.Tensor,
               params:Sequence[Any]=[],
               bck_options:Mapping[str,Any]={},
-              method:Optional[str]=None,
+              method:Union[str, Callable, None]=None,
               **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Solve the initial value problem (IVP) or also commonly known as ordinary
@@ -47,7 +48,7 @@ def solve_ivp(fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.
     bck_options: dict
         Options for the backward solve_ivp method. If not specified, it will
         take the same options as fwd_options.
-    method: str or None
+    method: str or callable or None
         Initial value problem solver. If None, it will choose ``"rk45"``.
     **fwd_options
         Method-specific option (see method section below).
@@ -102,15 +103,13 @@ class _SolveIVP(torch.autograd.Function):
 
         orig_method = config.pop("method")
         method = orig_method.lower()
-        try:
-            solver = {
-                "rk4": rk4_ivp,
-                "rk38": rk38_ivp,
-                "rk23": rk23_adaptive,
-                "rk45": rk45_adaptive,
-            }[method]
-        except KeyError:
-            raise RuntimeError("Unknown solve_ivp method: %s" % config["method"])
+        methods = {
+            "rk4": rk4_ivp,
+            "rk38": rk38_ivp,
+            "rk23": rk23_adaptive,
+            "rk45": rk45_adaptive,
+        }
+        solver = get_method("solve_ivp", methods, method)
         yt = solver(pfcn, ts, y0, params, **config)
 
         # save the parameters for backward

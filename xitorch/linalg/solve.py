@@ -1,10 +1,10 @@
 import torch
 import warnings
-from typing import Union, Any, Mapping, Optional
+from typing import Union, Any, Mapping, Optional, Union, Callable
 import numpy as np
 from xitorch import LinearOperator
 from xitorch._utils.assertfuncs import assert_runtime
-from xitorch._utils.misc import set_default_option, dummy_context_manager
+from xitorch._utils.misc import set_default_option, dummy_context_manager, get_method
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
@@ -13,7 +13,7 @@ from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Optional[LinearOperator]=None,
           bck_options:Mapping[str,Any]={},
-          method:Optional[str]=None,
+          method:Union[str, Callable, None]=None,
           **fwd_options) -> torch.Tensor:
     r"""
     Performing iterative method to solve the equation
@@ -54,7 +54,7 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         If LinearOperator, it must be Hermitian with shape ``(*BM, na, na)``.
     bck_options: dict
         Options of the iterative solver in the backward calculation.
-    method: str or None
+    method: str or callable or None
         The method of linear equation solver. If ``None``, it will choose
         ``"cg"``.
     **fwd_options
@@ -121,16 +121,16 @@ class solve_torchfcn(torch.autograd.Function):
         if torch.all(B == 0): # special case
             dims = (*_get_batchdims(A, B, E, M), *B.shape[-2:])
             x = torch.zeros(dims, dtype=B.dtype, device=B.device)
-        elif method == "custom_exactsolve":
-            x = custom_exactsolve(A, params, B, E=E, M=M, mparams=mparams, **config)
-        elif method == "scipy_gmres":
-            x = wrap_gmres(A, params, B, E=E, M=M, mparams=mparams, **config)
-        elif method == "broyden1":
-            x = broyden1_solve(A, params, B, E=E, M=M, mparams=mparams, **config)
-        elif method == "cg":
-            x = cg(A, params, B, E=E, M=M, mparams=mparams, **config)
         else:
-            raise RuntimeError("Unknown solve method: %s" % method)
+            with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
+                methods = {
+                    "custom_exactsolve": custom_exactsolve,
+                    "scipy_gmres": wrap_gmres,
+                    "broyden1": broyden1_solve,
+                    "cg": cg
+                }
+                method_fcn = get_method("solve", methods, method)
+                x = method_fcn(A, B, E, M, **config)
 
         ctx.A = A
         ctx.M = M
@@ -190,14 +190,13 @@ class solve_torchfcn(torch.autograd.Function):
         return (None, grad_B, grad_E, None, None, None, None, None,
                 *grad_params, *grad_mparams)
 
-def custom_exactsolve(A, params, B, E=None,
-                M=None, mparams=[], **options):
+def custom_exactsolve(A, B, E=None,
+                M=None, **options):
     # A: (*BA, na, na)
     # B: (*BB, na, ncols)
     # E: (*BE, ncols)
     # M: (*BM, na, na)
-    with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
-        return exactsolve(A, B, E, M)
+    return exactsolve(A, B, E, M)
 
 # docstring completion
 _solve_methods = {

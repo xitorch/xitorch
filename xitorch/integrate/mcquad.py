@@ -2,7 +2,8 @@ import torch
 from typing import Union, Sequence, Any, Callable, Optional, Mapping
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._core.pure_function import get_pure_function, make_sibling
-from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
+    TensorPacker, get_method
 from xitorch._utils.tupleops import tuple_axpy1
 from xitorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
 from xitorch._docstr.api_docstr import get_methods_docstr
@@ -16,7 +17,7 @@ def mcquad(
         fparams:Sequence[Any]=[],
         pparams:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Performing monte carlo quadrature to calculate the expectation value:
@@ -43,7 +44,7 @@ def mcquad(
     bck_options: dict
         Options for the backward mcquad operation. Unspecified fields will be
         taken from ``fwd_options``.
-    method: str or None
+    method: str or callable or None
         Monte Carlo quadrature method. If None, it will choose ``"mh"``.
     **fwd_options: dict
         Method-specific options (see method section below).
@@ -109,14 +110,13 @@ class _MCQuad(torch.autograd.Function):
         # select the method for the sampling
         if xsamples is None:
             method = config["method"].lower()
-            method_fcn = {
+            methods = {
                 "mh": mh,
                 "_dummy1d": dummy1d,
                 "mhcustom": mhcustom,
             }
-            if method not in method_fcn:
-                raise RuntimeError("Unknown mcquad method: %s" % config["method"])
-            xsamples, wsamples = method_fcn[method](log_pfcn, x0, pparams, **config)
+            method_fcn = get_method("mcquad", methods, method)
+            xsamples, wsamples = method_fcn(log_pfcn, x0, pparams, **config)
         epf = _integrate(ffcn, xsamples, wsamples, fparams)
 
         # save parameters for backward calculations

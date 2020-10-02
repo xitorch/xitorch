@@ -5,7 +5,8 @@ from typing import Callable, Union, Mapping, Any, Sequence, Optional
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
-from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, TensorPacker
+from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
+    TensorPacker, get_method
 from xitorch._impls.integrate.fixed_quad import leggauss
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
@@ -18,7 +19,7 @@ def quad(
         xu:Union[float,int,torch.Tensor],
         params:Sequence[Any]=[],
         bck_options:Mapping[str,Any]={},
-        method:Optional[str]=None,
+        method:Union[str, Callable, None]=None,
         **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Calculate the quadrature:
@@ -40,7 +41,7 @@ def quad(
         Sequence of any other parameters for the function ``fcn``.
     bck_options: dict
         Options for the backward quadrature method.
-    method: str or None
+    method: str or callable or None
         Quadrature method. If None, it will choose ``"leggauss"``.
     **fwd_options
         Method-specific options (see method section).
@@ -131,10 +132,11 @@ class _Quadrature(torch.autograd.Function):
                 tu = xu
 
             method = config["method"].lower()
-            if method == "leggauss":
-                y = leggauss(fcn2, tl, tu, params, **config)
-            else:
-                raise RuntimeError("Unknown quad method: %s" % config["method"])
+            methods = {
+                "leggauss": leggauss
+            }
+            method_fcn = get_method("quad", methods, method)
+            y = method_fcn(fcn2, tl, tu, params, **config)
 
             # save the parameters for backward
             ctx.param_sep = TensorNonTensorSeparator(all_params)
