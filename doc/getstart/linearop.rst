@@ -45,7 +45,7 @@ as a LinearOperator, we can write
     >>> a = torch.tensor(2.0).requires_grad_()
     >>> flip = Flip(a, 5)
     >>> print(flip)
-    xitorch.LinearOperator with shape: (5,5)
+    LinearOperator (Flip) with shape (5, 5), dtype = torch.float32, device = cpu
 
 With ``_mv`` implemented, we can call ``.mv()``, ``.mm()``, and ``.fullmatrix()``,
 but not ``.rmv()`` and ``.rmm()``

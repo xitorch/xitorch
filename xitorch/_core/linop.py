@@ -48,13 +48,19 @@ class LinearOperator(EditableModule):
 
             import torch
             import xitorch
+            torch.manual_seed(100)
 
         .. doctest::
 
-            >>> mat = torch.rand(4,2,5,5)  # 5x5 matrix with (4,2) batch dimensions
+            >>> mat = torch.rand(1,3,1,2)  # 1x2 matrix with (1,3) batch dimensions
             >>> linop = xitorch.LinearOperator.m(mat)
             >>> print(linop)
-            xitorch.LinearOperator with shape: (4,2,5,5)
+            MatrixLinearOperator with shape (1, 3, 1, 2):
+               tensor([[[[0.1117, 0.8158]],
+            <BLANKLINE>
+                        [[0.2626, 0.4839]],
+            <BLANKLINE>
+                        [[0.6765, 0.7539]]]])
         """
         if is_hermitian is None:
             if mat.shape[-2] != mat.shape[-1]:
