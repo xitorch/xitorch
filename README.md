@@ -20,6 +20,10 @@ The documentation can be found at: https://xitorch.readthedocs.io/
 
 After fulfilling all the requirements, type the commands below to install `xitorch`
 
+    python -m pip install xitorch
+
+Or if you want to install from source:
+
     git clone https://github.com/mfkasim91/xitorch/
     cd xitorch
     python -m pip install -e .
