@@ -260,10 +260,10 @@ def _get_batchdims(A:LinearOperator, B:torch.Tensor,
     return get_bcasted_dims(*batchdims)
 
 def _setup_precond(precond:Optional[LinearOperator]) -> Callable[[torch.Tensor], torch.Tensor]:
-    if precond is None:
-        precond_fcn = lambda x: x
-    elif isinstance(precond, LinearOperator):
+    if isinstance(precond, LinearOperator):
         precond_fcn = lambda x: precond.mm(x)
+    elif precond is None:
+        precond_fcn = lambda x: x
     return precond_fcn
 
 def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
