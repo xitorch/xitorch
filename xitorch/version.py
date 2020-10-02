@@ -3,8 +3,8 @@ import subprocess as sp
 
 MAJOR = 0
 MINOR = 1
-MICRO = 0
-ISRELEASED = False
+MICRO = 1
+ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 # Return the git revision as a string
