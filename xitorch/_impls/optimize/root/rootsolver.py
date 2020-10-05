@@ -1,6 +1,7 @@
 # file mostly from SciPy: https://github.com/scipy/scipy/blob/914523af3bc03fe7bf61f621363fca27e97ca1d6/scipy/optimize/nonlin.py#L221
 # and converted to PyTorch for GPU efficiency
 
+import warnings
 import torch
 import functools
 from xitorch._impls.optimize.root._jacobian import BroydenFirst
