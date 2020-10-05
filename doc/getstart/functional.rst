@@ -11,6 +11,7 @@ restricted to
 1. Pure functions (i.e functions with their outputs fully determined by their tensor inputs)
 2. Methods of classes derived from ``torch.nn.Module``
 3. Methods of classes derived from :class:`xitorch.EditableModule`
+4. Siblings of the above methods
 
 In this example, we will show how to use the functionals in xitorch with above
 function inputs.
@@ -180,3 +181,83 @@ The output can then be used to get the derivatives with respect to direct parame
     dxdA, dxdb, dxdE = torch.autograd.grad(xroot.sum(), params, create_graph=True)  # 1st deriv
     grad2A, grad2b, gradE = torch.autograd.grad(dxdE.sum(), params, create_graph=True)  # 2nd deriv
     print(grad2A)
+
+Siblings of acceptable methods
+------------------------------
+
+Suppose that we want to make a new functional that finds a solution for the
+equation below,
+
+.. math::
+
+    \mathbf{y}^2 = \mathbf{f}(\mathbf{y}, \theta).
+
+This is equivalent of finding the root of
+:math:`\mathbf{g}(\mathbf{y},\theta) = \mathbf{y}^2 - \mathbf{f}(\mathbf{y}, \theta)`.
+A naive solution would look like below
+
+.. jupyter-execute::
+
+    import torch
+    from xitorch.optimize import rootfinder
+
+    def quad_naive_solver(fcn, y, params, **rf_kwargs):  # solve y^2 = f(y,*params)
+        def gfcn(y, *params):
+            return y*y - fcn(y, *params)
+        return rootfinder(gfcn, y, params, **rf_kwargs)
+
+The solution above would only work if ``fcn`` is a pure function because in
+a pure function, all affecting parameters should be in ``params``.
+However, if ``fcn`` is a method of ``torch.nn.Module`` or :obj:`xitorch.EditableModule`,
+there might be some object's parameters that are affecting parameters which are
+not included in ``params`` (as seen in the previous subsection).
+
+The solution is to use :func:`xitorch.make_sibling` decorator as below
+
+.. jupyter-execute::
+
+    import xitorch
+    from xitorch.optimize import rootfinder
+
+    def quad_solver(fcn, y, params, **rf_kwargs):  # solve y^2 = f(y,*params)
+        @xitorch.make_sibling(fcn)
+        def gfcn(y, *params):
+            return y*y - fcn(y, *params)
+        return rootfinder(gfcn, y, params, **rf_kwargs)
+
+The function :func:`xitorch.make_sibling` makes the decorated function
+as a sibling of its input function.
+It means that the decorated function can be seen as another method of the same
+instance as ``fcn.__self__``.
+It only takes an effect if ``fcn`` is a method and it doesn't have any effect
+if ``fcn`` is a pure function.
+
+Now, let's try our implementations with a method from ``torch.nn.Module``.
+
+.. jupyter-execute::
+
+    class DummyModule(torch.nn.Module):
+        def __init__(self, a):
+            super().__init__()
+            self.a = a
+
+        def forward(self, y):
+            return self.a[0] * y * y + self.a[1] * y + self.a[2]
+
+    a = torch.nn.Parameter(torch.tensor([2., 4., -5.]))
+    module = DummyModule(a)
+    y0 = torch.zeros((1,), dtype=a.dtype)
+    ysolve = quad_solver(module.forward, y0, params=())
+    print(ysolve)
+
+.. jupyter-execute::
+
+    dyda = torch.autograd.grad(ysolve, a, create_graph=True)
+    # analytically calculated derivative
+    dyda_true = torch.tensor([-1./6, -1./6, -1./6])
+    print(dyda, dyda_true)
+
+Results matching with the analytically calculated results means that our new
+functional works!
+You can see yourself what happens if we use the naive implementation without
+:func:`xitorch.make_sibling`.
