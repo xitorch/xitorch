@@ -165,7 +165,11 @@ def get_pure_function(fcn:Callable[...,Any]) -> PureFunction:
 def _get_pure_function(
         fcn,
         fcntocall:Optional[Callable[...,Any]]=None) -> PureFunction:
-    if not inspect.ismethod(fcn) and not inspect.isfunction(fcn) and not isinstance(fcn, PureFunction):
+    if not inspect.ismethod(fcn) and \
+       not inspect.isfunction(fcn) and \
+       not isinstance(fcn, PureFunction) and \
+       not isinstance(fcn, torch.jit.ScriptFunction):
+
         if hasattr(fcn, "__call__"):
             fcn = fcn.__call__
         else:
@@ -174,7 +178,7 @@ def _get_pure_function(
     if isinstance(fcn, PureFunction):
         pfunc = fcn
 
-    elif inspect.isfunction(fcn):
+    elif inspect.isfunction(fcn) or isinstance(fcn, torch.jit.ScriptFunction):
         pfunc = FunctionPureFunction(fcn, fcntocall=fcntocall)
 
     # if it is a method from an object, unroll the parameters and add
