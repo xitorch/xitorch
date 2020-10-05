@@ -42,7 +42,6 @@ def _nonlin_solver(fcn, x0, params, method,
         Options for verbosity
     """
 
-    stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol)
     jacobian = {
         "broyden1": BroydenFirst,
     }[method](alpha, max_rank)
@@ -61,6 +60,7 @@ def _nonlin_solver(fcn, x0, params, method,
 
     y = func(x)
     y_norm = y.norm()
+    stop_cond = TerminationCondition(f_tol, f_rtol, y_norm, x_tol, x_rtol)
     if (y_norm == 0):
         return x.reshape(xshape)
 
@@ -96,11 +96,10 @@ def _nonlin_solver(fcn, x0, params, method,
         jacobian.update(xnew.clone(), ynew)
 
         # print out dx and df
-        dy = (ynew - y)
-        to_stop = stop_cond.check(x.norm(), y_norm, dx_norm, dy.norm())
+        to_stop = stop_cond.check(xnew.norm(), y_norm_new, dx_norm)
         if verbose:
             if i < 10 or i % 10 == 0 or to_stop:
-                print("%6d: |dx|=%.3e, |df|=%.3e" % (i, dx_norm, dy.norm()))
+                print("%6d: |dx|=%.3e, |f|=%.3e" % (i, dx_norm, y_norm))
         if to_stop:
             converge = True
             break
@@ -118,8 +117,8 @@ def _nonlin_solver(fcn, x0, params, method,
         y = ynew
     if not converge:
         msg = "The rootfinder does not converge after %d iterations. " + \
-              "|dx|=%.3e, |df|=%.3e"
-        warnings.warn(msg % (maxiter, dx_norm, dy.norm()))
+              "|dx|=%.3e, |f|=%.3e"
+        warnings.warn(msg % (maxiter, dx_norm, y.norm()))
     return x.reshape(xshape)
 
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',)) # takes only the signature
@@ -234,7 +233,7 @@ def _scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0, max_nit
     return None, phi_a1
 
 class TerminationCondition(object):
-    def __init__(self, f_tol, f_rtol, x_tol, x_rtol):
+    def __init__(self, f_tol, f_rtol, f0_norm, x_tol, x_rtol):
         if f_tol is None:
             f_tol = 1e-6
         if f_rtol is None:
@@ -247,10 +246,11 @@ class TerminationCondition(object):
         self.f_rtol = f_rtol
         self.x_tol = x_tol
         self.x_rtol = x_rtol
+        self.f0_norm = f0_norm
 
-    def check(self, xnorm, ynorm, dxnorm, dynorm):
+    def check(self, xnorm, ynorm, dxnorm):
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
-        ytcheck = dynorm < self.f_tol
-        yrcheck = dynorm < self.f_rtol * ynorm
+        ytcheck = ynorm < self.f_tol
+        yrcheck = ynorm < self.f_rtol * self.f0_norm
         return xtcheck and xrcheck and ytcheck and yrcheck
