@@ -1,4 +1,5 @@
 import torch
+import copy
 from typing import Union, Sequence, Any, Callable, Optional, Mapping
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._core.pure_function import get_pure_function, make_sibling
@@ -57,10 +58,11 @@ def mcquad(
     """
     if method is None:
         method = "mh"
-    fwd_options["method"] = method
-    return _mcquad(ffcn, log_pfcn, x0, None, None, fparams, pparams, fwd_options, bck_options)
+    return _mcquad(ffcn, log_pfcn, x0, None, None, fparams, pparams,
+        method, bck_options, **fwd_options)
 
-def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, fwd_options, bck_options):
+def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, method,
+            bck_options, **fwd_options):
     # this is mcquad with an additional xsamples argument, to prevent xsamples being set by users
 
     if is_debug_enabled():
@@ -86,16 +88,19 @@ def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, fwd_option
         def pure_ffcn2(x, *fparams):
             y = pure_ffcn(x, *fparams)
             return packer.flatten(y)
-        res = _MCQuad.apply(pure_ffcn2, pure_logpfcn, x0, None, None, fwd_options, bck_options,
+        res = _MCQuad.apply(pure_ffcn2, pure_logpfcn, x0, None, None,
+            method, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
         return packer.pack(res)
     else:
-        return _MCQuad.apply(pure_ffcn, pure_logpfcn, x0, None, None, fwd_options, bck_options,
+        return _MCQuad.apply(pure_ffcn, pure_logpfcn, x0, None, None,
+            method, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
 
 class _MCQuad(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, ffcn, log_pfcn, x0, xsamples, wsamples, fwd_options, bck_options,
+    def forward(ctx, ffcn, log_pfcn, x0, xsamples, wsamples,
+            method, fwd_options, bck_options,
             nfparams, nf_objparams, npparams, *all_fpparams):
         # set up the default options
         config = fwd_options
@@ -109,7 +114,6 @@ class _MCQuad(torch.autograd.Function):
 
         # select the method for the sampling
         if xsamples is None:
-            method = config.pop("method")
             methods = {
                 "mh": mh,
                 "_dummy1d": dummy1d,
@@ -128,6 +132,7 @@ class _MCQuad(torch.autograd.Function):
         ctx.pparam_sep = TensorNonTensorSeparator((*pparams, *pobjparams))
         ctx.nfparams = len(fparams)
         ctx.npparams = len(pparams)
+        ctx.method = method
 
         # save for backward
         ftensor_params = ctx.fparam_sep.get_tensor_params()
@@ -227,8 +232,9 @@ class _MCQuad(torch.autograd.Function):
             wsamples=wsamples,
             fparams=(grad_epf, epf, *fptensor_params_copy),
             pparams=pparams,
-            fwd_options=ctx.bck_config,
-            bck_options=ctx.bck_config)
+            method=ctx.method,
+            bck_options=ctx.bck_config,
+            **ctx.bck_config)
         dLdthetaf = aug_epfs[:nftensorparams]
         dLdthetap = aug_epfs[nftensorparams:]
 
@@ -237,7 +243,7 @@ class _MCQuad(torch.autograd.Function):
         dLdpnontensor = [None for _ in range(ctx.pparam_sep.nnontensors())]
         dLdtf = ctx.fparam_sep.reconstruct_params(dLdthetaf, dLdfnontensor)
         dLdtp = ctx.pparam_sep.reconstruct_params(dLdthetap, dLdpnontensor)
-        return (None, None, None, None, None, None, None, None, None, None,
+        return (None, None, None, None, None, None, None, None, None, None, None,
                 *dLdtf, *dLdtp)
 
 def _integrate(ffcn, xsamples, wsamples, fparams):
