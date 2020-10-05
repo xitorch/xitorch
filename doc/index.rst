@@ -20,6 +20,7 @@ It is inspired by SciPy, a popular Python library for scientific computing.
    getstart/installation
    getstart/functional
    getstart/linearop
+   getstart/debugging
    getstart/custom_method
    getstart/contribute
 
