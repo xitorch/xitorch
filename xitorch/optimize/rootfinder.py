@@ -145,6 +145,11 @@ def equilibrium(
         >>> print(yequil)
         tensor([[ 0.2313],
                 [-0.5957]], grad_fn=<_RootFinderBackward>)
+
+    Note
+    ----
+    * This is a direct implementation of finding the root of
+      :math:`\mathbf{g}(\mathbf{y}, \theta) = \mathbf{y} - \mathbf{f}(\mathbf{y}, \theta)`
     """
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
