@@ -1,4 +1,23 @@
+import warnings
 from xitorch._utils.unique import Uniquifier
+from xitorch._utils.decorators import deprecated
+
+@deprecated("06 Oct 2020")
+def deprfunc():
+    return 3
+
+@deprecated("06 Oct 2020")
+class DeprClass():
+    def __init__(self):
+        self.a = 3
+
+class DeprMethod():
+    def __init__(self):
+        self.a = 4
+
+    @deprecated("06 Oct 2020")
+    def method(self):
+        return self.a + 2
 
 def test_uniquifier():
     obj1 = [1]
@@ -52,3 +71,31 @@ def test_uniquifier_error():
         assert False, "Expected a RuntimeError"
     except RuntimeError:
         pass
+
+def test_deprecated_func():
+    with warnings.catch_warnings(record=True) as w:
+        a = deprfunc()
+        assert len(w) == 1
+        msg = str(w[0].message)
+        assert "deprfunc" in msg
+        assert "deprecated" in msg
+        assert "06 Oct 2020" in msg
+
+def test_deprecated_class():
+    with warnings.catch_warnings(record=True) as w:
+        a = DeprClass()
+        assert len(w) == 1
+        msg = str(w[0].message)
+        assert "DeprClass" in msg
+        assert "deprecated" in msg
+        assert "06 Oct 2020" in msg
+
+def test_deprecated_method():
+    with warnings.catch_warnings(record=True) as w:
+        a = DeprMethod()
+        b = a.method()
+        assert len(w) == 1
+        msg = str(w[0].message)
+        assert "DeprMethod.method" in msg
+        assert "deprecated" in msg
+        assert "06 Oct 2020" in msg
