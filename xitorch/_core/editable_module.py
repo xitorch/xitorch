@@ -141,20 +141,6 @@ class EditableModule(object):
         self._unique_params_maps[methodname] = idx_map
         return idxs
 
-    @contextmanager
-    def useuniqueparams(self, methodname:str, *params):
-        try:
-            _orig_params_ = self.getuniqueparams(methodname)
-            identical = _all_equal(_orig_params_, params)
-            if not identical:
-                self.setuniqueparams(methodname, *params)
-            yield self
-        except Exception as exc:
-            raise exc
-        finally:
-            if not identical:
-                self.setuniqueparams(methodname, *_orig_params_)
-
     ############# debugging #############
     def assertparams(self, method, *args, **kwargs):
         """
@@ -217,7 +203,6 @@ class EditableModule(object):
         methodname = method.__name__
 
         self.__assert_method_preserve(method, *args, **kwargs) # assert if the method preserve the float tensors of the object
-        self.__assert_match_getsetparams(methodname) # check if getparams and setparams matched the tensors
         self.__assert_get_correct_params(method, *args, **kwargs) # check if getparams returns the correct tensors
         print('"%s" method check done' % methodname)
 
@@ -241,25 +226,6 @@ class EditableModule(object):
             if p0.shape != p1.shape:
                 raise GetSetParamsError(msg)
             if not torch.allclose(p0,p1):
-                raise GetSetParamsError(msg)
-
-    def __assert_match_getsetparams(self, methodname):
-        # this function assert if get & set params functions correspond to the
-        # same parameters in the same order
-
-        # count the number of parameters in getparams and setparams
-        params0 = self.getparams(methodname)
-        len_setparams0 = self.setparams(methodname, *params0)
-        if len_setparams0 != len(params0):
-            raise GetSetParamsError("The number of parameters returned by getparams and set by setparams do not match \n"\
-                "(getparams: %d, setparams: %d)" % (len(params0), len_setparams0))
-
-        # check if the params are assigned correctly in the correct order
-        params1 = self.getparams(methodname)
-        names1 = self.getparamnames(methodname)
-        for i,p0,p1 in zip(range(len(params0)), params0, params1):
-            if id(p0) != id(p1):
-                msg = "The parameter %s in getparams and setparams does not match" % names1[i]
                 raise GetSetParamsError(msg)
 
     def __assert_get_correct_params(self, method, *args, **kwargs):
@@ -348,30 +314,6 @@ class EditableModule(object):
             params.append(all_tensors[i])
 
         return names, params
-
-def getmethodparams(method):
-    if not inspect.ismethod(method):
-        return []
-    obj = method.__self__
-    methodname = method.__name__
-    if not isinstance(obj, EditableModule):
-        return []
-    return obj.getparams(methodname)
-
-def setmethodparams(method, *params):
-    if not inspect.ismethod(method):
-        return
-    obj = method.__self__
-    methodname = method.__name__
-    if not isinstance(obj, EditableModule):
-        return 0
-    return obj.setparams(methodname, *params)
-
-def _all_equal(params1, params2):
-    for p1, p2 in zip(params1, params2):
-        if id(p1) != id(p2):
-            return False
-    return True
 
 ############################ traversing functions ############################
 def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
