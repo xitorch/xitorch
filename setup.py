@@ -21,7 +21,7 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Physics",
         "Topic :: Scientific/Engineering :: Mathematics",
-        "License :: OSI Approved :: BSD License",
+        "License :: OSI Approved :: MIT License",
 
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
