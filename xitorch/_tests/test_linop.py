@@ -1,3 +1,4 @@
+import warnings
 import torch
 from xitorch import LinearOperator
 
@@ -41,6 +42,15 @@ class LinOp2(BaseLinOp):
 
     def _rmv(self, x):
         return torch.matmul(self.mat.transpose(-2,-1), x.unsqueeze(-1)).squeeze(-1)
+
+class NotLinOp1(BaseLinOp):
+    # LinearOperator where only ._mv is implemented (bare minimum)
+    def __init__(self, mat, is_hermitian=False):
+        super(NotLinOp1, self).__init__(mat, is_hermitian)
+        self.implemented_methods = ["_mv"]
+
+    def _mv(self, x):
+        return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1) + 1
 
 def test_linop0_err():
     mat = torch.rand((3,1,2))
@@ -164,6 +174,82 @@ def test_linop_repr():
     d = LinearOperator.m(mat1)
     drepr = ["MatrixLinearOperator", "(2, 3, 2)"]
     _assert_str_contains(d.__repr__(), drepr)
+
+def test_linop_mat_hermit_err():
+    torch.manual_seed(100)
+    mat = torch.rand(3,3)
+    mat2 = torch.rand(3,4)
+    msg = "Expecting a RuntimeError for non-symmetric matrix "\
+          "indicated as a Hermitian"
+
+    try:
+        LinearOperator.m(mat, is_hermitian=True)
+        assert False, msg
+    except RuntimeError:
+        pass
+
+    try:
+        LinearOperator.m(mat2, is_hermitian=True)
+        assert False, msg
+    except RuntimeError:
+        pass
+
+def test_linop_op_err():
+    mat1 = torch.rand(3, 4)
+    vec1 = torch.rand(3)
+    vec2 = torch.rand(4)
+    errmsg = "Mismatch shape should raise a RuntimeError"
+    linop1 = LinOp1(mat1)
+    linop2 = LinOp2(mat1)
+
+    try:
+        linop1.mv(vec1)
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
+    try:
+        linop1.mm(mat1)
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
+    try:
+        linop1.rmv(vec2)
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
+    try:
+        linop1.rmm(mat1.transpose(-2,-1))
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
+    try:
+        linop1.matmul(linop2)
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
+def test_check_linop():
+    mat1 = torch.rand(3,4)
+    linop1 = LinOp1(mat1)
+    nlinop1 = NotLinOp1(mat1)
+
+    with warnings.catch_warnings(record=True) as w:
+        linop1.check()
+        assert len(w) == 1
+        assert "slow down" in str(w[0].message)
+
+    with warnings.catch_warnings(record=True) as w:
+        try:
+            nlinop1.check()
+            assert False, "AssertionError must be raised for non-LinearOperator"
+        except AssertionError:
+            pass
+        assert len(w) == 1
+        assert "slow down" in str(w[0].message)
 
 def _assert_str_contains(s, slist):
     for c in slist:

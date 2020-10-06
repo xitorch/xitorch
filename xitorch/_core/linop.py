@@ -184,9 +184,6 @@ class LinearOperator(EditableModule):
             _orig_params_ = self.getuniqueparams(methodname)
             self.setuniqueparams(methodname, *params)
             yield self
-        except Exception as exc:
-            raise exc
-            # traceback.print_exc()
         finally:
             self.setuniqueparams(methodname, *_orig_params_)
 
