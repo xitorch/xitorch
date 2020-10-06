@@ -16,12 +16,6 @@ setup(
     license='MIT',
     packages=find_packages(),
     python_requires=">=3.6",
-    install_requires=[
-        "numpy>=1.8.2",
-        "scipy>=1.1.0",
-        "matplotlib>=1.5.3",
-        "torch>=1.5",
-    ],
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering",
