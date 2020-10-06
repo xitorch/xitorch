@@ -94,38 +94,6 @@ def test_linop1_fullmatrix():
     linop_mat = linop.fullmatrix()
     assert torch.allclose(linop_mat, mat)
 
-def atest_linop1_adj_err():
-    # see if an error is raised if .H.mv() is called without .rmv() implementation
-    mat = torch.rand((2,4,2,3))
-    xv = torch.rand((2,))
-    x = torch.rand((2,3))
-    linop = LinOp1(mat)
-
-    # try the rmv and rmm
-    try:
-        ymv = linop.rmv(xv)
-        assert False, "A RuntimeError must be raised when calling .rmv() if ._rmv is not implemented"
-    except RuntimeError:
-        pass
-    try:
-        ymv = linop.rmm(x)
-        assert False, "A RuntimeError must be raised when calling .rmm() if ._rmv or ._rmm is not implemented"
-    except RuntimeError:
-        pass
-
-    # try the adjoint .mv and .mm
-    linopH = linop.H
-    try:
-        ymv = linopH.mv(xv)
-        assert False, "A RuntimeError must be raised when calling .H.mv() if ._rmv is not implemented"
-    except RuntimeError:
-        pass
-    try:
-        ymv = linopH.mm(x)
-        assert False, "A RuntimeError must be raised when calling .H.mm() if ._rmv or ._rmm is not implemented"
-    except RuntimeError:
-        pass
-
 def test_linop1_rmm():
     # test if rmv and rmm done correctly if not implemented
     mat = torch.rand((2,4,2,3))
