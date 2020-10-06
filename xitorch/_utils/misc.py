@@ -2,9 +2,7 @@ import contextlib
 import torch
 from typing import Mapping, Callable, Union, List, Optional, Dict
 
-def set_default_option(defopt:Dict, opt:Optional[Dict]=None) -> Dict:
-    if opt is None:
-        opt = {}
+def set_default_option(defopt:Dict, opt:Dict) -> Dict:
     defopt.update(opt)
     return defopt
 
@@ -26,17 +24,6 @@ def get_method(algname:str,
             "set the default method"
     else:
         raise TypeError("Invalid method type: %s. Only str and callable are accepted." % type(method))
-
-def extract_differentiable_tensors(model:torch.nn.Module) -> List:
-    res = list(model.parameters())  # type:List
-
-    # add differentiable and non-parameters attribute in the model
-    for varname in model.__dict__:
-        var = model.__dict__[varname]
-        if not isinstance(var, torch.Tensor): continue
-        if var.requires_grad:
-            res.append(var)
-    return res
 
 @contextlib.contextmanager
 def dummy_context_manager():
@@ -68,15 +55,6 @@ class TensorNonTensorSeparator(object):
 
     def get_tensor_params(self):
         return self.tensor_params
-
-    def get_nontensor_params(self):
-        return self.nontensor_params
-
-    def get_tensor_idxs(self):
-        return self.tensor_idxs
-
-    def get_nontensor_idxs(self):
-        return self.nontensor_idxs
 
     def ntensors(self):
         return len(self.tensor_idxs)
