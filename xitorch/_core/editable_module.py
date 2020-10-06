@@ -201,9 +201,9 @@ class EditableModule(object):
             >>> x = torch.tensor(0.4).requires_grad_()
             >>> A = AClass(a)
             >>> A.assertparams(A.mult, x) # doctest:+ELLIPSIS
-            <doctest assertparams[4]>:1: UserWarning: getparams for AClass.mult does not include: b
+            <...>:1: UserWarning: getparams for AClass.mult does not include: b
               A.assertparams(A.mult, x) # doctest:+ELLIPSIS
-            <doctest assertparams[4]>:1: UserWarning: getparams for AClass.mult has excess parameters: a
+            <...>:1: UserWarning: getparams for AClass.mult has excess parameters: a
               A.assertparams(A.mult, x) # doctest:+ELLIPSIS
             "mult" method check done
         """
