@@ -109,7 +109,7 @@ class SQuad(EditableModule):
 
     def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
         """"""
-        return self.getparamnames(methodname, prefix=prefix+"obj.")
+        return self.obj.getparamnames(methodname, prefix=prefix+"obj.")
 
 # docstring completion
 _squad_methods = {

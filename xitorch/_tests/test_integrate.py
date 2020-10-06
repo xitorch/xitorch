@@ -370,6 +370,11 @@ def test_squad(dtype, device, imethod):
         else:
             return quad.integrate(y, dim=-1)
 
+    # getparamnames
+    quad = SQuad(x, method=method, **option)
+    quad.assertparams(quad.cumsum, y, dim=-1)
+    quad.assertparams(quad.integrate, y, dim=-1)
+
     # cumsum
     ycumsum = getval(x, y, "cumsum")
     assert torch.allclose(ycumsum, ytrue)
