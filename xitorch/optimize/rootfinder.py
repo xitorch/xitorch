@@ -162,7 +162,7 @@ def equilibrium(
         return y - pfunc(y, *params)
 
     fwd_options["method"] = _get_rootfinder_default_method(method)
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.getobjparams())
+    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 def minimize(
         fcn:Callable[...,torch.Tensor],
