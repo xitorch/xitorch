@@ -34,7 +34,7 @@ class SQuad(EditableModule):
             **fwd_options):
         if method is None:
             method = "cspline"
-        if not (isinstance(x, torch.Tensor) and x.ndim == 1):
+        if not (isinstance(x, torch.Tensor) and len(x.shape) == 1):
             raise RuntimeError("The input x to SQuad must be a 1D tensor")
 
         all_clss = {
