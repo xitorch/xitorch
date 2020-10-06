@@ -1,4 +1,4 @@
-https://download.pytorch.org/whl/cpu/torch-1.6.0%2Bcpu-cp37-cp37m-linux_x86_64.whl
+torch==1.6.0
 git+https://github.com/mfkasim1/xitorch#egg=xitorch
 sphinx>=3
 sphinx_rtd_theme
