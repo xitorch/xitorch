@@ -1,5 +1,11 @@
 import os
 from setuptools import setup, find_packages
+from distutils.command.build_py import build_py
+
+try:
+    import torch
+except ImportError:
+    raise ImportError("Please install torch before install xitorch")
 
 module_name = "xitorch"
 file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -14,8 +20,6 @@ def sp_write_template():
     with open(sp_template_file, "r") as fp:
         exec(fp.read(), sp_template_module)
     sp_template_module["main"]()
-
-sp_write_template()
 
 ############### special functions compilation ###############
 sp_ext_name = "%s.special_impl" % module_name
@@ -45,8 +49,15 @@ with open(verfile, "r") as fp:
     exec(fp.read(), version)
 
 ############### setup ###############
-with open(absdir("requirements.txt"), "r") as f:
-    install_requires = [line.strip() for line in f.read().split("\n") if line.strip() != ""]
+class custom_build_py(build_py):
+    def run(self):
+        if not self.dry_run:
+            sp_write_template()
+        build_py.run(self)
+
+def get_requirements(fname):
+    with open(absdir(fname), "r") as f:
+        return [line.strip() for line in f.read().split("\n") if line.strip() != ""]
 
 setup(
     name=module_name,
@@ -58,9 +69,13 @@ setup(
     license='MIT',
     packages=find_packages(),
     python_requires=">=3.6",
-    install_requires=install_requires,
+    install_requires=get_requirements("requirements.txt"),
+    setup_requires=get_requirements("setup-requirements.txt"),
     ext_modules=[get_torch_cpp_extension()],
-    cmdclass={'build_ext': get_build_extension()},
+    cmdclass={
+        'build_ext': get_build_extension(),
+        'build_py': custom_build_py,
+    },
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering",
