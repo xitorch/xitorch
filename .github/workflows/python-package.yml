@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install torch
+        python -m pip install -r setup-requirements.txt
         python -m pip install -r test-requirements.txt
         python setup.py install
     - name: Test with pytest
@@ -55,7 +55,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install torch
+        python -m pip install -r setup-requirements.txt
         python -m pip install -r test-requirements.txt
         python setup.py install
     - name: Type check
@@ -78,7 +78,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install torch
+        python -m pip install -r setup-requirements.txt
         python -m pip install -r doc/requirements.txt
         python setup.py install
     - name: Doctest
