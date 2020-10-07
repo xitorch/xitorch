@@ -15,7 +15,7 @@ def main():
         os.mkdir(fgendir)
 
     with open(functions_yaml, "r") as f:
-        functions = yaml.load(f, Loader=yaml.CLoader)
+        functions = yaml.load(f, Loader=yaml.Loader)
 
     ftemplates = os.listdir(ftemplatedir)
     for ftempl in ftemplates:

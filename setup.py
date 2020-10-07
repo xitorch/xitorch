@@ -15,6 +15,7 @@ def sp_write_template():
         exec(fp.read(), sp_template_module)
     sp_template_module["main"]()
 
+sp_write_template()
 
 ############### special functions compilation ###############
 sp_ext_name = "%s.special_impl" % module_name
@@ -57,11 +58,6 @@ setup(
     license='MIT',
     packages=find_packages(),
     python_requires=">=3.6",
-    setup_requires=[
-        "pybind11>=2.5.0",
-        "jinja2>=2.11.0",
-        "pyyaml>=5.3.1",
-    ],
     install_requires=install_requires,
     ext_modules=[get_torch_cpp_extension()],
     cmdclass={'build_ext': get_build_extension()},
