@@ -62,6 +62,7 @@ setup(
         "pybind11>=2.5.0",
         "jinja2>=2.11.0",
         "pyyaml>=5.3.1",
+        "torch>=1.5",
     ],
     ext_modules=[get_torch_cpp_extension()],
     cmdclass={'build_ext': get_build_extension()},
