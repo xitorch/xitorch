@@ -161,7 +161,7 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
-xitorch_github_page = "https://github.com/mfkasim91/xitorch"
+xitorch_github_page = "https://github.com/mfkasim1/xitorch"
 extlinks = {
     "github": ("{gh}/%s".format(gh=xitorch_github_page), "xitorch Github page"),
     "github_issue": ("{gh}/issues/%s".format(gh=xitorch_github_page), "issue page"),
