@@ -1,0 +1,6 @@
+- name: mysquare
+  funcname: mysquare
+  num_io: "1,1"
+  dtypes: "f,d"
+  derivs:
+    - "2 * gouts[0] * inps[0]"

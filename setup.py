@@ -1,13 +1,53 @@
 import os
 from setuptools import setup, find_packages
 
-verfile = os.path.abspath(os.path.join("xitorch", "version.py"))
+module_name = "xitorch"
+file_dir = os.path.dirname(os.path.realpath(__file__))
+absdir = lambda p: os.path.join(file_dir, p)
+
+
+############### special functions template writing ###############
+sp_template_file = os.path.abspath(os.path.join(module_name,
+    "_impls", "special", "write_functions.py"))
+sp_template_module = {"__file__": sp_template_file}
+with open(sp_template_file, "r") as fp:
+    exec(fp.read(), sp_template_module)
+sp_template_module["main"]()
+
+
+############### special functions compilation ###############
+sp_ext_name = "%s.special_impl" % module_name
+sp_incl_dirs = [absdir("xitorch/_impls")]
+sp_sources = [
+    absdir("xitorch/_impls/special/generated/batchfuncs.cpp"),
+    absdir("xitorch/_impls/special/generated/bind.cpp"),
+]
+
+def get_pybind_include():
+    import pybind11
+    return pybind11.get_include()
+
+def get_torch_cpp_extension():
+    from torch.utils.cpp_extension import CppExtension
+    return CppExtension(
+        name=sp_ext_name,
+        sources=sp_sources,
+        include_dirs=[get_pybind_include()] + sp_incl_dirs,
+        extra_compile_args=['-g'],
+    )
+
+def get_build_extension():
+    from torch.utils.cpp_extension import BuildExtension
+    return BuildExtension
+
+############### versioning ###############
+verfile = os.path.abspath(os.path.join(module_name, "version.py"))
 version = {"__file__": verfile}
 with open(verfile, "r") as fp:
     exec(fp.read(), version)
 
 setup(
-    name='xitorch',
+    name=module_name,
     version=version["get_version"](),
     description='Differentiable scientific computing library',
     url='https://xitorch.readthedocs.io/',
@@ -16,6 +56,13 @@ setup(
     license='MIT',
     packages=find_packages(),
     python_requires=">=3.6",
+    setup_requires=[
+        "pybind11>=2.5.0",
+        "jinja2>=2.11.0",
+        "pyyaml>=5.3.1",
+    ],
+    ext_modules=[get_torch_cpp_extension()],
+    cmdclass={'build_ext': get_build_extension()},
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering",
