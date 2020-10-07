@@ -24,22 +24,17 @@ sp_sources = [
     absdir("xitorch/_impls/special/generated/bind.cpp"),
 ]
 
-def get_pybind_include():
-    import pybind11
-    return pybind11.get_include()
-
 def get_torch_cpp_extension():
     from torch.utils.cpp_extension import CppExtension
     return CppExtension(
         name=sp_ext_name,
         sources=sp_sources,
-        include_dirs=[get_pybind_include()] + sp_incl_dirs,
+        include_dirs=sp_incl_dirs,
         extra_compile_args=['-g'],
     )
 
 def get_build_extension():
     from torch.utils.cpp_extension import BuildExtension
-    sp_write_template()
     return BuildExtension
 
 ############### versioning ###############
@@ -47,6 +42,10 @@ verfile = os.path.abspath(os.path.join(module_name, "version.py"))
 version = {"__file__": verfile}
 with open(verfile, "r") as fp:
     exec(fp.read(), version)
+
+############### setup ###############
+with open(absdir("requirements.txt"), "r") as f:
+    install_requires = [line.strip() for line in f.read().split("\n") if line.strip() != ""]
 
 setup(
     name=module_name,
@@ -62,8 +61,8 @@ setup(
         "pybind11>=2.5.0",
         "jinja2>=2.11.0",
         "pyyaml>=5.3.1",
-        "torch>=1.5",
     ],
+    install_requires=install_requires,
     ext_modules=[get_torch_cpp_extension()],
     cmdclass={'build_ext': get_build_extension()},
     classifiers=[
