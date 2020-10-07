@@ -5,17 +5,26 @@ from xitorch.interpolate.interp1 import Interp1D
 from xitorch._tests.utils import device_dtype_float_test
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "bc_type": ["clamped", "natural", "not-a-knot", None]
+    "bc_type": ["clamped", "natural", "not-a-knot", None],
+    "scramble": [False, True]
 })
-def test_interp1_cspline(dtype, device, bc_type):
+def test_interp1_cspline(dtype, device, bc_type, scramble):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
     x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
     y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
     y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
                        [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
     # points are well inside to avoid extrapolation in numerical gradient calculations
-    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs).requires_grad_()
-    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs).requires_grad_()
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
+
+    if scramble:
+        idx1 = torch.randperm(len(xq1))
+        idx2 = torch.randperm(len(xq2))
+        xq1 = xq1[...,idx1]
+        xq2 = xq2[...,idx2]
+    xq1 = xq1.requires_grad_()
+    xq2 = xq2.requires_grad_()
 
     # true results (obtained from scipy.interpolate.CubicSpline)
     # from scipy.interpolate import CubicSpline
@@ -64,6 +73,12 @@ def test_interp1_cspline(dtype, device, bc_type):
         yq22_true = torch.tensor([[1.03045416, 2.03025785, 1.41177844, 2.52449066],
                                   [0.70073217, 2.02728778, 1.57916384, 1.98521859]],
                                   **dtype_device_kwargs)
+
+    if scramble:
+        yq11_true = yq11_true[...,idx1]
+        yq12_true = yq12_true[...,idx2]
+        yq21_true = yq21_true[...,idx1]
+        yq22_true = yq22_true[...,idx2]
 
     def interp(x, y, xq):
         return Interp1D(x, y, method="cspline", bc_type=bc_type)(xq)
