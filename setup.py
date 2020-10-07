@@ -7,12 +7,13 @@ absdir = lambda p: os.path.join(file_dir, p)
 
 
 ############### special functions template writing ###############
-sp_template_file = os.path.abspath(os.path.join(module_name,
-    "_impls", "special", "write_functions.py"))
-sp_template_module = {"__file__": sp_template_file}
-with open(sp_template_file, "r") as fp:
-    exec(fp.read(), sp_template_module)
-sp_template_module["main"]()
+def sp_write_template():
+    sp_template_file = os.path.abspath(os.path.join(module_name,
+        "_impls", "special", "write_functions.py"))
+    sp_template_module = {"__file__": sp_template_file}
+    with open(sp_template_file, "r") as fp:
+        exec(fp.read(), sp_template_module)
+    sp_template_module["main"]()
 
 
 ############### special functions compilation ###############
@@ -38,6 +39,7 @@ def get_torch_cpp_extension():
 
 def get_build_extension():
     from torch.utils.cpp_extension import BuildExtension
+    sp_write_template()
     return BuildExtension
 
 ############### versioning ###############
