@@ -1,3 +1,6 @@
+pybind11>=2.5.0
+jinja2>=2.11.0
+pyyaml>=5.3.1
 torch==1.6.0
 git+https://github.com/mfkasim1/xitorch#egg=xitorch
 sphinx==3.2.1
@@ -6,4 +9,3 @@ jupyter-sphinx==0.3.2
 matplotlib>=3.0
 numpy>=1.8.2
 scipy>=1.1.0
-sphinx-build>=3.2.1
