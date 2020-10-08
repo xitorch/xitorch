@@ -14,6 +14,7 @@ The documentation can be found at: https://xitorch.readthedocs.io/
 * [`linalg`](xitorch/linalg/): Linear algebra and sparse linear algebra module
 * [`optimize`](xitorch/optimize/): Optimization and root finder module
 * [`integrate`](xitorch/integrate/): Quadrature and integration module
+* [`interpolate`](xitorch/interpolate/): Interpolation
 
 ## Requirements
 
@@ -30,7 +31,8 @@ Or if you want to install from source:
 
     git clone https://github.com/mfkasim1/xitorch/
     cd xitorch
-    python setup.py install
+    python -m pip install -r setup-requirements.txt
+    python -m pip install -e .
 
 ## Gallery
 
