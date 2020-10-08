@@ -1,2 +1,3 @@
 generated/*
 !generated/__init__.py
+cfuncs/cephes/all/*

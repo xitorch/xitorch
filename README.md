@@ -32,7 +32,7 @@ Or if you want to install from source:
     git clone https://github.com/mfkasim1/xitorch/
     cd xitorch
     python -m pip install -r setup-requirements.txt
-    python -m pip install -e .
+    python setup.py install --record files.txt
 
 ## Gallery
 
