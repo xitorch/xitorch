@@ -22,5 +22,6 @@ python:
   version: 3.7
   install:
     - requirements: doc/requirements.txt
+    - requirements: setup-requirements.txt
     - method: setuptools
       path: .
