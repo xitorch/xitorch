@@ -29,6 +29,8 @@ def get_signature_and_device(inps, outs):
 {%- set inp_sig = liststr(num_inp, "inp") %}
 {%- set out_sig = liststr(num_out, "out", suffix="=None") %}
 {%- set out_sig2 = liststr(num_out, "out") %}
+
+################# {{func.name}} #################
 def {{func.name}}({{inp_sig}}, {{out_sig}}):
     {%- for i in range(num_out) %}
     if out{{i}} is None:
