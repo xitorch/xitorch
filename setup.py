@@ -4,9 +4,8 @@ from distutils.command.build_py import build_py
 
 try:
     import torch
-    import pybind11
 except ImportError:
-    raise ImportError("Please install torch and pybind11 before installing xitorch")
+    raise ImportError("Please install torch before installing xitorch")
 
 module_name = "xitorch"
 file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -22,7 +21,7 @@ def sp_write_template():
     sp_template_module["main"]()
 
 ############### special functions compilation ###############
-sp_ext_name = "%s._special_impl" % module_name
+sp_ext_name = "_%s_special_impl" % module_name
 sp_incl_dirs = [absdir("xitorch/_impls")]
 sp_source_dirs = [
     absdir("xitorch/_impls/special/generated/")
@@ -47,17 +46,13 @@ sp_sources = [
     absdir("xitorch/_impls/special/generated/bind.cpp"),
 ]
 
-def get_pybind_include():
-    import pybind11
-    return pybind11.get_include()
-
 def get_torch_cpp_extension():
     from torch.utils.cpp_extension import CppExtension
     return CppExtension(
         name=sp_ext_name,
         sources=sp_get_sources(),
-        include_dirs=[get_pybind_include()] + sp_incl_dirs,
-        extra_compile_args=['-g'],
+        include_dirs=sp_incl_dirs,
+        # extra_compile_args=['-g'],
     )
 
 def get_build_extension():

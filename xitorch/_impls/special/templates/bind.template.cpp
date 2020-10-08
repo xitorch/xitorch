@@ -1,12 +1,12 @@
 #pragma once
 
+#include <torch/extension.h>
 #include <special/generated/batchfuncs.h>
-#include <pybind11/pybind11.h>
 {%- from "macros.jinja" import fulldtype, liststr, apply_funcname %}
 
 // generated file
 
-PYBIND11_MODULE(_special_impl, m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.doc() = "Implementation of special functions";
 
   {%- for func in functions %}

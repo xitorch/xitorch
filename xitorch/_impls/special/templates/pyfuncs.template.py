@@ -1,5 +1,5 @@
 import torch
-from xitorch._special_impl import *
+from _xitorch_special_impl import *
 {%- from "macros.jinja" import fulldtype, liststr, apply_funcname, ifs %}
 
 # generated file
@@ -42,10 +42,12 @@ def _{{func.name}}({{inp_sig}}, {{out_sig2}}):
     {{ifs(loop.index0)}} signature == "{{sig}}":
         {%- for device in func.cfuncs[sig] %}
         {{ifs(loop.index0)}} device == "{{device}}":
-            return {{apply_funcname(func.name, device, sig)}}({{inp_sig}}, {{out_sig2}})
+            {{apply_funcname(func.name, device, sig)}}({{inp_sig}}, {{out_sig2}})
+            return {{out_sig2}}
         {%- endfor %}
     {%- endfor %}
-    raise RuntimeError("The function {{func.name}} has no {{sig}} defined.")
+    raise RuntimeError("The function {{func.name}} has no %s (%s) defined." % \
+                       (signature, device))
 
 class PyFunc_{{func.name}}(torch.autograd.Function):
     @staticmethod
