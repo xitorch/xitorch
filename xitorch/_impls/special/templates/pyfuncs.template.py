@@ -21,6 +21,11 @@ def get_signature_and_device(inps, outs):
     device = str(inps[0].device).split(":")[0]
     return signature, device
 
+def broadcasted_dims(*shapes):
+    maxlens = max([len(shape) for shape in shapes])
+    shapes = [[1]*(maxlens - len(shape)) + list(shape) for shape in shapes]
+    return [max(*a) for a in zip(*shapes)]
+
 ###################### generated functions ######################
 
 {%- for func in functions %}
@@ -35,10 +40,22 @@ def get_signature_and_device(inps, outs):
 
 ################# {{func.name}} #################
 def {{func.name}}({{inp_sig}}, {{out_sig}}):
+    {%- if num_inp == 1 %}
     {%- for i in range(num_out) %}
     if {{outs[i]}} is None:
-        {{outs[i]}} = torch.empty_like({{inps[0]}}) # TODO: fix this ???
+        {{outs[i]}} = torch.empty_like({{inps[0]}})
     {%- endfor %}
+    {%- else %}
+    outshape = broadcasted_dims({{joinlist(inps, ", ", suffix=".shape")}})
+
+    dtype = {{inps[0]}}.dtype # TODO: fix this in case inps[0] is integer
+    device = {{inps[0]}}.device
+    {%- for i in range(num_out) %}
+    if {{outs[i]}} is None:
+        {{outs[i]}} = torch.empty(outshape, dtype=dtype, device=device)
+    {%- endfor %}
+
+    {%- endif %}
     return PyFunc_{{func.name}}.apply({{inp_sig}}, {{out_sig2}})
 
 def _{{func.name}}({{inp_sig}}, {{out_sig2}}):
