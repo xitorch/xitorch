@@ -1,6 +1,6 @@
 import torch
 from _xitorch_special_impl import *
-{%- from "macros.jinja" import fulldtype, liststr, apply_funcname, ifs %}
+{%- from "macros.jinja" import fulldtype, liststr, apply_funcname, ifs, joinlist %}
 
 # generated file
 
@@ -24,18 +24,20 @@ def get_signature_and_device(inps, outs):
 ###################### generated functions ######################
 
 {%- for func in functions %}
-{%- set num_inp = func.num_inp %}
-{%- set num_out = func.num_out %}
-{%- set inp_sig = liststr(num_inp, "inp") %}
-{%- set out_sig = liststr(num_out, "out", suffix="=None") %}
-{%- set out_sig2 = liststr(num_out, "out") %}
-{%- set gout_sig = liststr(num_out, "gout") %}
+{%- set inps = func.inp.split(",") %}
+{%- set outs = func.out.split(",") %}
+{%- set num_inp = inps|length %}
+{%- set num_out = outs|length %}
+{%- set inp_sig = func.inp %}
+{%- set out_sig = joinlist(outs, ", ", suffix="=None") %}
+{%- set out_sig2 = func.out %}
+{%- set gout_sig = joinlist(outs, ", ", prefix="grad_") %}
 
 ################# {{func.name}} #################
 def {{func.name}}({{inp_sig}}, {{out_sig}}):
     {%- for i in range(num_out) %}
-    if out{{i}} is None:
-        out{{i}} = torch.empty_like(inp0) # TODO: fix this ???
+    if {{outs[i]}} is None:
+        {{outs[i]}} = torch.empty_like({{inps[0]}}) # TODO: fix this ???
     {%- endfor %}
     return PyFunc_{{func.name}}.apply({{inp_sig}}, {{out_sig2}})
 

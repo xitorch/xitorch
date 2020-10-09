@@ -17,3 +17,10 @@ apply_{{name}}_{{device}}_{{sig}}
 {%- macro ifs(i) -%}
 {%- if i > 0 %}el{% endif %}if
 {%- endmacro -%}
+
+{%- macro joinlist(lst, sep, prefix="", suffix="") -%}
+{%- for i in range(lst|length) -%}
+{{prefix}}{{lst[i]}}{{suffix}}
+{%- if i < (lst|length - 1) %}{{sep}}{%- endif %}
+{%- endfor -%}
+{%- endmacro -%}

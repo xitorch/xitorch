@@ -12,26 +12,25 @@
 An example of function in `functions.yaml` is
 
     - name: mysquare
-      num_inp: 1
-      num_out: 1
+      inp: x
+      out: out
       cfuncs:
         f2f:
           cpu: mysquare<float>
         d2d:
           cpu: mysquare<double>
       derivs:
-      - 2 * gout0 * inp0
+      - 2 * grad_out * x
 
 Here are the details of the fields:
 
 * `"name"`: name of your square, it will be accessible through
   `xitorch.special.[name]`
-* `"num_inp"`: number of inputs in the C/C++ functions
-* `"num_out"`: number of outputs in the C/C++ functions
+* `"inp"`: signature of the inputs in the API (separated by a comma, without space)
+* `"out"`: signature of the outputs in the API (separated by a comma, without space)
 * `"cfuncs"`: dictionary indicating the name of the C/C++ functions based on
   the dtype signature and device (e.g. `"f2f"` means `float` input to `float`
   output, `"dd2d"` means `double, double` input to `double` output)
 * `"derivs"`: the list of expression of the derivatives. Set it to `0` if the
-  derivatives are not implemented yet. The variables are:
-  * `gout%d`: gradients of the outputs (starts from 0)
-  * `inp%d`: the input tensors (starts from 0)
+  derivatives are not implemented yet. The variables correspond to the ones
+  specified in `inp` and `out`. The gradient is prefixed with `grad_`

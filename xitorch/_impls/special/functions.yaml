@@ -1,18 +1,18 @@
 ---
 - name: mysquare
-  num_inp: 1
-  num_out: 1
+  inp: x
+  out: out
   cfuncs:
     f2f:
       cpu: mysquare<float>
     d2d:
       cpu: mysquare<double>
   derivs:
-  - 2 * gout0 * inp0
+  - 2 * grad_out * x
 
 - name: j0
-  num_inp: 1
-  num_out: 1
+  inp: x
+  out: out
   cfuncs:
     f2f:
       cpu: xicephes_j0f
@@ -21,8 +21,8 @@
   derivs: 0
 
 - name: y0
-  num_inp: 1
-  num_out: 1
+  inp: x
+  out: out
   cfuncs:
     f2f:
       cpu: xicephes_y0f
