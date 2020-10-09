@@ -22,11 +22,26 @@
 #define NAN XICEPHES_NAN
 #define NEGZERO XICEPHES_NEGZERO
 
+// exp.c
+#define exp xicephes_exp
+
+// fabs.c
+#define fabs xicephes_fabs
+
 // floor.c
 #define ceil xicephes_ceil
 #define floor xicephes_floor
 #define frexp xicephes_frexp
 #define ldexp xicephes_ldexp
+
+// gamma.c
+#define stirf xicephes_stirf
+#define gamma xicephes_gamma
+#define lgam xicephes_lgam
+
+// igam.c
+#define igamc xicephes_igamc
+#define igam xicephes_igam
 
 // isnan.c
 #define isnan xicephes_isnan
@@ -46,6 +61,13 @@
 // polevl.c
 #define polevl xicephes_polevl
 #define p1evl xicephes_p1evl
+
+// pow.c
+#define pow xicephes_pow
+#define reduc xicephes_reduc
+
+// powi.c
+#define powi xicephes_powi
 
 // sin.c
 #define sin xicephes_sin

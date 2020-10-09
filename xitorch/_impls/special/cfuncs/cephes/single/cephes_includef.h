@@ -5,5 +5,6 @@
 
 float xicephes_j0f(float x);
 float xicephes_y0f(float x);
+float xicephes_igamf(float a, float x);
 
 #endif

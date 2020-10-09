@@ -44,3 +44,32 @@ y0.__doc__ = """
     ----------
     .. [1] Cephes Mathematical Functions Library, http://www.netlib.org/cephes/
 """
+
+igam.__doc__ = """
+    Regularized lower incomplete gamma function:
+
+    .. math::
+
+        P(a, x) = \frac{1}{\Gamma(a)} \int_0^x t^{a-1}e^-t\ \mathrm{d}t
+
+    Arguments
+    ---------
+    a: torch.Tensor
+        The first input argument (must be positive).
+
+    x: torch.Tensor
+        The second input argument.
+
+    Returns
+    -------
+    torch.Tensor
+        The value of regularized lower incomplete gamma function
+
+    Notes
+    -----
+    * This function is a wrapper of the Cephes' igam function [1]_.
+
+    References
+    ----------
+    .. [1] Cephes Mathematical Functions Library, http://www.netlib.org/cephes/
+"""

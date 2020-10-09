@@ -11,6 +11,10 @@ special_funcs_inouts = {
     "y0": [
         [(tensor([1.5, 2.5]),), tensor([0.3824489712715149, 0.4980703592300415])],
     ],
+    # "igam": [
+    #     [(tensor([1.5, 2.5]), tensor([1.2, 1.2])),
+    #       tensor([0.5063653588294983, 0.2085258662700653])],
+    # ],
 }
 special_funcs_fcnnames = list(special_funcs_inouts.keys())
 
@@ -99,7 +103,8 @@ def test_transpose(dtype, device, fcnname):
     inp1 = tuple(inp.transpose(-2,-1) for inp in inp0) # non-contiguous
     out1 = fcn(*inp1)
     if nout == 1:
-        assert torch.allclose(out0.transpose(-2,-1), out1)
+        out0t = out0.transpose(-2,-1)
+        assert torch.allclose(out0t, out1)
     else:
         for out,o1 in zip(out0, out1):
             assert torch.allclose(out.transpose(-2,-1), o1)

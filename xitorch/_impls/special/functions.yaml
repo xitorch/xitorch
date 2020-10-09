@@ -29,3 +29,13 @@
     d2d:
       cpu: xicephes_y0
   derivs: 0
+
+- name: igam
+  inp: a,x
+  out: out
+  cfuncs:
+    ff2f:
+      cpu: xicephes_igamf
+    dd2d:
+      cpu: xicephes_igam
+  derivs: 0

@@ -4,16 +4,20 @@
 
 // generated file
 
-{%- from "macros.jinja" import fulldtype, liststr, apply_funcname %}
+{%- from "macros.jinja" import fulldtype, liststr, apply_funcname, joinlist %}
 
 {%- for func in functions %}
 {%- for sig in func.cfuncs %}
-{%- set inp_dtypes, out_dtypes = sig.split("2") %}
-{%- set num_inp = inp_dtypes|length %}
-{%- set num_out = out_dtypes|length %}
+
+{%- set inps = func.inp.split(",") %}
+{%- set outs = func.out.split(",") %}
+{%- set num_inp = inps|length %}
+{%- set num_out = outs|length %}
+{%- set inp_sig = joinlist(inps, ", ", prefix="torch::Tensor& ") %}
+{%- set out_sig = joinlist(outs, ", ", prefix="torch::Tensor& ") %}
 
 {%- for device in func.cfuncs[sig] %}
-void {{apply_funcname(func.name, device, sig)}}({{liststr(num_inp,"torch::Tensor& self")}}, {{liststr(num_out, "torch::Tensor& out")}});
+void {{apply_funcname(func.name, device, sig)}}({{inp_sig}}, {{out_sig}});
 {%- endfor %}
 
 {%- endfor %}

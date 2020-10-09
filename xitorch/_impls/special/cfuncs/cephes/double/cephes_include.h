@@ -5,5 +5,6 @@
 
 double xicephes_j0(double x);
 double xicephes_y0(double x);
+double xicephes_igam(double a, double x);
 
 #endif

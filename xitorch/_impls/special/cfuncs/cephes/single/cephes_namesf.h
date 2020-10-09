@@ -22,6 +22,9 @@
 #define NANF XICEPHES_NANF
 #define NEGZEROF XICEPHES_NEGZEROF
 
+// exp.c
+#define expf xicephes_expf
+
 // floor.c
 #define ceilf xicephes_ceilf
 #define floorf xicephes_floorf
@@ -31,6 +34,15 @@
 #define isnanf xicephes_isnanf
 #define isfinitef xicephes_isfinitef
 #define signbitf xicephes_signbitf
+
+// gamma.c
+#define stirff xicephes_stirff
+#define gammaf xicephes_gammaf
+#define lgamf xicephes_lgamf
+
+// igam.c
+#define igamcf xicephes_igamcf
+#define igamf xicephes_igamf
 
 // j0.c
 #define j0f xicephes_j0f
@@ -45,6 +57,13 @@
 // polevl.c
 #define polevlf xicephes_polevlf
 #define p1evlf xicephes_p1evlf
+
+// pow.c
+#define powf xicephes_powf
+#define reducf xicephes_reducf
+
+// powi.c
+#define powif xicephes_powif
 
 // sin.c
 #define sinf xicephes_sinf
