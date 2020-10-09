@@ -49,7 +49,7 @@ def _{{func.name}}({{inp_sig}}, {{out_sig2}}):
             return {{out_sig2}}
         {%- endfor %}
     {%- endfor %}
-    raise RuntimeError("The function {{func.name}} has no %s (device: %s) defined." % \
+    raise NotImplementedError("The function {{func.name}} has no %s (device: %s) defined." % \
                        (signature.replace("2", "->"), device))
 
 class PyFunc_{{func.name}}(torch.autograd.Function):
