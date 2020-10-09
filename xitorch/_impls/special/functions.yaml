@@ -8,7 +8,7 @@
     d2d:
       cpu: mysquare<double>
   derivs:
-  - 2 * gouts[0] * inps[0]
+  - 2 * gout0 * inp0
 
 - name: j0
   num_inp: 1

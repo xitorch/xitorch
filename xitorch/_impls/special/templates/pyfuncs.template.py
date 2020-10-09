@@ -29,6 +29,7 @@ def get_signature_and_device(inps, outs):
 {%- set inp_sig = liststr(num_inp, "inp") %}
 {%- set out_sig = liststr(num_out, "out", suffix="=None") %}
 {%- set out_sig2 = liststr(num_out, "out") %}
+{%- set gout_sig = liststr(num_out, "gout") %}
 
 ################# {{func.name}} #################
 def {{func.name}}({{inp_sig}}, {{out_sig}}):
@@ -53,25 +54,27 @@ def _{{func.name}}({{inp_sig}}, {{out_sig2}}):
 
 class PyFunc_{{func.name}}(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, *inps):
-        res = _{{func.name}}(*inps)
-        ctx.save_for_backward(inps)
+    def forward(ctx, {{inp_sig}}, {{out_sig2}}):
+        res = _{{func.name}}({{inp_sig}}, {{out_sig2}})
+        ctx.save_for_backward({{inp_sig}}, {{out_sig2}})
         return res
 
     @staticmethod
-    def backward(ctx, *gouts):
+    def backward(ctx, {{gout_sig}}):
         {%- if func.derivs == 0 %}
-        raise RuntimeError("Backward of {{func.name}} is not implemented. ")
+        raise NotImplementedError("Backward of {{func.name}} is not implemented. ")
 
         {%- else %}
-        inps = ctx.saved_tensors
-        derivs = [
+        {{inp_sig}}, {{out_sig2}} = ctx.saved_tensors
+        derivs = (
             {%- for deriv in func.derivs %}
             {{deriv}},
             {%- endfor %}
-        ]
-        all_derivs = derivs + ([None] * (len(inps)-len(derivs)))
-        return tuple(all_derivs)
+            {%- for i in range(num_out) %}
+            None,
+            {%- endfor %}
+        )
+        return derivs
 
         {%- endif %}
 

@@ -5,28 +5,22 @@
 * If you are making a new directory for your source inside `cfuncs`, add the
   directory in `sp_source_dirs` variable in `setup.py` (in the root directory)
 * List the header of your function in `cfuncs/includes.h`
-* Add your function in `functions.json`
+* Add your function in `functions.yaml`
 
-## JSON file guide
+## YAML file guide
 
-An example of function in `functions.json` is
+An example of function in `functions.yaml` is
 
-    {
-      "name": "mysquare",
-      "num_inp": 1,
-      "num_out": 1,
-      "cfuncs": {
-        "f2f": {
-          "cpu": "mysquare<float>"
-        },
-        "d2d": {
-          "cpu": "mysquare<double>"
-        }
-      },
-      "derivs": [
-        "2 * gouts[0] * inps[0]"
-      ]
-    }
+    - name: mysquare
+      num_inp: 1
+      num_out: 1
+      cfuncs:
+        f2f:
+          cpu: mysquare<float>
+        d2d:
+          cpu: mysquare<double>
+      derivs:
+      - 2 * gout0 * inp0
 
 Here are the details of the fields:
 
@@ -39,5 +33,5 @@ Here are the details of the fields:
   output, `"dd2d"` means `double, double` input to `double` output)
 * `"derivs"`: the list of expression of the derivatives. Set it to `0` if the
   derivatives are not implemented yet. The variables are:
-  * `gouts`: gradients of the outputs
-  * `inps`: the input tensors
+  * `gout%d`: gradients of the outputs (starts from 0)
+  * `inp%d`: the input tensors (starts from 0)
