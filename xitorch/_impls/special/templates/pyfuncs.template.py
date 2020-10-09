@@ -60,12 +60,10 @@ class PyFunc_{{func.name}}(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *gouts):
-        {%- if func.derivs == 0 -%}
-
+        {%- if func.derivs == 0 %}
         raise RuntimeError("Backward of {{func.name}} is not implemented. ")
 
-        {%- else -%}
-
+        {%- else %}
         inps = ctx.saved_tensors
         derivs = [
             {%- for deriv in func.derivs %}

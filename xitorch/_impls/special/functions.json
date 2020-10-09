@@ -20,6 +20,9 @@
     "num_inp": 1,
     "num_out": 1,
     "cfuncs": {
+      "f2f": {
+        "cpu": "xicephes_j0f"
+      },
       "d2d": {
         "cpu": "xicephes_j0"
       }
