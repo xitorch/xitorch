@@ -48,8 +48,8 @@ def _{{func.name}}({{inp_sig}}, {{out_sig2}}):
             return {{out_sig2}}
         {%- endfor %}
     {%- endfor %}
-    raise RuntimeError("The function {{func.name}} has no %s (%s) defined." % \
-                       (signature, device))
+    raise RuntimeError("The function {{func.name}} has no %s (device: %s) defined." % \
+                       (signature.replace("2", "->"), device))
 
 class PyFunc_{{func.name}}(torch.autograd.Function):
     @staticmethod
@@ -60,6 +60,12 @@ class PyFunc_{{func.name}}(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *gouts):
+        {%- if func.derivs == 0 -%}
+
+        raise RuntimeError("Backward of {{func.name}} is not implemented. ")
+
+        {%- else -%}
+
         inps = ctx.saved_tensors
         derivs = [
             {%- for deriv in func.derivs %}
@@ -68,5 +74,7 @@ class PyFunc_{{func.name}}(torch.autograd.Function):
         ]
         all_derivs = derivs + ([None] * (len(inps)-len(derivs)))
         return tuple(all_derivs)
+
+        {%- endif %}
 
 {%- endfor %}

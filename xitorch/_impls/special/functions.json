@@ -11,8 +11,19 @@
         "cpu": "mysquare<double>"
       }
     },
-    "derivs":[
+    "derivs": [
       "2 * gouts[0] * inps[0]"
     ]
+  },
+  {
+    "name": "j0",
+    "num_inp": 1,
+    "num_out": 1,
+    "cfuncs": {
+      "d2d": {
+        "cpu": "xicephes_j0"
+      }
+    },
+    "derivs": 0
   }
 ]

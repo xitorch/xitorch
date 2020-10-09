@@ -24,7 +24,10 @@ def sp_write_template():
 sp_ext_name = "_%s_special_impl" % module_name
 sp_incl_dirs = [absdir("xitorch/_impls")]
 sp_source_dirs = [
-    absdir("xitorch/_impls/special/generated/")
+    absdir("xitorch/_impls/special/generated/"),
+    absdir("xitorch/_impls/special/cfuncs/"),
+    absdir("xitorch/_impls/special/cfuncs/cephes/single/"),
+    absdir("xitorch/_impls/special/cfuncs/cephes/double/"),
 ]
 sp_source_exts = [".cpp", ".c"]
 
@@ -40,11 +43,6 @@ def sp_get_sources():
     print("Compiling:")
     print(allfiles)
     return allfiles
-
-sp_sources = [
-    absdir("xitorch/_impls/special/generated/batchfuncs.cpp"),
-    absdir("xitorch/_impls/special/generated/bind.cpp"),
-]
 
 def get_torch_cpp_extension():
     from torch.utils.cpp_extension import CppExtension
