@@ -1,6 +1,6 @@
 import os
 from jinja2 import Environment, FileSystemLoader
-import json
+import yaml
 
 def main():
     filedir = os.path.dirname(os.path.realpath(__file__))
@@ -8,15 +8,17 @@ def main():
 
     fgendir = absdir("generated") # directory for generated files
     ftemplatedir = absdir("templates") # directory for the templates
-    functions_json = absdir("functions.json")
+    # functions_file = absdir("functions.json")
+    functions_file = absdir("functions.yaml")
     templ_suffix = ".template"
 
     env = Environment(loader=FileSystemLoader(ftemplatedir))
     if not os.path.exists(fgendir):
         os.mkdir(fgendir)
 
-    with open(functions_json, "r") as f:
-        functions = json.load(f)
+    with open(functions_file, "r") as f:
+        # functions = json.load(f)
+        functions = yaml.load(f)
 
     ftemplates = os.listdir(ftemplatedir)
     for ftempl in ftemplates:

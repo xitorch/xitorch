@@ -4,5 +4,6 @@
 // list the functions for API (including the prefix defined in cephes_names.h)
 
 float xicephes_j0f(float x);
+float xicephes_y0f(float x);
 
 #endif

@@ -1,0 +1,31 @@
+---
+- name: mysquare
+  num_inp: 1
+  num_out: 1
+  cfuncs:
+    f2f:
+      cpu: mysquare<float>
+    d2d:
+      cpu: mysquare<double>
+  derivs:
+  - 2 * gouts[0] * inps[0]
+
+- name: j0
+  num_inp: 1
+  num_out: 1
+  cfuncs:
+    f2f:
+      cpu: xicephes_j0f
+    d2d:
+      cpu: xicephes_j0
+  derivs: 0
+
+- name: y0
+  num_inp: 1
+  num_out: 1
+  cfuncs:
+    f2f:
+      cpu: xicephes_y0f
+    d2d:
+      cpu: xicephes_y0
+  derivs: 0
