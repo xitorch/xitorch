@@ -1,1 +1,1 @@
-from xitorch._impls.special.generated.pyfuncs import *
+from xitorch._impls.special import *

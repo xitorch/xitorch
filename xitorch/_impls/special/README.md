@@ -6,6 +6,7 @@
   directory in `sp_source_dirs` variable in `setup.py` (in the root directory)
 * List the header of your function in `cfuncs/includes.h`
 * Add your function in `functions.yaml`
+* Add the docstring in `__init__.py`
 
 ## YAML file guide
 
