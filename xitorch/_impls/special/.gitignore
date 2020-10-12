@@ -1,4 +1,0 @@
-generated/*
-!generated/__init__.py
-cfuncs/cephes/*/all/*
-# !cfuncs/cephes/double/all/*
