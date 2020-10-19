@@ -352,10 +352,34 @@ class LinearOperator(EditableModule):
     ############# cached properties ################
     @property
     def H(self):
+        """
+        Returns a LinearOperator representing the Hermite / transposed of the
+        self LinearOperator.
+
+        Returns
+        -------
+        LinearOperator
+            The Hermite / transposed LinearOperator
+        """
         return AdjointLinearOperator(self)
 
     ############# special functions ################
     def matmul(self, b, is_hermitian:bool=False):
+        """
+        Returns a LinearOperator representing `self @ b`.
+
+        Arguments
+        ---------
+        b: LinearOperator
+            Other linear operator
+        is_hermitian: bool
+            Flag to indicate if the resulting LinearOperator is Hermitian.
+
+        Returns
+        -------
+        LinearOperator
+            LinearOperator representing `self @ b`
+        """
         # returns linear operator that represents self @ b
         if self.shape[-1] != b.shape[-2]:
             raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (self.shape, b.shape))
