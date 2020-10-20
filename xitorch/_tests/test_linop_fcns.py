@@ -300,7 +300,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
         gradgradcheck(solvefcn, (amat, bmat))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["scipy_gmres", "broyden1", "cg"],
+    "method": ["scipy_gmres", "broyden1", "cg", "bicgstab"],
 })
 def test_solve_A_methods(dtype, device, method):
     torch.manual_seed(seed)
@@ -312,7 +312,10 @@ def test_solve_A_methods(dtype, device, method):
         "broyden1": {},
         "cg": {
             "rtol": 1e-8 # stringent rtol required to meet the torch.allclose tols
-        }
+        },
+        "bicgstab": {
+            "rtol": 1e-8,
+        },
     }[method]
     fwd_options = {"method": method, **options}
 
@@ -441,7 +444,7 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
         gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "cg"],
+    "method": ["broyden1", "cg", "bicgstab"],
 })
 def test_solve_AEM_methods(dtype, device, method):
     torch.manual_seed(seed)
@@ -456,7 +459,8 @@ def test_solve_AEM_methods(dtype, device, method):
         "broyden1": {},
         "cg": {
             "rtol": 1e-8 # stringent rtol required to meet the torch.allclose tols
-        }
+        },
+        "bicgstab": {},
     }[method]
     fwd_options = {"method": method, **options}
 

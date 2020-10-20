@@ -8,7 +8,7 @@ from xitorch._utils.misc import set_default_option, dummy_context_manager, get_m
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
-    cg, broyden1_solve, _get_batchdims
+    cg, bicgstab, broyden1_solve, _get_batchdims
 
 def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
           M:Optional[LinearOperator]=None,
@@ -56,7 +56,9 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
         Options of the iterative solver in the backward calculation.
     method: str or callable or None
         The method of linear equation solver. If ``None``, it will choose
-        ``"cg"``.
+        ``"cg"`` or ``"bicgstab"`` based on the matrices symmetry.
+        `Note`: default method will be changed quite frequently, so if you want
+        future compatibility, please specify a method.
     **fwd_options
         Method-specific options (see method below)
 
@@ -83,7 +85,8 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
             M.check()
 
     if method is None:
-        method = "cg"
+        is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
+        method = "cg" if is_hermit else "bicgstab"
 
     if method == "exactsolve":
         return exactsolve(A, B, E, M)
@@ -127,7 +130,8 @@ class solve_torchfcn(torch.autograd.Function):
                     "custom_exactsolve": custom_exactsolve,
                     "scipy_gmres": wrap_gmres,
                     "broyden1": broyden1_solve,
-                    "cg": cg
+                    "cg": cg,
+                    "bicgstab": bicgstab,
                 }
                 method_fcn = get_method("solve", methods, method)
                 x = method_fcn(A, B, E, M, **config)
@@ -201,6 +205,7 @@ def custom_exactsolve(A, B, E=None,
 # docstring completion
 _solve_methods = {
     "cg": cg,
+    "bicgstab": bicgstab,
     "exactsolve": exactsolve,
     "broyden1": broyden1_solve,
     "scipy_gmres": wrap_gmres,
