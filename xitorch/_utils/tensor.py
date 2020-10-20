@@ -54,3 +54,34 @@ def convert_none_grads_to_zeros(grads, inputs):
     if is_tuple:
         grads = tuple(grads)
     return grads
+
+def create_random_square_matrix(n, is_hermitian=False,
+        min_eival=1.0, max_eival=1.0, minabs_eival=0.0, seed=-1):
+
+    dtype = torch.float64
+    eivals = torch.linspace(min_eival, max_eival, n, dtype=dtype)
+
+    # clip absolute eivals to minabs_eival
+    idx = eivals.abs() < minabs_eival
+    eivals[idx] = torch.sign(eivals[idx]) * minabs_eival
+
+    eivals = torch.diag_embed(eivals)
+    if seed > 0:
+        torch.manual_seed(seed)
+    if is_hermitian:
+        eivecs = create_random_ortho_matrix(n, seed=seed)
+        mat = torch.matmul(torch.matmul(eivecs.transpose(-2,-1), eivals), eivecs)
+        mat = (mat + mat.transpose(-2,-1)) * 0.5
+        return mat
+    else:
+        a = torch.randn((n, n), dtype=dtype)
+        a = a / a.norm(dim=-2, keepdim=True)
+        return torch.matmul(torch.matmul(a.inverse(), eivals), a)
+
+def create_random_ortho_matrix(n, seed=-1):
+    dtype = torch.float64
+    if seed > 0:
+        torch.manual_seed(seed)
+    a = torch.randn((n, n), dtype=dtype)
+    q, r = torch.qr(a)
+    return q
