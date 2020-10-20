@@ -127,13 +127,13 @@ def cg(A:LinearOperator, B:torch.Tensor,
     rkzk = _dot(rk, zk)
     converge = False
     resid_calc_every = 10
-    for k in range(max_niter):
+    for k in range(1, max_niter+1):
         Apk = A_fcn(pk)
         alphak = rkzk / _safedenom(_dot(pk, Apk), eps)
         xk_1 = xk + alphak * pk
 
         # correct the residual calculation
-        if k % resid_calc_every == 1:
+        if k % resid_calc_every == 0:
             rk_1 = B2 - A_fcn(xk_1)
         else:
             rk_1 = rk - alphak * Apk # (*, nr, nc)
@@ -235,9 +235,9 @@ def bicgstab(A:LinearOperator, B:torch.Tensor,
     pk:Union[float, torch.Tensor] = 0.0
     converge = False
     resid_calc_every = 10
-    for k in range(max_niter):
+    for k in range(1, max_niter + 1):
         rho_knew = _dot(r0hat, rk)
-        omega_denom = omega_k if k == 0 else _safedenom(omega_k, eps)
+        omega_denom = omega_k if k == 1 else _safedenom(omega_k, eps)
         beta = rho_knew / _safedenom(rho_k, eps) * (alpha / omega_denom)
         pk = rk + beta * (pk - omega_k * vk)
         y = precond_fcn_r(pk)
@@ -253,7 +253,7 @@ def bicgstab(A:LinearOperator, B:torch.Tensor,
         xk = h + omega_k * z
 
         # correct the residual calculation regularly
-        if k % resid_calc_every == 1:
+        if k % resid_calc_every == 0:
             rk = B2 - A_fcn(xk)
         else:
             rk = s - omega_k * t

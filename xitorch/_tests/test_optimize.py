@@ -146,6 +146,9 @@ def test_equil(dtype, device, clss):
         "f_tol": 1e-9,
         "alpha": -0.5,
     }
+    bck_options = {
+        "method": "cg",
+    }
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
@@ -154,14 +157,14 @@ def test_equil(dtype, device, clss):
 
     model = clss(A, addx=False)
     model.set_diag_bias(diag, bias)
-    y = equilibrium(model.forward, y0, **fwd_options)
+    y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
     f = model.forward(y)
     assert torch.allclose(y, f)
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=False)
         model.set_diag_bias(diag, bias)
-        y = equilibrium(model.forward, y0, **fwd_options)
+        y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
         return y
 
     gradcheck(getloss, (A, y0, diag, bias))
