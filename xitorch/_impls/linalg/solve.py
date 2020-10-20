@@ -117,7 +117,9 @@ def cg(A:LinearOperator, B:torch.Tensor,
 
     # setup the preconditioning and the matrix problem
     precond_fcn = _setup_precond(precond)
-    A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, batchdims, posdef)
+    need_hermit = True
+    A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, batchdims,
+                                                   posdef, need_hermit)
 
     # get the stopping matrix
     B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
@@ -266,7 +268,8 @@ def _setup_precond(precond:Optional[LinearOperator]) -> Callable[[torch.Tensor],
 def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         E:Optional[torch.Tensor], M:Optional[LinearOperator],
         batchdims:Sequence[int],
-        posdef:Optional[bool]) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
+        posdef:Optional[bool],
+        need_hermit:bool) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
 
     # get the linear operator (including the MXE part)
     if E is None:
@@ -306,8 +309,11 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         col_swapped = True
 
     # estimate if it's posdef with power iteration
-    is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
-    if is_hermit and (posdef is None):
+    if need_hermit:
+        is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
+        if not is_hermit:
+            posdef = False
+    if posdef is None:
         nr, ncols = B.shape[-2:]
         x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
         x0 = torch.randn(x0shape, dtype=A.dtype, device=A.device)
@@ -322,10 +328,10 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
             offset = torch.clamp(largest_eival, min=0.0)
             A_fcn2 = lambda x: A_fcn(x) - offset * x
             mostneg_eival = _get_largest_eival(A_fcn2, x0) # (*, 1, nc)
-            posdef = torch.all(torch.logical_or(-mostneg_eival <= offset, negeival)).item()
+            posdef = bool(torch.all(torch.logical_or(-mostneg_eival <= offset, negeival)).item())
 
     # get the linear operation if it is not a posdef (A -> AT.A)
-    if is_hermit and posdef:
+    if posdef:
         return A_fcn, B_new, col_swapped
     else:
         def A_new_fcn(x):
