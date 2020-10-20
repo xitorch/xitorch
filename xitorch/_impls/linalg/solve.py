@@ -1,6 +1,6 @@
 import warnings
 import functools
-from typing import Union, Optional, List, Callable, Tuple
+from typing import Union, Optional, List, Callable, Tuple, Sequence
 import torch
 import numpy as np
 from xitorch import LinearOperator
@@ -65,7 +65,7 @@ def wrap_gmres(A, B, E=None, M=None,
 def cg(A:LinearOperator, B:torch.Tensor,
         E:Optional[torch.Tensor]=None,
         M:Optional[LinearOperator]=None,
-        posdef:bool=False,
+        posdef:Optional[bool]=None,
         precond:Optional[LinearOperator]=None,
         max_niter:Optional[int]=None,
         rtol:float=1e-6,
@@ -77,9 +77,10 @@ def cg(A:LinearOperator, B:torch.Tensor,
 
     Keyword arguments
     -----------------
-    posdef: bool
+    posdef: bool or None
         Indicating if the operation :math:`\mathbf{AX-MXE}` a positive
         definite for all columns and batches.
+        If None, it will be determined by power iterations.
     precond: LinearOperator or None
         LinearOperator for the preconditioning. If None, no preconditioner is
         applied.
@@ -116,7 +117,7 @@ def cg(A:LinearOperator, B:torch.Tensor,
 
     # setup the preconditioning and the matrix problem
     precond_fcn = _setup_precond(precond)
-    A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, posdef)
+    A_fcn, B2, col_swapped = _setup_linear_problem(A, B, E, M, batchdims, posdef)
 
     # get the stopping matrix
     B_norm = B2.norm(dim=-2, keepdim=True) # (*BB, 1, nc)
@@ -264,7 +265,8 @@ def _setup_precond(precond:Optional[LinearOperator]) -> Callable[[torch.Tensor],
 
 def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         E:Optional[torch.Tensor], M:Optional[LinearOperator],
-        posdef:bool) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
+        batchdims:Sequence[int],
+        posdef:Optional[bool]) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
 
     # get the linear operator (including the MXE part)
     if E is None:
@@ -303,11 +305,49 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
 
         col_swapped = True
 
+    # estimate if it's posdef with power iteration
+    is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
+    if is_hermit and (posdef is None):
+        nr, ncols = B.shape[-2:]
+        x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
+        x0 = torch.randn(x0shape, dtype=A.dtype, device=A.device)
+        x0 = x0 / x0.norm(dim=-2, keepdim=True)
+        largest_eival = _get_largest_eival(A_fcn, x0) # (*, 1, nc)
+        negeival = largest_eival <= 0
+
+        # if the largest eigenvalue is negative, then it's not posdef
+        if torch.all(negeival):
+            posdef = False
+        else:
+            offset = torch.clamp(largest_eival, min=0.0)
+            A_fcn2 = lambda x: A_fcn(x) - offset * x
+            mostneg_eival = _get_largest_eival(A_fcn2, x0) # (*, 1, nc)
+            posdef = torch.all(torch.logical_or(-mostneg_eival <= offset, negeival)).item()
+
     # get the linear operation if it is not a posdef (A -> AT.A)
-    if posdef:
+    if is_hermit and posdef:
         return A_fcn, B_new, col_swapped
     else:
         def A_new_fcn(x):
             return AT_fcn(A_fcn(x))
         B2 = AT_fcn(B_new)
         return A_new_fcn, B2, col_swapped
+
+def _get_largest_eival(Afcn, x):
+    niter = 10
+    rtol = 1e-3
+    atol = 1e-6
+    for i in range(niter):
+        x = Afcn(x) # (*, nr, nc)
+        xnorm = x.norm(dim=-2, keepdim=True) # (*, 1, nc)
+
+        # check if xnorm is converging
+        if i > 0:
+            dnorm = torch.abs(xnorm_prev - xnorm)
+            if torch.all(dnorm <= rtol * xnorm + atol):
+                break
+
+        xnorm_prev = xnorm
+        if i < niter - 1:
+            x = x / xnorm
+    return xnorm
