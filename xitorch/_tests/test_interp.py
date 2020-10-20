@@ -5,19 +5,26 @@ from xitorch.interpolate.interp1 import Interp1D
 from xitorch._tests.utils import device_dtype_float_test
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "bc_type": ["clamped", "natural", "not-a-knot", None],
+    "bc_type": ["clamped", "natural", "not-a-knot", "periodic", None][3:4],
     "scramble": [False, True]
 })
 def test_interp1_cspline(dtype, device, bc_type, scramble):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
     x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
-    y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
-    y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
-                       [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
+    if bc_type != "periodic":
+        y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
+        y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
+                           [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
+    else:
+        y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 1.0], **dtype_device_kwargs).requires_grad_()
+        y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 1.0],
+                           [0.8, 1.2, 2.2, 0.4, 3.2, 0.8]], **dtype_device_kwargs).requires_grad_()
+
     # points are well inside to avoid extrapolation in numerical gradient calculations
     xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
     xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
 
+    scramble = scramble and bc_type != "periodic"
     if scramble:
         idx1 = torch.randperm(len(xq1))
         idx2 = torch.randperm(len(xq2))
@@ -73,6 +80,19 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
         yq22_true = torch.tensor([[1.03045416, 2.03025785, 1.41177844, 2.52449066],
                                   [0.70073217, 2.02728778, 1.57916384, 1.98521859]],
                                   **dtype_device_kwargs)
+    elif bc_type == "periodic":
+        yq11_true = torch.tensor([0.88184647, 1.16754002, 1.87806756, 1.99916778, 1.3241823 , 1.13211374,
+                                  1.69017244, 2.25696675, 2.09041608, 1.31247223],
+                                  **dtype_device_kwargs)
+        yq12_true = torch.tensor([0.88184647, 1.99916778, 1.69017244, 1.31247223], **dtype_device_kwargs)
+        yq21_true = torch.tensor([[0.88184647, 1.16754002, 1.87806756, 1.99916778, 1.3241823 , 1.13211374,
+                                   1.69017244, 2.25696675, 2.09041608, 1.31247223],
+                                  [0.46559344, 0.70408188, 1.82662341, 1.99677022, 0.77170332, 0.52939286,
+                                   1.76540093, 3.03216372, 2.8731096 , 1.44347038]],
+                                   **dtype_device_kwargs)
+        yq22_true = torch.tensor([[0.88184647, 1.99916778, 1.69017244, 1.31247223],
+                                  [0.46559344, 1.99677022, 1.76540093, 1.44347038]],
+                                  **dtype_device_kwargs)
 
     if scramble:
         yq11_true = yq11_true[...,idx1]
@@ -95,10 +115,14 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
     # plt.plot(xx, CubicSpline(x.detach(), y1.detach(), bc_type=bc_type)(xx.detach()))
     # plt.plot(x.detach(), y1.detach(), 'x')
     # plt.show()
-    assert torch.allclose(yq11, yq11_true)
-    assert torch.allclose(yq12, yq12_true)
-    assert torch.allclose(yq21, yq21_true)
-    assert torch.allclose(yq22, yq22_true)
+    if bc_type == "periodic":
+        rtol = 2e-2
+    else:
+        rtol = 1e-3
+    assert torch.allclose(yq11, yq11_true, rtol=rtol)
+    assert torch.allclose(yq12, yq12_true, rtol=rtol)
+    assert torch.allclose(yq21, yq21_true, rtol=rtol)
+    assert torch.allclose(yq22, yq22_true, rtol=rtol)
 
     # skip the gradient check if bc_type is None
     if bc_type is None:

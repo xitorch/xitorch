@@ -116,7 +116,7 @@ class CubicSpline1D(BaseInterp1D):
         if x.ndim != 1:
             raise RuntimeError("The input x must be a 1D tensor")
 
-        bc_types = ["natural", "clamped", "not-a-knot"]
+        bc_types = ["natural", "clamped", "not-a-knot", "periodic"]
         if bc_type not in bc_types:
             raise RuntimeError("Unimplemented %s bc_type. Available options: %s" % (bc_type, bc_types))
         self.bc_type = bc_type
@@ -210,6 +210,7 @@ def check_and_get_extrap(extrap, bc_type):
         try:
             return {
                 "clamped": "mirror",
+                "periodic": "periodic",
             }[bc_type]
         except KeyError:
             return "nan"
@@ -308,6 +309,20 @@ def _get_spline_mat_inv(x:torch.Tensor, bc_type:str):
         matr[...,-1,-1] = 2 * (-dxinv0n_3)
         matr[...,-1,-2] = 2 * (dxinv0n_3 + dxinv0nm1_3)
         matr[...,-1,-3] = 2 * (-dxinv0nm1_3)
+    elif bc_type == "periodic":
+        dxinv01 = dxinv0[...,-1]
+        dxinv00 = dxinv0[...,0]
+        spline_mat[..., 0,-2] += dxinv01
+        spline_mat[..., 0, 0] += dxinv01 * 2
+        spline_mat[...,-1, 1] += dxinv00
+        spline_mat[...,-1,-1] += dxinv00 * 2
+
+        dxinv01_sq3 = 3 * dxinv01 * dxinv01
+        dxinv00_sq3 = 3 * dxinv00 * dxinv00
+        matr[..., 0,-2] -= dxinv01_sq3
+        matr[..., 0, 0] += dxinv01_sq3
+        matr[...,-1, 1] += dxinv00_sq3
+        matr[...,-1,-1] -= dxinv00_sq3
     else:
         raise RuntimeError("Unknown boundary condition: %s" % bc_type)
 
