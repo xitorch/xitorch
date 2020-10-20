@@ -2,6 +2,28 @@ import warnings
 import torch
 from xitorch import LinearOperator
 
+class LinOpWithoutGetParamNames(LinearOperator):
+    def __init__(self, mat, is_hermitian=False):
+        super(LinOpWithoutGetParamNames, self).__init__(
+            shape = mat.shape,
+            is_hermitian = is_hermitian,
+            dtype = mat.dtype,
+            device = mat.device
+        )
+        self.mat = mat
+        self.implemented_methods = []
+
+    def _mv(self, x):
+        return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
+
+class LinOpWithoutInit(LinearOperator):
+    def __init__(self, mat, is_hermitian=False):
+        self.mat = mat
+        self.implemented_methods = []
+
+    def _mv(self, x):
+        return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
+
 class BaseLinOp(LinearOperator):
     def __init__(self, mat, is_hermitian=False):
         super(BaseLinOp, self).__init__(
@@ -16,10 +38,10 @@ class BaseLinOp(LinearOperator):
     def _getparamnames(self, prefix=""):
         return [prefix+"mat"]
 
-class LinOp0(BaseLinOp):
+class LinOpWithoutMv(BaseLinOp):
     # LinearOperator where only nothing is implemented (should produce an error)
     def __init__(self, mat, is_hermitian=False):
-        super(LinOp0, self).__init__(mat, is_hermitian)
+        super(LinOpWithoutMv, self).__init__(mat, is_hermitian)
         self.implemented_methods = []
 
 class LinOp1(BaseLinOp):
@@ -55,10 +77,34 @@ class NotLinOp1(BaseLinOp):
 def test_linop0_err():
     mat = torch.rand((3,1,2))
     try:
-        linop = LinOp0(mat)
-        assert False, "A RuntimeError must be raised when creating a LinearOperator without ._mv()"
+        linop = LinOpWithoutMv(mat)
+        msg = ("A RuntimeError must be raised when creating a "
+               "LinearOperator without ._mv()")
+        assert False, msg
     except RuntimeError:
         pass
+
+def test_linop_no_getparamnames_err():
+    mat = torch.rand((3,1,2))
+    try:
+        linop = LinOpWithoutGetParamNames(mat)
+        msg = ("A RuntimeError must be raised when creating a "
+               "LinearOperator without ._getparamnames()")
+        assert False, msg
+    except RuntimeError:
+        pass
+
+def test_linop_no_init_err():
+    mat = torch.rand((3,1,2))
+    x = torch.rand(2)
+    linop = LinOpWithoutInit(mat)
+    try:
+        y = linop.mv(x)
+        msg = ("A RuntimeError must be raised when a LinearOperator "
+               "is called without .__init__() called first")
+        assert False, msg
+    except RuntimeError as e:
+        assert "__init__" in str(e), 'The error message must contain "__init__"'
 
 def test_linop1_shape1_err():
     mat = torch.rand(3)

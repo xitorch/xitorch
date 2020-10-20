@@ -92,16 +92,19 @@ class LinearOperator(EditableModule):
             raise RuntimeError("The object is indicated as Hermitian, but the shape is not square")
 
         # check which methods are implemented
-        self._is_mv_implemented = self.__check_if_implemented("_mv")
         self._is_mm_implemented = self.__check_if_implemented("_mm")
         self._is_rmv_implemented = self.__check_if_implemented("_rmv")
         self._is_rmm_implemented = self.__check_if_implemented("_rmm")
         self._is_fullmatrix_implemented = self.__check_if_implemented("_fullmatrix")
-        if not self._is_mv_implemented:
-            raise RuntimeError("LinearOperator must have at least ._mv() method implemented")
+        if not self.__check_if_implemented("_mv") or \
+           not self.__check_if_implemented("_getparamnames"):
+            raise RuntimeError("LinearOperator must have at least _mv(self) and "
+                               "_getparamnames(self, prefix) method implemented")
         if not _suppress_hermit_warning and self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
-            warnings.warn("The LinearOperator is Hermitian with implemented rmv or rmm. We will use the mv and mm methods instead",
-                stacklevel=2)
+            warnings.warn("The LinearOperator is Hermitian with implemented "
+                          "rmv or rmm. We will use the mv and mm methods "
+                          "instead",
+                          stacklevel=2)
 
         # caches
         self._matrix_defined = False
@@ -204,6 +207,7 @@ class LinearOperator(EditableModule):
         y: torch.tensor
             The result of the linear operation with shape ``(...,p)``
         """
+        self.__assert_if_init_executed()
         if x.shape[-1] != self.shape[-1]:
             raise RuntimeError("Cannot operate .mv on shape %s. Expected (...,%d)" %\
                 (str(tuple(x.shape)), self.shape[-1]))
@@ -226,6 +230,7 @@ class LinearOperator(EditableModule):
         y: torch.tensor
             The result of the linear operation with shape ``(...,p,r)``
         """
+        self.__assert_if_init_executed()
         if x.shape[-2] != self.shape[-1]:
             raise RuntimeError("Cannot operate .mm on shape %s. Expected (...,%d,*)" %\
                 (str(tuple(x.shape)), self.shape[-1]))
@@ -264,6 +269,7 @@ class LinearOperator(EditableModule):
         y: torch.tensor
             The result of the adjoint linear operation with shape ``(...,q)``
         """
+        self.__assert_if_init_executed()
         if x.shape[-1] != self.shape[-2]:
             raise RuntimeError("Cannot operate .rmv on shape %s. Expected (...,%d)" %\
                 (str(tuple(x.shape)), self.shape[-2]))
@@ -291,6 +297,7 @@ class LinearOperator(EditableModule):
         y: torch.Tensor
             The result of the adjoint linear operation with shape ``(...,q,r)``.
         """
+        self.__assert_if_init_executed()
         if x.shape[-2] != self.shape[-2]:
             raise RuntimeError("Cannot operate .rmm on shape %s. Expected (...,%d,*)" %\
                 (str(tuple(x.shape)), self.shape[-2]))
@@ -321,6 +328,7 @@ class LinearOperator(EditableModule):
             if self._is_fullmatrix_implemented:
                 self._matrix = self._fullmatrix()
             else:
+                self.__assert_if_init_executed()
                 nq = self._shape[-1]
                 V = torch.eye(nq, dtype=self._dtype, device=self._device) # (nq,nq)
                 self._matrix = self.mm(V) # (B1,B2,...,Bb,np,nq)
@@ -405,7 +413,7 @@ class LinearOperator(EditableModule):
     # implementation
     @property
     def is_mv_implemented(self) -> bool:
-        return self._is_mv_implemented
+        return True
 
     @property
     def is_mm_implemented(self) -> bool:
@@ -481,6 +489,10 @@ class LinearOperator(EditableModule):
         this_method = getattr(self, methodname).__func__
         base_method = getattr(LinearOperator, methodname)
         return this_method is not base_method
+
+    def __assert_if_init_executed(self):
+        if not hasattr(self, "_shape"):
+            raise RuntimeError("super().__init__ must be executed first")
 
 ############## special linear operators ##############
 class AdjointLinearOperator(LinearOperator):
