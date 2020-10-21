@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
@@ -257,7 +258,7 @@ def test_minimize(dtype, device, clss):
 
 ############## forward methods test ##############
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2"],
+    "method": ["broyden1", "broyden2", "linearmixing"],
 })
 def test_rootfinder_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -274,6 +275,7 @@ def test_rootfinder_methods(dtype, device, method):
     options = {
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
+        "linearmixing": default_fwd_options,
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -289,7 +291,7 @@ def test_rootfinder_methods(dtype, device, method):
     assert torch.allclose(f*0, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2"],
+    "method": ["broyden1", "broyden2", "linearmixing"],
 })
 def test_equil_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -305,6 +307,7 @@ def test_equil_methods(dtype, device, method):
     options = {
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
+        "linearmixing": default_fwd_options,
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -320,7 +323,7 @@ def test_equil_methods(dtype, device, method):
     assert torch.allclose(y, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2"]
+    "method": ["broyden1", "broyden2", "linearmixing"]
 })
 def test_minimize_methods(dtype, device, method):
     torch.manual_seed(400)
@@ -333,11 +336,21 @@ def test_minimize_methods(dtype, device, method):
         "f_tol": 1e-9,
         "alpha": -1.0,
     }
+    linearmixing_fwd_options = {
+        "max_niter": 50,
+        "f_tol": 3e-6,
+        "alpha": -0.3,
+    }
     # list the methods and the options here
     options = {
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
+        "linearmixing": linearmixing_fwd_options,
     }[method]
+
+    # specify higher atol for non-ideal method
+    atol = defaultdict(lambda: 1e-8)
+    atol["linearmixing"] = 3e-6
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
@@ -356,7 +369,7 @@ def test_minimize_methods(dtype, device, method):
         y1 = y.clone().requires_grad_()
         f = model.forward(y1)
     grady, = torch.autograd.grad(f, (y1,))
-    assert torch.allclose(grady, grady*0)
+    assert torch.allclose(grady, grady*0, atol=atol[method])
 
     # check the hessian (must be posdef)
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()

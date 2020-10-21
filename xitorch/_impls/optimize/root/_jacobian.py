@@ -4,6 +4,8 @@ from xitorch.grad import jac
 
 # taking most of the part from SciPy
 
+__all__ = ["BroydenFirst", "BroydenSecond", "LinearMixing"]
+
 class Jacobian(object):
     """
     Base class for the Jacobians used in rootfinder algorithms.
@@ -98,6 +100,22 @@ class BroydenSecond(BroydenFirst):
         c = dx - self.Gm.mv(dy)
         d = v / (dynorm * dynorm)
         self.Gm = self.Gm.append(c, d)
+
+class LinearMixing(Jacobian):
+    def __init__(self, alpha=None):
+        # The initial guess of inverse Jacobian is ``-alpha * I``
+        if alpha is None:
+            alpha = -1.0
+        self.alpha = alpha
+
+    def setup(self, x0, y0, func):
+        pass
+
+    def solve(self, v, tol=0):
+        return -v * self.alpha
+
+    def update(self, x, y):
+        pass
 
 class LowRankMatrix(object):
     # represents a matrix of `\alpha * I + \sum_n c_n d_n^T`

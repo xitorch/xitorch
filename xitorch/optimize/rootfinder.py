@@ -6,7 +6,8 @@ import scipy.optimize
 import xitorch as xt
 from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
-from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2
+from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
+    linearmixing
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
 from xitorch import LinearOperator
@@ -257,6 +258,7 @@ class _RootFinder(torch.autograd.Function):
             methods = {
                 "broyden1": broyden1,
                 "broyden2": broyden2,
+                "linearmixing": linearmixing,
             }
             method_fcn = get_method("rootfinder", methods, method)
             y = method_fcn(fcn, y0, params, **config)
@@ -321,7 +323,7 @@ def _get_minimizer_default_method(method):
         return method
 
 # docstring completion
-rf_methods = [broyden1, broyden2]
+rf_methods = [broyden1, broyden2, linearmixing]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
 equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
 minimize.__doc__ = get_methods_docstr(minimize, rf_methods)

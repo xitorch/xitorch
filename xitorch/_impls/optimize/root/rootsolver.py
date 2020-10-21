@@ -4,9 +4,10 @@
 import warnings
 import torch
 import functools
-from xitorch._impls.optimize.root._jacobian import BroydenFirst, BroydenSecond
+from xitorch._impls.optimize.root._jacobian import BroydenFirst, \
+    BroydenSecond, LinearMixing
 
-__all__ = ["broyden1", "broyden2"]
+__all__ = ["broyden1", "broyden2", "linearmixing"]
 
 def _nonlin_solver(fcn, x0, params, method,
         # jacobian parameters
@@ -46,10 +47,14 @@ def _nonlin_solver(fcn, x0, params, method,
         Options for verbosity
     """
 
-    jacobian = {
-        "broyden1": BroydenFirst,
-        "broyden2": BroydenSecond,
-    }[method](alpha=alpha, uv0=uv0, max_rank=max_rank)
+    if method == "broyden1":
+        jacobian = BroydenFirst(alpha=alpha, uv0=uv0, max_rank=max_rank)
+    elif method == "broyden2":
+        jacobian = BroydenSecond(alpha=alpha, uv0=uv0, max_rank=max_rank)
+    elif method == "linearmixing":
+        jacobian = LinearMixing(alpha=alpha)
+    else:
+        raise RuntimeError("Unknown method: %s" % method)
 
     if maxiter is None:
         maxiter = 100*(torch.numel(x0)+1)
@@ -157,6 +162,41 @@ def broyden2(fcn, x0, params=(), **kwargs):
            https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
     """
     return _nonlin_solver(fcn, x0, params, "broyden2", **kwargs)
+
+def linearmixing(fcn, x0, params=(),
+        # jacobian parameters
+        alpha=None,
+        # stopping criteria
+        maxiter=None, f_tol=None, f_rtol=None, x_tol=None, x_rtol=None,
+        # algorithm parameters
+        line_search=True,
+        # misc parameters
+        verbose=False,
+        **unused):
+    """
+    Solve the root finding problem by approximating the inverse of Jacobian
+    to be a constant scalar.
+
+    Keyword arguments
+    -----------------
+    alpha: float or None
+        The initial guess of inverse Jacobian is ``-alpha * I``.
+    maxiter: int or None
+        Maximum number of iterations, or inf if it is set to None.
+    f_tol: float or None
+        The absolute tolerance of the norm of the output ``f``.
+    f_rtol: float or None
+        The relative tolerance of the norm of the output ``f``.
+    x_tol: float or None
+        The absolute tolerance of the norm of the input ``x``.
+    x_rtol: float or None
+        The relative tolerance of the norm of the input ``x``.
+    line_search: bool or str
+        Options to perform line search. If ``True``, it is set to ``"armijo"``.
+    verbose: bool
+        Options for verbosity
+    """
+    return _nonlin_solver(fcn, x0, params, "linearmixing", **kwargs)
 
 # set the docstring of the functions
 broyden1.__doc__ += _nonlin_solver.__doc__  # type: ignore
