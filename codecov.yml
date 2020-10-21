@@ -2,3 +2,4 @@ ignore:
   - "setup.py"
   - "**/write_functions.py"
   - "**/generated/*"
+  - "benchmarks/*"
