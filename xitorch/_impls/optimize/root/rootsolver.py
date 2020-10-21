@@ -196,6 +196,16 @@ def linearmixing(fcn, x0, params=(),
     verbose: bool
         Options for verbosity
     """
+    kwargs = {
+        "alpha": alpha,
+        "maxiter": maxiter,
+        "f_tol": f_tol,
+        "x_tol": x_tol,
+        "x_rtol": x_rtol,
+        "line_search": line_search,
+        "verbose": verbose,
+        **unused
+    }
     return _nonlin_solver(fcn, x0, params, "linearmixing", **kwargs)
 
 # set the docstring of the functions
