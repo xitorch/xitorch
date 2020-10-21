@@ -1,5 +1,6 @@
 import torch
 from abc import abstractmethod
+from xitorch.grad import jac
 
 # taking most of the part from SciPy
 
@@ -20,11 +21,12 @@ class Jacobian(object):
         pass
 
 class BroydenFirst(Jacobian):
-    def __init__(self, alpha=None, max_rank=None):
+    def __init__(self, alpha=None, uv0=None, max_rank=None):
         self.alpha = alpha
+        self.uv0 = uv0
         self.max_rank = max_rank
 
-    def setup(self, x0, y0):
+    def setup(self, x0, y0, func):
         self.x_prev = x0
         self.y_prev = y0
 
@@ -39,8 +41,11 @@ class BroydenFirst(Jacobian):
             else:
                 self.alpha = ones
 
+        if self.uv0 == "svd":
+            self.uv0 = _get_svd_uv0(func, x0)
+
         # setup the approximate inverse Jacobian
-        self.Gm = LowRankMatrix(-self.alpha, "restart")
+        self.Gm = LowRankMatrix(-self.alpha, self.uv0, "restart")
         self._reduce = lambda: self.Gm.reduce(self.max_rank)
 
     def solve(self, v, tol=0):
@@ -67,10 +72,15 @@ class BroydenFirst(Jacobian):
 
 class LowRankMatrix(object):
     # represents a matrix of `\alpha * I + \sum_n c_n d_n^T`
-    def __init__(self, alpha, reduce_method):
+    def __init__(self, alpha, uv0, reduce_method):
         self.alpha = alpha
-        self.cns = []
-        self.dns = []
+        if uv0 is None:
+            self.cns = []
+            self.dns = []
+        else:
+            cn0, dn0 = uv0
+            self.cns = [cn0]
+            self.dns = [dn0]
         self.reduce_method = {
             "restart": 0,
             "simple": 1
@@ -127,3 +137,13 @@ class FullRankMatrix(object):
 
     def reduce(self, max_rank, **kwargs):
         pass # ???
+
+def _get_svd_uv0(func, x0):
+    from xitorch.linalg import svd
+    # raise RuntimeError
+    fjac = jac(func, (x0.clone().requires_grad_(),), idxs=[0])[0]
+    # u: (n, 1), s: (1,), vh: (1, n)
+    u, s, vh = svd(fjac, k=1, mode="lowest", method="davidson", min_eps=1e-3)
+    sinv_sqrt = 1. / torch.sqrt(torch.clamp(s, min=0.1))
+    uv0 = (sinv_sqrt * vh.squeeze(-2), sinv_sqrt * u.squeeze(-1))
+    return uv0

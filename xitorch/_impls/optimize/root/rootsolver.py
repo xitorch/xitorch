@@ -10,7 +10,7 @@ __all__ = ["broyden1"]
 
 def _nonlin_solver(fcn, x0, params, method,
         # jacobian parameters
-        alpha=None, max_rank=None,
+        alpha=None, uv0=None, max_rank=None,
         # stopping criteria
         maxiter=None, f_tol=None, f_rtol=None, x_tol=None, x_rtol=None,
         # algorithm parameters
@@ -22,7 +22,11 @@ def _nonlin_solver(fcn, x0, params, method,
     Keyword arguments
     -----------------
     alpha: float or None
-        The initial guess of Jacobian is ``-1/alpha``
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+    uv0: tuple of tensors or str or None
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+        If ``"svd"``, then it uses 1-rank svd to obtain ``u`` and ``v``.
+        If None, then ``u`` and ``v`` are zeros.
     max_rank: int or None
         The maximum rank of inverse Jacobian approximation. If ``None``, it
         is ``inf``.
@@ -44,7 +48,7 @@ def _nonlin_solver(fcn, x0, params, method,
 
     jacobian = {
         "broyden1": BroydenFirst,
-    }[method](alpha, max_rank)
+    }[method](alpha=alpha, uv0=uv0, max_rank=max_rank)
 
     if maxiter is None:
         maxiter = 100*(torch.numel(x0)+1)
@@ -65,7 +69,7 @@ def _nonlin_solver(fcn, x0, params, method,
         return x.reshape(xshape)
 
     # set up the jacobian
-    jacobian.setup(x, y)
+    jacobian.setup(x, y, func)
 
     # solver tolerance
     gamma = 0.9
