@@ -22,7 +22,8 @@ class LinearOperator(EditableModule):
 
     For a user-defined class to behave as ``LinearOperator``, it must use
     ``LinearOperator`` as one of the parent and it has to have ``._mv()``
-    and ``._getparamnames()`` methods implemented at the very least.
+    method implemented and ``._getparamnames()`` if used in xitorch's
+    functionals with torch grad enabled.
     """
     @classmethod
     def m(cls, mat:torch.Tensor, is_hermitian:Optional[bool]=None):
@@ -96,10 +97,10 @@ class LinearOperator(EditableModule):
         self._is_rmv_implemented = self.__check_if_implemented("_rmv")
         self._is_rmm_implemented = self.__check_if_implemented("_rmm")
         self._is_fullmatrix_implemented = self.__check_if_implemented("_fullmatrix")
-        if not self.__check_if_implemented("_mv") or \
-           not self.__check_if_implemented("_getparamnames"):
-            raise RuntimeError("LinearOperator must have at least _mv(self) and "
-                               "_getparamnames(self, prefix) method implemented")
+        self._is_gpn_implemented = self.__check_if_implemented("_getparamnames")
+        if not self.__check_if_implemented("_mv"):
+            raise RuntimeError("LinearOperator must have at least _mv(self) "
+                               "method implemented")
         if not _suppress_hermit_warning and self._is_hermitian and (self._is_rmv_implemented or self._is_rmm_implemented):
             warnings.warn("The LinearOperator is Hermitian with implemented "
                           "rmv or rmm. We will use the mv and mm methods "
@@ -132,7 +133,7 @@ class LinearOperator(EditableModule):
             List of parameter names (including the prefix) that affecting
             the ``LinearOperator``.
         """
-        pass
+        return []
 
     @abstractmethod
     def _mv(self, x:torch.Tensor) -> torch.Tensor:
@@ -430,6 +431,10 @@ class LinearOperator(EditableModule):
     @property
     def is_fullmatrix_implemented(self) -> bool:
         return self._is_fullmatrix_implemented
+
+    @property
+    def is_getparamnames_implemented(self) -> bool:
+        return self._is_gpn_implemented
 
     ############ debug functions ##############
     def check(self, warn:Optional[bool]=None) -> None:

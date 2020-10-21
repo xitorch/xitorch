@@ -5,12 +5,14 @@ xitorch provides some linear algebra operations that does not need the explicit
 matrix, such as :func:`xitorch.linalg.solve` and :func:`xitorch.linalg.symeig`.
 To represent the matrix implicitly, base class :class:`xitorch.LinearOperator`
 should be used to construct user-defined linear operators.
-To write a LinearOperator class, these 2 functions must be implemented at the
-very minimum:
+To write a LinearOperator class, the method ``_mv`` (matrix-vector
+multiplication) must be implemented.
 
-  * ``_mv`` (matrix-vector multiplication)
-  * ``_getparamnames`` (returning list of parameters affecting the output, as in
-    :obj:`xitorch.EditableModule`)
+If the LinearOperator is used in xitorch's functional with grad enabled, e.g.
+:func:`xitorch.linalg.symeig` or :func:`xitorch.linalg.solve`, it must have
+the method ``_getparamnames`` implemented.
+``_getparamnames`` returns a list of parameters affecting the output,
+as in :obj:`xitorch.EditableModule`
 
 As an example, to write the matrix
 

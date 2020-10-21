@@ -69,10 +69,18 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
     """
     assert_runtime(A.shape[-1] == A.shape[-2], "The linear operator A must have a square shape")
     assert_runtime(A.shape[-1] == B.shape[-2], "Mismatch shape of A & B (A: %s, B: %s)" % (A.shape, B.shape))
+    assert_runtime(
+        not torch.is_grad_enabled() or A.is_getparamnames_implemented,
+        "The _getparamnames(self, prefix) of linear operator A must be "
+        "implemented if using solve with grad enabled")
     if M is not None:
         assert_runtime(M.shape[-1] == M.shape[-2], "The linear operator M must have a square shape")
         assert_runtime(M.shape[-1] == A.shape[-1], "The shape of A & M must match (A: %s, M: %s)" % (A.shape, M.shape))
         assert_runtime(M.is_hermitian, "The linear operator M must be a Hermitian matrix")
+        assert_runtime(
+            not torch.is_grad_enabled() or M.is_getparamnames_implemented,
+            "The _getparamnames(self, prefix) of linear operator M must be "
+            "implemented if using solve with grad enabled")
     if E is not None:
         assert_runtime(E.shape[-1] == B.shape[-1], "The last dimension of E & B must match (E: %s, B: %s)" % (E.shape, B.shape))
     if E is None and M is not None:

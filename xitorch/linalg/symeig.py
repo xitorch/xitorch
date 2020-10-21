@@ -74,9 +74,17 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
         broadcasted shape of ``*BA`` and ``*BM``.
     """
     assert_runtime(A.is_hermitian, "The linear operator A must be Hermitian")
+    assert_runtime(
+        not torch.is_grad_enabled() or A.is_getparamnames_implemented,
+        "The _getparamnames(self, prefix) of linear operator A must be "
+        "implemented if using symeig with grad enabled")
     if M is not None:
         assert_runtime(M.is_hermitian, "The linear operator M must be Hermitian")
         assert_runtime(M.shape[-1] == A.shape[-1], "The shape of A & M must match (A: %s, M: %s)" % (A.shape, M.shape))
+        assert_runtime(
+            not torch.is_grad_enabled() or M.is_getparamnames_implemented,
+            "The _getparamnames(self, prefix) of linear operator M must be "
+            "implemented if using symeig with grad enabled")
     mode = mode.lower()
     if mode == "uppermost":
         mode = "uppest"

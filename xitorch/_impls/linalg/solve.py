@@ -229,15 +229,15 @@ def bicgstab(A:LinearOperator, B:torch.Tensor,
     rk = B2 - A_fcn(xk)
     r0hat = rk
     rho_k = _dot(r0hat, rk)
+    omega_k = torch.tensor(1.0, dtype=A.dtype, device=A.device)
     alpha:Union[float, torch.Tensor] = 1.0
-    omega_k:Union[float, torch.Tensor] = 1.0
     vk:Union[float, torch.Tensor] = 0.0
     pk:Union[float, torch.Tensor] = 0.0
     converge = False
     resid_calc_every = 10
     for k in range(1, max_niter + 1):
         rho_knew = _dot(r0hat, rk)
-        omega_denom = omega_k if k == 1 else _safedenom(omega_k, eps)
+        omega_denom = _safedenom(omega_k, eps)
         beta = rho_knew / _safedenom(rho_k, eps) * (alpha / omega_denom)
         pk = rk + beta * (pk - omega_k * vk)
         y = precond_fcn_r(pk)
@@ -393,7 +393,10 @@ def _setup_linear_problem(A:LinearOperator, B:torch.Tensor,
         E:Optional[torch.Tensor], M:Optional[LinearOperator],
         batchdims:Sequence[int],
         posdef:Optional[bool],
-        need_hermit:bool) -> Tuple[Callable[[torch.Tensor],torch.Tensor], torch.Tensor, bool]:
+        need_hermit:bool) -> \
+        Tuple[Callable[[torch.Tensor],torch.Tensor],
+              Callable[[torch.Tensor],torch.Tensor],
+              torch.Tensor, bool]:
 
     # get the linear operator (including the MXE part)
     if E is None:

@@ -1,6 +1,7 @@
 import warnings
 import torch
 from xitorch import LinearOperator
+from xitorch.linalg import solve
 
 class LinOpWithoutGetParamNames(LinearOperator):
     def __init__(self, mat, is_hermitian=False):
@@ -85,11 +86,17 @@ def test_linop0_err():
         pass
 
 def test_linop_no_getparamnames_err():
-    mat = torch.rand((3,1,2))
+    mat = torch.rand((3,2,2))
+    linop = LinOpWithoutGetParamNames(mat)
+    x = torch.rand(2,4)
+    b = linop.mm(x)
+    with torch.no_grad():
+        solve(linop, b)
     try:
-        linop = LinOpWithoutGetParamNames(mat)
-        msg = ("A RuntimeError must be raised when creating a "
-               "LinearOperator without ._getparamnames()")
+        with torch.enable_grad():
+            solve(linop, b)
+        msg = ("A RuntimeError must be raised when using a LinearOperator "
+               "without ._getparamnames() in xitorch functions")
         assert False, msg
     except RuntimeError:
         pass
