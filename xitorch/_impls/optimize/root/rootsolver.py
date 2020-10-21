@@ -4,9 +4,9 @@
 import warnings
 import torch
 import functools
-from xitorch._impls.optimize.root._jacobian import BroydenFirst
+from xitorch._impls.optimize.root._jacobian import BroydenFirst, BroydenSecond
 
-__all__ = ["broyden1"]
+__all__ = ["broyden1", "broyden2"]
 
 def _nonlin_solver(fcn, x0, params, method,
         # jacobian parameters
@@ -48,6 +48,7 @@ def _nonlin_solver(fcn, x0, params, method,
 
     jacobian = {
         "broyden1": BroydenFirst,
+        "broyden2": BroydenSecond,
     }[method](alpha=alpha, uv0=uv0, max_rank=max_rank)
 
     if maxiter is None:
@@ -141,8 +142,25 @@ def broyden1(fcn, x0, params=(), **kwargs):
     """
     return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
 
+@functools.wraps(_nonlin_solver, assigned=('__annotations__',)) # takes only the signature
+def broyden2(fcn, x0, params=(), **kwargs):
+    """
+    Solve the root finder or linear equation using the second Broyden method [2]_.
+    It can be used to solve minimization by finding the root of the
+    function's gradient.
+
+    References
+    ----------
+    .. [2] B.A. van der Rotten, PhD thesis,
+           "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
+           Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
+           https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
+    """
+    return _nonlin_solver(fcn, x0, params, "broyden2", **kwargs)
+
 # set the docstring of the functions
 broyden1.__doc__ += _nonlin_solver.__doc__  # type: ignore
+broyden2.__doc__ += _nonlin_solver.__doc__  # type: ignore
 
 def _safe_norm(v):
     if not torch.isfinite(v).all():

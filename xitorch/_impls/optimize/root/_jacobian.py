@@ -21,7 +21,18 @@ class Jacobian(object):
         pass
 
 class BroydenFirst(Jacobian):
+    """
+    Approximating the Jacobian based on Broyden's first approximation.
+
+    [1] B.A. van der Rotten, PhD thesis,
+        "A limited memory Broyden method to solve high-dimensional
+        systems of nonlinear equations". Mathematisch Instituut,
+        Universiteit Leiden, The Netherlands (2003).
+    """
     def __init__(self, alpha=None, uv0=None, max_rank=None):
+        # The initial guess of inverse Jacobian is `-alpha * I + u v^T`.
+        # `max_rank` indicates the maximum rank of the Jacoabian before
+        # reducing it
         self.alpha = alpha
         self.uv0 = uv0
         self.max_rank = max_rank
@@ -68,6 +79,24 @@ class BroydenFirst(Jacobian):
         v = self.Gm.rmv(dx)
         c = dx - self.Gm.mv(dy)
         d = v / torch.dot(dy, v)
+        self.Gm = self.Gm.append(c, d)
+
+class BroydenSecond(BroydenFirst):
+    """
+    Inverse Jacobian approximation based on Broyden's second method.
+
+    [1] B.A. van der Rotten, PhD thesis,
+        "A limited memory Broyden method to solve high-dimensional
+        systems of nonlinear equations". Mathematisch Instituut,
+        Universiteit Leiden, The Netherlands (2003).
+    """
+    def _update(self, x, y, dx, dy, dxnorm, dynorm):
+        # keep the rank small
+        self._reduce()
+
+        v = dy
+        c = dx - self.Gm.mv(dy)
+        d = v / (dynorm * dynorm)
         self.Gm = self.Gm.append(c, d)
 
 class LowRankMatrix(object):

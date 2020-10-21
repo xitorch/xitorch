@@ -257,7 +257,7 @@ def test_minimize(dtype, device, clss):
 
 ############## forward methods test ##############
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1"],
+    "method": ["broyden1", "broyden2"],
 })
 def test_rootfinder_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -272,7 +272,8 @@ def test_rootfinder_methods(dtype, device, method):
     }
     # list the methods and the options here
     options = {
-        "broyden1": default_fwd_options
+        "broyden1": default_fwd_options,
+        "broyden2": default_fwd_options,
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -288,7 +289,7 @@ def test_rootfinder_methods(dtype, device, method):
     assert torch.allclose(f*0, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1"],
+    "method": ["broyden1", "broyden2"],
 })
 def test_equil_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -302,7 +303,8 @@ def test_equil_methods(dtype, device, method):
     }
     # list the methods and the options here
     options = {
-        "broyden1": default_fwd_options
+        "broyden1": default_fwd_options,
+        "broyden2": default_fwd_options,
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
@@ -318,7 +320,7 @@ def test_equil_methods(dtype, device, method):
     assert torch.allclose(y, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1"]
+    "method": ["broyden1", "broyden2"]
 })
 def test_minimize_methods(dtype, device, method):
     torch.manual_seed(400)
@@ -329,11 +331,12 @@ def test_minimize_methods(dtype, device, method):
     default_fwd_options = {
         "max_niter": 50,
         "f_tol": 1e-9,
-        "alpha": -0.5,
+        "alpha": -1.0,
     }
     # list the methods and the options here
     options = {
         "broyden1": default_fwd_options,
+        "broyden2": default_fwd_options,
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
