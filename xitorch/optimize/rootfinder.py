@@ -323,7 +323,7 @@ def _get_minimizer_default_method(method):
         return method
 
 # docstring completion
-rf_methods = [broyden1, broyden2, linearmixing]
+rf_methods:Sequence[Callable] = [broyden1, broyden2, linearmixing]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
 equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
 minimize.__doc__ = get_methods_docstr(minimize, rf_methods)

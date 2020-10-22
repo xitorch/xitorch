@@ -4,7 +4,7 @@ from typing import Union, Any, Mapping, Sequence, Optional, Callable, List, \
 
 def get_methods_docstr(
         cls_or_func:Callable,
-        methods:Union[Sequence[function], Sequence[Callable], Mapping[str,Any]],
+        methods:Union[Sequence[Callable], Mapping[str,Any]],
         ignore_kwargs:Optional[List[str]]=None) -> str:
     """
     Get the full docstring of a class or a function. Full docstring is the
