@@ -8,7 +8,7 @@ def get_extrap_pos(xqextrap, extrap, xmin=0.0, xmax=1.0):
     elif extrap == "mirror":
         xqnorm = xqnorm.abs()
         xqnorm_ceil = xqnorm.long() + 1
-        xqinside = (2*(xqnorm_ceil // 2) - xqnorm) * (1 - (xqnorm_ceil % 2.0) * 2)
+        xqinside = (2 * (xqnorm_ceil // 2) - xqnorm) * (1 - (xqnorm_ceil % 2.0) * 2)
     elif extrap == "bound":
         xqinside = torch.clamp(xqnorm, 0.0, 1.0)
     else:
@@ -25,9 +25,9 @@ def get_extrap_val(xqextrap, y, extrap):
     if extrap is None or extrap == "nan":
         return torch.empty(shape, dtype=dtype, device=device) * float("nan")
     elif isinstance(extrap, int) or isinstance(extrap, float) or \
-         (isinstance(extrap, torch.Tensor) and torch.numel(extrap) == 1):
+            (isinstance(extrap, torch.Tensor) and torch.numel(extrap) == 1):
         return torch.zeros(shape, dtype=dtype, device=device) + extrap
     elif hasattr(extrap, "__call__"):
-        return extrap(xqextrap).expand(*y.shape[:-1], -1) # (*BY, nrq)
+        return extrap(xqextrap).expand(*y.shape[:-1], -1)  # (*BY, nrq)
     else:
         raise RuntimeError("Invalid extrap type (type: %s): %s" % (type(extrap), extrap))

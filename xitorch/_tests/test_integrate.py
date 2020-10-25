@@ -3,7 +3,6 @@ import torch
 import numpy as np
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
-from xitorch.grad.jachess import hess
 from xitorch.integrate import quad, solve_ivp, mcquad, SQuad
 from xitorch._tests.utils import device_dtype_float_test
 
@@ -28,7 +27,7 @@ class IntegrationModule(xt.EditableModule):
         return torch.cos(self.a * x + self.b * c)
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"a", prefix+"b"]
+        return [prefix + "a", prefix + "b"]
 
 class IntegrationNNMultiModule(torch.nn.Module):
     # cos(a*x + b * c), sin(a*x + b*c)
@@ -50,7 +49,7 @@ class IntegrationMultiModule(xt.EditableModule):
         return torch.cos(self.a * x + self.b * c), torch.sin(self.a * x + self.b * c)
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"a", prefix+"b"]
+        return [prefix + "a", prefix + "b"]
 
 class IntegrationInfModule(torch.nn.Module):
     def __init__(self, w):
@@ -58,7 +57,7 @@ class IntegrationInfModule(torch.nn.Module):
         self.w = w
 
     def forward(self, x):
-        return torch.exp(-x*x/(2*self.w*self.w))
+        return torch.exp(-x * x / (2 * self.w * self.w))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "clss": [IntegrationModule, IntegrationNNModule],
@@ -76,7 +75,7 @@ def test_quad(dtype, device, clss):
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
     c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
     xl = torch.zeros((1,), dtype=dtype, device=device).requires_grad_()
-    xu = (torch.ones ((1,), dtype=dtype, device=device) * 0.5).requires_grad_()
+    xu = (torch.ones((1,), dtype=dtype, device=device) * 0.5).requires_grad_()
 
     module = clss(a, b)
     y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
@@ -88,10 +87,10 @@ def test_quad(dtype, device, clss):
         y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
         return y
 
-    gradcheck    (getloss, (a, b, c, xl, xu))
+    gradcheck(getloss, (a, b, c, xl, xu))
     gradgradcheck(getloss, (a, b, c, xl, xu))
     # check if not all parameters require grad
-    gradcheck    (getloss, (a, b.detach(), c, xl, xu))
+    gradcheck(getloss, (a, b.detach(), c, xl, xu))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "clss": [IntegrationMultiModule, IntegrationNNMultiModule],
@@ -109,7 +108,7 @@ def test_quad_multi(dtype, device, clss):
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
     c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
     xl = torch.zeros((1,), dtype=dtype, device=device).requires_grad_()
-    xu = (torch.ones ((1,), dtype=dtype, device=device) * 0.5).requires_grad_()
+    xu = (torch.ones((1,), dtype=dtype, device=device) * 0.5).requires_grad_()
 
     module = clss(a, b)
     y = quad(module.forward, xl, xu, params=(c,), **fwd_options)
@@ -134,10 +133,10 @@ def test_quad_inf(dtype, device, totensor):
 
     if totensor:
         xl = torch.tensor(-float("inf"), dtype=dtype, device=device)
-        xu = torch.tensor( float("inf"), dtype=dtype, device=device)
+        xu = torch.tensor(float("inf"), dtype=dtype, device=device)
     else:
         xl = -float("inf")
-        xu =  float("inf")
+        xu = float("inf")
 
     def get_loss(w):
         module = IntegrationInfModule(w)
@@ -145,7 +144,7 @@ def test_quad_inf(dtype, device, totensor):
         return y
 
     y = get_loss(w)
-    ytrue = w * np.sqrt(2*np.pi)
+    ytrue = w * np.sqrt(2 * np.pi)
     assert torch.allclose(y, ytrue)
     if totensor:
         gradcheck(get_loss, (w,))
@@ -172,7 +171,7 @@ class IVPModule(xt.EditableModule):
         return -self.a * y * t - self.b * y - c * y
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"a", prefix+"b"]
+        return [prefix + "a", prefix + "b"]
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "clss": [IVPModule, IVPNNModule],
@@ -209,7 +208,7 @@ def test_ivp(dtype, device, clss):
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "method_tol": [
-        ("rk4" , (1e-8, 1e-5)),
+        ("rk4", (1e-8, 1e-5)),
         ("rk38", (1e-8, 1e-5)),
         ("rk45", (1e-8, 1e-5)),
         ("rk23", (1e-6, 1e-4)),
@@ -252,7 +251,7 @@ class MCQuadLogProbNNModule(torch.nn.Module):
 
     def forward(self, x):
         # x, w are single-element tensors
-        return -x*x/(2*self.w*self.w)
+        return -x * x / (2 * self.w * self.w)
 
 class MCQuadFcnModule(xt.EditableModule):
     def __init__(self, a):
@@ -260,10 +259,10 @@ class MCQuadFcnModule(xt.EditableModule):
 
     def forward(self, x):
         # return self.a*self.a * x * x
-        return torch.exp(-x*x/(2*self.a*self.a))
+        return torch.exp(-x * x / (2 * self.a * self.a))
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"a"]
+        return [prefix + "a"]
 
 def get_true_output(w, a):
     # return a*a*w*w
@@ -293,7 +292,7 @@ def test_mcquad(dtype, device, method):
             "method": "_dummy1d",
             "nsamples": 100,
             "lb": -float("inf"),
-            "ub":  float("inf"),
+            "ub": float("inf"),
         }
 
     def getoutput(w, a, x0):
@@ -313,23 +312,23 @@ def test_mcquad(dtype, device, method):
 
     # manually check the gradient
     g = torch.tensor(0.7, dtype=dtype, device=device).reshape(epf.shape).requires_grad_()
-    ga     , gw      = torch.autograd.grad(epf     , (a, w), grad_outputs=g, create_graph=True)
+    ga, gw      = torch.autograd.grad(epf, (a, w), grad_outputs=g, create_graph=True)
     # different implementation
-    ga2    , gw2     = torch.autograd.grad(epf     , (a, w), grad_outputs=g, retain_graph=True, create_graph=False)
+    ga2, gw2     = torch.autograd.grad(epf, (a, w), grad_outputs=g, retain_graph=True, create_graph=False)
     ga_true, gw_true = torch.autograd.grad(epf_true, (a, w), grad_outputs=g, create_graph=True)
     assert torch.allclose(gw, gw_true)
     assert torch.allclose(ga, ga_true)
     assert torch.allclose(gw2, gw_true)
     assert torch.allclose(ga2, ga_true)
 
-    ggaw     , ggaa     , ggag      = torch.autograd.grad(ga     , (w, a, g), retain_graph=True, allow_unused=True)
+    ggaw, ggaa, ggag      = torch.autograd.grad(ga, (w, a, g), retain_graph=True, allow_unused=True)
     ggaw_true, ggaa_true, ggag_true = torch.autograd.grad(ga_true, (w, a, g), retain_graph=True, allow_unused=True)
     print("ggaw", ggaw, ggaw_true, (ggaw - ggaw_true) / ggaw_true)
     print("ggaa", ggaa, ggaa_true, (ggaa - ggaa_true) / ggaa_true)
     print("ggag", ggag, ggag_true, (ggag - ggag_true) / ggag_true)
     assert torch.allclose(ggaa, ggaa_true)
     assert torch.allclose(ggag, ggag_true)
-    ggww     , ggwa     , ggwg      = torch.autograd.grad(gw     , (w, a, g), allow_unused=True)
+    ggww, ggwa, ggwg      = torch.autograd.grad(gw, (w, a, g), allow_unused=True)
     ggww_true, ggwa_true, ggwg_true = torch.autograd.grad(gw_true, (w, a, g), allow_unused=True)
     print("ggwa", ggwa, ggwa_true, (ggwa - ggwa_true) / ggwa_true)
     print("ggwg", ggwg, ggwg_true, (ggwg - ggwg_true) / ggwg_true)
@@ -343,21 +342,21 @@ def test_mcquad(dtype, device, method):
     "imethod": list(enumerate(["trapz", "cspline"])),
 })
 def test_squad(dtype, device, imethod):
-    x = torch.tensor( [0.0, 1.0, 2.0, 4.0, 5.0, 7.0],
-                      dtype=dtype, device=device).requires_grad_()
+    x = torch.tensor([0.0, 1.0, 2.0, 4.0, 5.0, 7.0],
+                     dtype=dtype, device=device).requires_grad_()
     y = torch.tensor([[1.0, 2.0, 2.0, 1.5, 1.2, 4.0],
                       [0.0, 0.8, 1.0, 1.5, 2.0, 1.4]],
-                      dtype=dtype, device=device).requires_grad_()
+                     dtype=dtype, device=device).requires_grad_()
 
     # true values
-    ycumsum_trapz = torch.tensor( # obtained by calculating manually
-                     [[0.0, 1.5, 3.5, 7.0, 8.35, 13.55],
-                      [0.0, 0.4, 1.3, 3.8, 5.55, 8.95]],
-                      dtype=dtype, device=device)
-    ycspline_natural = torch.tensor( # obtained using scipy's CubicSpline and quad
-                     [[0.0, 1.5639104372355428, 3.6221791255289135, 7.2068053596614945, 8.4994887166897, 13.11119534565217],
-                      [0.0, 0.43834626234132584, 1.3733074753173484, 3.724083215796897, 5.494693230049832, 9.181717209378409]],
-                      dtype=dtype, device=device)
+    ycumsum_trapz = torch.tensor(  # obtained by calculating manually
+        [[0.0, 1.5, 3.5, 7.0, 8.35, 13.55],
+         [0.0, 0.4, 1.3, 3.8, 5.55, 8.95]],
+        dtype=dtype, device=device)
+    ycspline_natural = torch.tensor(  # obtained using scipy's CubicSpline and quad
+        [[0.0, 1.5639104372355428, 3.6221791255289135, 7.2068053596614945, 8.4994887166897, 13.11119534565217],
+         [0.0, 0.43834626234132584, 1.3733074753173484, 3.724083215796897, 5.494693230049832, 9.181717209378409]],
+        dtype=dtype, device=device)
 
     i, method = imethod
     option = [{}, {"bc_type": "natural"}][i]
@@ -381,12 +380,13 @@ def test_squad(dtype, device, imethod):
 
     # integrate
     yintegrate = getval(x, y, "integrate")
-    assert torch.allclose(yintegrate, ytrue[...,-1])
+    assert torch.allclose(yintegrate, ytrue[..., -1])
 
     gradcheck(getval, (x, y, "cumsum"))
     gradgradcheck(getval, (x, y, "cumsum"))
     gradcheck(getval, (x, y, "integrate"))
     gradgradcheck(getval, (x, y, "integrate"))
+
 
 if __name__ == "__main__":
     # with torch.autograd.detect_anomaly():

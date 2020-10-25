@@ -7,7 +7,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Run python script by enabling xitorch debug mode")
     parser.add_argument("scriptfile", type=str, help="Path to the script to run")
     parser.add_argument("args", type=str, nargs=argparse.REMAINDER,
-        help="The arguments needed to run the script")
+                        help="The arguments needed to run the script")
     return parser.parse_args()
 
 def main():
@@ -29,6 +29,7 @@ def main():
             '__cached__': None,
         }
         exec(code, globs, None)
+
 
 if __name__ == "__main__":
     main()

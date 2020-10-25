@@ -1,8 +1,7 @@
 import torch
 import inspect
-import contextlib
-from typing import Callable, Any, Optional, List, Tuple, Union, Sequence
-from xitorch._utils.attr import get_attr, set_attr, del_attr
+from typing import Callable, List, Tuple, Union, Sequence
+from xitorch._utils.attr import set_attr, del_attr
 from xitorch._utils.unique import Uniquifier
 from xitorch._core.editable_module import EditableModule
 from contextlib import contextmanager
@@ -18,7 +17,8 @@ class PureFunction(object):
     states (`objparams`).
     For functions, this class only acts as a thin wrapper.
     """
-    def __init__(self, fcntocall:Callable):
+
+    def __init__(self, fcntocall: Callable):
         self._state_change_allowed = True
         self._allobjparams = self._get_all_obj_params_init()
         self._uniq = Uniquifier(self._allobjparams)
@@ -28,7 +28,7 @@ class PureFunction(object):
         # restore stack stores list of (objparams, identical)
         # everytime the objparams are set, it will store the old objparams
         # and indication if the old and new objparams are identical
-        self._restore_stack:List[Tuple[List,bool]] = []
+        self._restore_stack: List[Tuple[List, bool]] = []
 
     def __call__(self, *params):
         return self._fcntocall(*params)
@@ -44,7 +44,7 @@ class PureFunction(object):
     def objparams(self) -> List:
         return self._cur_objparams
 
-    def set_objparams(self, objparams:List):
+    def set_objparams(self, objparams: List):
         # TODO: check if identical with current object parameters
         identical = _check_identical_objs(objparams, self._cur_objparams)
         self._restore_stack.append((self._cur_objparams, identical))
@@ -61,7 +61,7 @@ class PureFunction(object):
             self._cur_objparams = old_objparams
 
     @contextmanager
-    def useobjparams(self, objparams:List):
+    def useobjparams(self, objparams: List):
         if not self._state_change_allowed:
             raise RuntimeError("The state change is disabled")
         try:
@@ -87,7 +87,7 @@ class FunctionPureFunction(PureFunction):
         pass
 
 class EditableModulePureFunction(PureFunction):
-    def __init__(self, obj:EditableModule, method:Callable):
+    def __init__(self, obj: EditableModule, method: Callable):
         self.obj = obj
         self.method = method
         super().__init__(method)
@@ -95,11 +95,11 @@ class EditableModulePureFunction(PureFunction):
     def _get_all_obj_params_init(self) -> List:
         return list(self.obj.getparams(self.method.__name__))
 
-    def _set_all_obj_params(self, allobjparams:List):
+    def _set_all_obj_params(self, allobjparams: List):
         self.obj.setparams(self.method.__name__, *allobjparams)
 
 class TorchNNPureFunction(PureFunction):
-    def __init__(self, obj:torch.nn.Module, method:Callable):
+    def __init__(self, obj: torch.nn.Module, method: Callable):
         self.obj = obj
         self.method = method
         super().__init__(method)
@@ -108,8 +108,8 @@ class TorchNNPureFunction(PureFunction):
         # get the tensors in the torch.nn.Module to be used as params
         named_params = list(self.obj.named_parameters())
         if len(named_params) == 0:
-            paramnames:List[str] = []
-            obj_params:List[Union[torch.Tensor,torch.nn.Parameter]] = []
+            paramnames: List[str] = []
+            obj_params: List[Union[torch.Tensor, torch.nn.Parameter]] = []
         else:
             paramnames_temp, obj_params_temp = zip(*named_params)
             paramnames = list(paramnames_temp)
@@ -117,42 +117,42 @@ class TorchNNPureFunction(PureFunction):
         self.names = paramnames
         return obj_params
 
-    def _set_all_obj_params(self, objparams:List):
+    def _set_all_obj_params(self, objparams: List):
         for (name, param) in zip(self.names, objparams):
-            del_attr(self.obj, name) # delete required in case the param is not a torch.nn.Parameter
+            del_attr(self.obj, name)  # delete required in case the param is not a torch.nn.Parameter
             set_attr(self.obj, name, param)
 
 class SingleSiblingPureFunction(PureFunction):
-    def __init__(self, fcn:Callable, fcntocall:Callable):
+    def __init__(self, fcn: Callable, fcntocall: Callable):
         self.pfunc = get_pure_function(fcn)
         super().__init__(fcntocall)
 
     def _get_all_obj_params_init(self) -> List:
         return self.pfunc._get_all_obj_params_init()
 
-    def _set_all_obj_params(self, allobjparams:List):
+    def _set_all_obj_params(self, allobjparams: List):
         self.pfunc._set_all_obj_params(allobjparams)
 
 class MultiSiblingPureFunction(PureFunction):
-    def __init__(self, fcns:Sequence[Callable], fcntocall:Callable):
+    def __init__(self, fcns: Sequence[Callable], fcntocall: Callable):
         self.pfuncs = [get_pure_function(fcn) for fcn in fcns]
         self.npfuncs = len(self.pfuncs)
         super().__init__(fcntocall)
 
     def _get_all_obj_params_init(self) -> List:
-        res:List[Union[torch.Tensor,torch.nn.Parameter]] = []
-        self.cumsum_idx = [0] * (self.npfuncs+1)
-        for i,pfunc in enumerate(self.pfuncs):
+        res: List[Union[torch.Tensor, torch.nn.Parameter]] = []
+        self.cumsum_idx = [0] * (self.npfuncs + 1)
+        for i, pfunc in enumerate(self.pfuncs):
             objparams = pfunc._get_all_obj_params_init()
             res = res + objparams
-            self.cumsum_idx[i+1] = self.cumsum_idx[i] + len(objparams)
+            self.cumsum_idx[i + 1] = self.cumsum_idx[i] + len(objparams)
         return res
 
-    def _set_all_obj_params(self, allobjparams:List):
-        for i,pfunc in enumerate(self.pfuncs):
-            pfunc._set_all_obj_params(allobjparams[self.cumsum_idx[i]:self.cumsum_idx[i+1]])
+    def _set_all_obj_params(self, allobjparams: List):
+        for i, pfunc in enumerate(self.pfuncs):
+            pfunc._set_all_obj_params(allobjparams[self.cumsum_idx[i]:self.cumsum_idx[i + 1]])
 
-def _check_identical_objs(objs1:List, objs2:List) -> bool:
+def _check_identical_objs(objs1: List, objs2: List) -> bool:
     for obj1, obj2 in zip(objs1, objs2):
         if id(obj1) != id(obj2):
             return False
@@ -217,19 +217,6 @@ def make_sibling(*pfuncs) -> Callable[[Callable], PureFunction]:
         return lambda fcn: SingleSiblingPureFunction(pfuncs[0], fcntocall=fcn)
     else:
         return lambda fcn: MultiSiblingPureFunction(pfuncs, fcntocall=fcn)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # class PureFunction(object):

@@ -1,14 +1,11 @@
-import sys
 import inspect
 import warnings
 from abc import abstractmethod
-from contextlib import contextmanager
 import copy
-import traceback as tb
 import torch
-from typing import Sequence, Union, Mapping, Sequence, Dict, List
+from typing import Sequence, Union, Dict, List
 from xitorch._utils.exceptions import GetSetParamsError
-from xitorch._utils.attr import get_attr, set_attr, del_attr
+from xitorch._utils.attr import get_attr, set_attr
 
 __all__ = ["EditableModule"]
 
@@ -19,24 +16,25 @@ class EditableModule(object):
     ``EditableModule`` is a base class to enable classes that it inherits be
     converted to pure functions for higher order derivatives purpose.
     """
-    def getparams(self, methodname:str) -> Sequence[torch.Tensor]:
+
+    def getparams(self, methodname: str) -> Sequence[torch.Tensor]:
         # Returns a list of tensor parameters used in the object's operations
 
         paramnames = self.getparamnames(methodname)
         return [get_attr(self, name) for name in paramnames]
 
-    def setparams(self, methodname:str, *params) -> int:
+    def setparams(self, methodname: str, *params) -> int:
         # Set the input parameters to the object's parameters to make a copy of
         # the operations.
         # *params is an excessive list of the parameters to be set and the
         # method will return the number of parameters it sets.
         paramnames = self.getparamnames(methodname)
-        for name,val in zip(paramnames, params):
+        for name, val in zip(paramnames, params):
             set_attr(self, name, val)
         return len(params)
 
     @abstractmethod
-    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
+    def getparamnames(self, methodname: str, prefix: str = "") -> List[str]:
         """
         This method should list tensor names that affect the output of the
         method with name indicated in ``methodname``.
@@ -85,12 +83,12 @@ class EditableModule(object):
         """
         pass
 
-    def getuniqueparams(self, methodname:str) -> List[torch.Tensor]:
+    def getuniqueparams(self, methodname: str) -> List[torch.Tensor]:
         allparams = self.getparams(methodname)
         idxs = self._get_unique_params_idxs(methodname, allparams)
         return [allparams[i] for i in idxs]
 
-    def setuniqueparams(self, methodname:str, *uniqueparams) -> int:
+    def setuniqueparams(self, methodname: str, *uniqueparams) -> int:
         nparams = self._number_of_params[methodname]
         allparams = [None for _ in range(nparams)]
         maps = self._unique_params_maps[methodname]
@@ -103,11 +101,11 @@ class EditableModule(object):
 
         return self.setparams(methodname, *allparams)
 
-    def _get_unique_params_idxs(self, methodname:str,
-            allparams:Union[Sequence[torch.Tensor],None]=None) -> Sequence[int]:
+    def _get_unique_params_idxs(self, methodname: str,
+                                allparams: Union[Sequence[torch.Tensor], None] = None) -> Sequence[int]:
 
         if not hasattr(self, "_unique_params_idxs"):
-            self._unique_params_idxs = {} # type: Dict[str,Sequence[int]]
+            self._unique_params_idxs = {}  # type: Dict[str,Sequence[int]]
             self._unique_params_maps = {}
             self._number_of_params = {}
 
@@ -117,9 +115,9 @@ class EditableModule(object):
             allparams = self.getparams(methodname)
 
         # get the unique ids
-        ids = [] # type: List[int]
+        ids = []  # type: List[int]
         idxs = []
-        idx_map = [] # type: List[List[int]]
+        idx_map = []  # type: List[List[int]]
         for i in range(len(allparams)):
             param = allparams[i]
             id_param = id(param)
@@ -202,8 +200,9 @@ class EditableModule(object):
 
         methodname = method.__name__
 
-        self.__assert_method_preserve(method, *args, **kwargs) # assert if the method preserve the float tensors of the object
-        self.__assert_get_correct_params(method, *args, **kwargs) # check if getparams returns the correct tensors
+        # assert if the method preserve the float tensors of the object
+        self.__assert_method_preserve(method, *args, **kwargs)
+        self.__assert_get_correct_params(method, *args, **kwargs)  # check if getparams returns the correct tensors
         print('"%s" method check done' % methodname)
 
     def __assert_method_preserve(self, method, *args, **kwargs):
@@ -222,10 +221,10 @@ class EditableModule(object):
         if len(all_params0) != len(all_params1):
             raise GetSetParamsError(msg)
 
-        for p0,p1 in zip(all_params0, all_params1):
+        for p0, p1 in zip(all_params0, all_params1):
             if p0.shape != p1.shape:
                 raise GetSetParamsError(msg)
-            if not torch.allclose(p0,p1):
+            if not torch.allclose(p0, p1):
                 raise GetSetParamsError(msg)
 
     def __assert_get_correct_params(self, method, *args, **kwargs):
@@ -237,6 +236,7 @@ class EditableModule(object):
 
         # get all tensor parameters in the object
         all_params, all_names = _get_tensors(self)
+
         def _get_tensor_name(param):
             for i in range(len(all_params)):
                 if id(all_params[i]) == id(param):
@@ -252,11 +252,11 @@ class EditableModule(object):
         user_params_id_set = set(user_params_id)
         oper_params_id_set = set(oper_params_id)
 
-
         # check if the userparams contains non-tensor
         for i in range(len(user_params)):
             param = user_params[i]
-            if (not isinstance(param, torch.Tensor)) or (isinstance(param, torch.Tensor) and param.dtype not in torch_float_type):
+            if (not isinstance(param, torch.Tensor)) or \
+               (isinstance(param, torch.Tensor) and param.dtype not in torch_float_type):
                 msg = "Parameter %s is a non-floating point tensor" % user_names[i]
                 raise GetSetParamsError(msg)
 
@@ -264,7 +264,7 @@ class EditableModule(object):
         missing_names = []
         for i in range(len(oper_names)):
             if oper_params_id[i] not in user_params_id_set:
-            # if oper_names[i] not in user_names:
+                # if oper_names[i] not in user_names:
                 missing_names.append(oper_names[i])
         # if there are missing parameters, give a warning (because the program
         # can still run correctly, e.g. missing parameters are parameters that
@@ -277,7 +277,7 @@ class EditableModule(object):
         excess_names = []
         for i in range(len(user_names)):
             if user_params_id[i] not in oper_params_id_set:
-            # if user_names[i] not in oper_names:
+                # if user_names[i] not in oper_names:
                 excess_names.append(user_names[i])
         # if there are excess parameters, give warnings
         if len(excess_names) > 0:
@@ -336,7 +336,7 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
     else:
         raise RuntimeError("The object must be iterable or keyable")
 
-    for key,elmt in generator:
+    for key, elmt in generator:
         name = name_format.format(prefix=prefix, key=key)
         if crit(elmt):
             action(elmt, name, objdict, key)
@@ -353,11 +353,11 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
 
             if max_depth > 0:
                 _traverse_obj(elmt,
-                    action = action,
-                    crit = crit,
-                    prefix = name+"." if hasdict else name,
-                    max_depth = max_depth - 1,
-                    exception_ids=exception_ids)
+                              action=action,
+                              crit=crit,
+                              prefix=name + "." if hasdict else name,
+                              max_depth=max_depth - 1,
+                              exception_ids=exception_ids)
             else:
                 raise RecursionError("Maximum number of recursion reached")
 
@@ -384,6 +384,7 @@ def _get_tensors(obj, prefix="", max_depth=20):
     # get the tensors recursively towards torch.nn.Module
     res = []
     names = []
+
     def action(elmt, name, objdict, key):
         res.append(elmt)
         names.append(name)

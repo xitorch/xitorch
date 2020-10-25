@@ -1,9 +1,7 @@
-import math
 from abc import abstractmethod
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence, Optional
+from typing import Callable, Union, Mapping, Any, Sequence
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
-from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
     TensorPacker, get_method
@@ -14,12 +12,12 @@ from xitorch.debug.modes import is_debug_enabled
 __all__ = ["quad"]
 
 def quad(
-        fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
-        xl:Union[float,int,torch.Tensor],
-        xu:Union[float,int,torch.Tensor],
-        params:Sequence[Any]=[],
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
+        fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[torch.Tensor]]],
+        xl: Union[float, int, torch.Tensor],
+        xu: Union[float, int, torch.Tensor],
+        params: Sequence[Any] = [],
+        bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable, None] = None,
         **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Calculate the quadrature:
@@ -85,11 +83,11 @@ def quad(
             return packer.flatten(y)
 
         res = _Quadrature.apply(pfunc2, xl, xu, fwd_options, bck_options, nparams,
-            dtype, device, *params, *pfunc.objparams())
+                                dtype, device, *params, *pfunc.objparams())
         return packer.pack(res)
     else:
         return _Quadrature.apply(pfunc, xl, xu, fwd_options, bck_options, nparams,
-            dtype, device, *params, *pfunc.objparams())
+                                 dtype, device, *params, *pfunc.objparams())
 
 class _Quadrature(torch.autograd.Function):
     # NOTE: _Quadrature method do not involve changing the state (objparams) of
@@ -101,7 +99,7 @@ class _Quadrature(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, fcn, xl, xu, fwd_options, bck_options, nparams,
-            dtype, device, *all_params):
+                dtype, device, *all_params):
 
         with fcn.disable_state_change():
 
@@ -118,6 +116,7 @@ class _Quadrature(torch.autograd.Function):
             # apply transformation if the boundaries contain inf
             if _isinf(xl) or _isinf(xu):
                 tfm = _TanInfTransform()
+
                 @make_sibling(fcn)
                 def fcn2(t, *params):
                     ys = fcn(tfm.forward(t), *params)
@@ -178,8 +177,10 @@ class _Quadrature(torch.autograd.Function):
                 xl, xu = ctx.xlxu_nontensor
 
             # calculate the gradient for the boundaries
-            grad_xl = -torch.dot(grad_ys.reshape(-1), fcn(xl, *params).reshape(-1)).reshape(xl.shape) if ctx.xltensor else None
-            grad_xu =  torch.dot(grad_ys.reshape(-1), fcn(xu, *params).reshape(-1)).reshape(xu.shape) if ctx.xutensor else None
+            grad_xl = -torch.dot(grad_ys.reshape(-1), fcn(xl, *params).reshape(-1)
+                                 ).reshape(xl.shape) if ctx.xltensor else None
+            grad_xu = torch.dot(grad_ys.reshape(-1), fcn(xu, *params).reshape(-1)
+                                ).reshape(xu.shape) if ctx.xutensor else None
 
             def new_fcn(x, *grad_y_params):
                 grad_ys = grad_y_params[0]
@@ -188,9 +189,9 @@ class _Quadrature(torch.autograd.Function):
                 with torch.enable_grad():
                     f = fcn(x, *params)
                 dfdts = torch.autograd.grad(f, tensor_params,
-                    grad_outputs=grad_ys,
-                    retain_graph=True,
-                    create_graph=torch.is_grad_enabled())
+                                            grad_outputs=grad_ys,
+                                            retain_graph=True,
+                                            create_graph=torch.is_grad_enabled())
                 return dfdts
 
             # reconstruct grad_params
@@ -224,11 +225,12 @@ class _TanInfTransform(_BaseInfTransform):
         return torch.tan(t)
 
     def dxdt(self, t):
-        sec = 1./torch.cos(t)
-        return sec*sec
+        sec = 1. / torch.cos(t)
+        return sec * sec
 
     def x2t(self, x):
         return torch.atan(x)
+
 
 # docstring completion
 quad.__doc__ = get_methods_docstr(quad, [leggauss])

@@ -1,7 +1,7 @@
 import xitorch
 import torch
 import pytest
-from xitorch._core.pure_function import get_pure_function, make_sibling, PureFunction
+from xitorch._core.pure_function import get_pure_function, PureFunction
 
 def func1(x, a, b):
     return x * a + b
@@ -32,9 +32,9 @@ class MyModule(xitorch.EditableModule):
 
     def getparamnames(self, methodname, prefix=""):
         if methodname == "forward":
-            return [prefix+"a", prefix+"b"]
+            return [prefix + "a", prefix + "b"]
         elif methodname == "forward2":
-            return [prefix+"a"]
+            return [prefix + "a"]
         else:
             raise KeyError()
 
@@ -48,7 +48,7 @@ def test_pure_function(fcn):
     x = torch.tensor(1.5)
     res = x * a + b
 
-    expr = lambda x,a,b: x*a+b
+    expr = lambda x, a, b: x * a + b
     runtest_pfunc(pfunc1, (x, a, b), expr)
 
 @pytest.mark.parametrize("clss", [TorchModule, MyModule])
@@ -59,7 +59,7 @@ def test_module_pfunc(clss):
     module = clss(a, b)
     pfunc = get_pure_function(module.forward)
 
-    expr = lambda x,a,b: x*a+b
+    expr = lambda x, a, b: x * a + b
     runtest_pfunc(pfunc, (x,), expr)
 
 @pytest.mark.parametrize("fcn", [func1, jitfunc1])
@@ -75,7 +75,7 @@ def test_make_sibling_fcn(fcn):
     assert isinstance(fminusx, PureFunction)
     assert len(fminusx.objparams()) == 0
 
-    expr = lambda x,a,b: x*a+b - x
+    expr = lambda x, a, b: x * a + b - x
     runtest_pfunc(fminusx, (x, a, b), expr)
 
 @pytest.mark.parametrize("clss", [TorchModule, MyModule])
@@ -92,7 +92,7 @@ def test_make_sibling_method(clss):
     assert isinstance(fminusx, PureFunction)
     assert len(fminusx.objparams()) == 2
 
-    expr = lambda x,a,b: x*a+b - x
+    expr = lambda x, a, b: x * a + b - x
     runtest_pfunc(fminusx, (x,), expr)
 
 def test_make_sibling_multiple():
@@ -100,16 +100,16 @@ def test_make_sibling_multiple():
     b = torch.nn.Parameter(torch.tensor(1.0))
     x = torch.tensor(1.5)
     module1 = TorchModule(a, b)
-    module2 = MyModule(a, b*2)
+    module2 = MyModule(a, b * 2)
 
     @xitorch.make_sibling(module1.forward, module2.forward)
     def newfcn(x):
         return module1.forward(x) + module2.forward(x) * 2
 
     assert isinstance(newfcn, PureFunction)
-    assert len(newfcn.objparams()) == 3 # not 4, because a is identical
+    assert len(newfcn.objparams()) == 3  # not 4, because a is identical
 
-    expr = lambda x,a,b,b2: (x*a+b) + (x*a+b2)*2
+    expr = lambda x, a, b, b2: (x * a + b) + (x * a + b2) * 2
     runtest_pfunc(newfcn, (x,), expr)
 
 def test_make_sibling_multiple_nonunique_objs():
@@ -125,7 +125,7 @@ def test_make_sibling_multiple_nonunique_objs():
     assert isinstance(newfcn, PureFunction)
     assert len(newfcn.objparams()) == 2
 
-    expr = lambda x,a,b: (x*a+b) + (x+a)*2
+    expr = lambda x, a, b: (x * a + b) + (x + a) * 2
     runtest_pfunc(newfcn, (x,), expr)
 
 def runtest_pfunc(pfunc, params, expr):

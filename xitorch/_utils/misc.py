@@ -35,6 +35,7 @@ class TensorNonTensorSeparator(object):
     Class that provides function to separate/combine tensors and nontensors
     parameters.
     """
+
     def __init__(self, params, varonly=True):
         """
         Params is a list of tensor or non-tensor to be splitted into

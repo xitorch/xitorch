@@ -31,6 +31,7 @@ class BroydenFirst(Jacobian):
         systems of nonlinear equations". Mathematisch Instituut,
         Universiteit Leiden, The Netherlands (2003).
     """
+
     def __init__(self, alpha=None, uv0=None, max_rank=None):
         # The initial guess of inverse Jacobian is `-alpha * I + u v^T`.
         # `max_rank` indicates the maximum rank of the Jacoabian before
@@ -92,6 +93,7 @@ class BroydenSecond(BroydenFirst):
         systems of nonlinear equations". Mathematisch Instituut,
         Universiteit Leiden, The Netherlands (2003).
     """
+
     def _update(self, x, y, dx, dy, dxnorm, dynorm):
         # keep the rank small
         self._reduce()
@@ -154,13 +156,13 @@ class LowRankMatrix(object):
 
     def reduce(self, max_rank, **otherparams):
         if len(self.cns) > max_rank:
-            if self.reduce_method == 0: # restart
+            if self.reduce_method == 0:  # restart
                 del self.cns[:]
                 del self.dns[:]
-            elif self.reduce_method == 1: # simple
+            elif self.reduce_method == 1:  # simple
                 n = len(self.cns)
-                del self.cns[:n-max_rank]
-                del self.dns[:n-max_rank]
+                del self.cns[:n - max_rank]
+                del self.dns[:n - max_rank]
 
 class FullRankMatrix(object):
     def __init__(self, alpha, cns, dns):
@@ -183,7 +185,7 @@ class FullRankMatrix(object):
         return self
 
     def reduce(self, max_rank, **kwargs):
-        pass # ???
+        pass  # ???
 
 def _get_svd_uv0(func, x0):
     from xitorch.linalg import svd

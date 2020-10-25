@@ -1,7 +1,6 @@
 import torch
 import warnings
-from typing import Union, Any, Mapping, Optional, Union, Callable
-import numpy as np
+from typing import Union, Any, Mapping, Optional, Callable
 from xitorch import LinearOperator
 from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.misc import set_default_option, dummy_context_manager, get_method
@@ -10,10 +9,10 @@ from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
     cg, bicgstab, broyden1_solve, _get_batchdims
 
-def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
-          M:Optional[LinearOperator]=None,
-          bck_options:Mapping[str,Any]={},
-          method:Union[str, Callable, None]=None,
+def solve(A: LinearOperator, B: torch.Tensor, E: Union[torch.Tensor, None] = None,
+          M: Optional[LinearOperator] = None,
+          bck_options: Mapping[str, Any] = {},
+          method: Union[str, Callable, None] = None,
           **fwd_options) -> torch.Tensor:
     r"""
     Performing iterative method to solve the equation
@@ -82,7 +81,8 @@ def solve(A:LinearOperator, B:torch.Tensor, E:Union[torch.Tensor,None]=None,
             "The _getparamnames(self, prefix) of linear operator M must be "
             "implemented if using solve with grad enabled")
     if E is not None:
-        assert_runtime(E.shape[-1] == B.shape[-1], "The last dimension of E & B must match (E: %s, B: %s)" % (E.shape, B.shape))
+        assert_runtime(E.shape[-1] == B.shape[-1],
+                       "The last dimension of E & B must match (E: %s, B: %s)" % (E.shape, B.shape))
     if E is None and M is not None:
         warnings.warn("M is supplied but will be ignored because E is not supplied")
 
@@ -129,7 +129,7 @@ class solve_torchfcn(torch.autograd.Function):
         ctx.bck_config = set_default_option({
         }, bck_options)
 
-        if torch.all(B == 0): # special case
+        if torch.all(B == 0):  # special case
             dims = (*_get_batchdims(A, B, E, M), *B.shape[-2:])
             x = torch.zeros(dims, dtype=B.dtype, device=B.device)
         else:
@@ -160,21 +160,22 @@ class solve_torchfcn(torch.autograd.Function):
 
         # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
-        AT = ctx.A.H # (*BA, nr, nr)
-        MT = ctx.M.H if ctx.M is not None else None # (*BM, nr, nr)
-        with AT.uselinopparams(*ctx.params), MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
+        AT = ctx.A.H  # (*BA, nr, nr)
+        MT = ctx.M.H if ctx.M is not None else None  # (*BM, nr, nr)
+        with AT.uselinopparams(*ctx.params), \
+             MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
             v = solve(AT, grad_x, ctx.E, MT,
-                fwd_options=ctx.bck_config, bck_options=ctx.bck_config) # (*BABEM, nr, ncols)
+                      fwd_options=ctx.bck_config, bck_options=ctx.bck_config)  # (*BABEM, nr, ncols)
         grad_B = v
 
         # calculate the grad of matrices parameters
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
             with ctx.A.uselinopparams(*params):
-                loss = -ctx.A.mm(ctx.x) # (*BABEM, nr, ncols)
+                loss = -ctx.A.mm(ctx.x)  # (*BABEM, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
-            create_graph=torch.is_grad_enabled())
+                                          create_graph=torch.is_grad_enabled())
 
         # calculate the biases gradient
         grad_E = None
@@ -183,8 +184,8 @@ class solve_torchfcn(torch.autograd.Function):
                 Mx = ctx.x
             else:
                 with ctx.M.uselinopparams(*ctx.mparams):
-                    Mx = ctx.M.mm(ctx.x) # (*BABEM, nr, ncols)
-            grad_E = torch.einsum('...rc,...rc->...c', v, Mx) # (*BABEM, ncols)
+                    Mx = ctx.M.mm(ctx.x)  # (*BABEM, nr, ncols)
+            grad_E = torch.einsum('...rc,...rc->...c', v, Mx)  # (*BABEM, ncols)
 
         # calculate the gradient to the biases matrices
         grad_mparams = []
@@ -196,19 +197,20 @@ class solve_torchfcn(torch.autograd.Function):
                     mloss = ctx.M.mm(lmbdax)
 
             grad_mparams = torch.autograd.grad((mloss,), mparams,
-                grad_outputs=(v,),
-                create_graph=torch.is_grad_enabled())
+                                               grad_outputs=(v,),
+                                               create_graph=torch.is_grad_enabled())
 
         return (None, grad_B, grad_E, None, None, None, None, None,
                 *grad_params, *grad_mparams)
 
 def custom_exactsolve(A, B, E=None,
-                M=None, **options):
+                      M=None, **options):
     # A: (*BA, na, na)
     # B: (*BB, na, ncols)
     # E: (*BE, ncols)
     # M: (*BM, na, na)
     return exactsolve(A, B, E, M)
+
 
 # docstring completion
 _solve_methods = {

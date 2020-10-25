@@ -24,11 +24,12 @@ class Interp1D(EditableModule):
     **fwd_options
         Method-specific options (see method section below)
     """
+
     def __init__(self,
-            x:torch.Tensor,
-            y:Optional[torch.Tensor]=None,
-            method:Union[str, Callable, None]=None,
-            **fwd_options):
+                 x: torch.Tensor,
+                 y: Optional[torch.Tensor] = None,
+                 method: Union[str, Callable, None] = None,
+                 **fwd_options):
         if method is None:
             method = "cspline"
         methods = {
@@ -37,7 +38,7 @@ class Interp1D(EditableModule):
         method_cls = get_method("Interp1D", methods, method)
         self.obj = method_cls(x, y, **fwd_options)
 
-    def __call__(self, xq:torch.Tensor, y:Optional[torch.Tensor]=None) -> torch.Tensor:
+    def __call__(self, xq: torch.Tensor, y: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Arguments
         ----------------
@@ -56,9 +57,10 @@ class Interp1D(EditableModule):
         """
         return self.obj(xq, y)
 
-    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
+    def getparamnames(self, methodname: str, prefix: str = "") -> List[str]:
         """"""
-        return [prefix+"obj."+c for c in self.obj.getparamnames()]
+        return [prefix + "obj." + c for c in self.obj.getparamnames()]
+
 
 # docstring completion
 interp1d_methods = {

@@ -1,18 +1,11 @@
-import inspect
-from typing import Callable, Mapping, Any, Optional, Sequence, Union
+from typing import Callable, Mapping, Any, Sequence, Union
 import torch
-import numpy as np
-import scipy.optimize
-import xitorch as xt
 from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
     linearmixing
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
-from xitorch import LinearOperator
-from xitorch._core.linop import checklinop
-from xitorch._core.editable_module import EditableModule
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
@@ -20,11 +13,11 @@ from xitorch.debug.modes import is_debug_enabled
 __all__ = ["equilibrium", "rootfinder", "minimize"]
 
 def rootfinder(
-        fcn:Callable[...,torch.Tensor],
-        y0:torch.Tensor,
-        params:Sequence[Any]=[],
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
+        fcn: Callable[..., torch.Tensor],
+        y0: torch.Tensor,
+        params: Sequence[Any] = [],
+        bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable, None] = None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solving the rootfinder equation of a given function,
@@ -88,11 +81,11 @@ def rootfinder(
     return _RootFinder.apply(pfunc, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 def equilibrium(
-        fcn:Callable[...,torch.Tensor],
-        y0:torch.Tensor,
-        params:Sequence[Any]=[],
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
+        fcn: Callable[..., torch.Tensor],
+        y0: torch.Tensor,
+        params: Sequence[Any] = [],
+        bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable, None] = None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solving the equilibrium equation of a given function,
@@ -166,11 +159,11 @@ def equilibrium(
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
 
 def minimize(
-        fcn:Callable[...,torch.Tensor],
-        y0:torch.Tensor,
-        params:Sequence[Any]=[],
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable]=None,
+        fcn: Callable[..., torch.Tensor],
+        y0: torch.Tensor,
+        params: Sequence[Any] = [],
+        bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable] = None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solve the unbounded minimization problem:
@@ -230,13 +223,14 @@ def minimize(
     # the rootfinder algorithms are designed to move to the opposite direction
     # of the output of the function, so the output of this function is just
     # the grad of z w.r.t. y
+
     @make_sibling(pfunc)
     def new_fcn(y, *params):
         with torch.enable_grad():
             y1 = y.clone().requires_grad_()
             z = pfunc(y1, *params)
         grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
-            create_graph=torch.is_grad_enabled())
+                                     create_graph=torch.is_grad_enabled())
         return grady
 
     return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
@@ -290,7 +284,7 @@ class _RootFinder(torch.autograd.Function):
         with fcn.useobjparams(objparams):
 
             jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
-            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1,1),
+            gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1, 1),
                           bck_options=ctx.bck_options, **ctx.bck_options)
             gyfcn = gyfcn.reshape(grad_yout.shape)
 
@@ -304,7 +298,7 @@ class _RootFinder(torch.autograd.Function):
                     yfcn = fcn(yout, *params_copy)
 
             grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
-                create_graph=torch.is_grad_enabled())
+                                                     create_graph=torch.is_grad_enabled())
             grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
             grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
 
@@ -322,8 +316,9 @@ def _get_minimizer_default_method(method):
     else:
         return method
 
+
 # docstring completion
-rf_methods:Sequence[Callable] = [broyden1, broyden2, linearmixing]
+rf_methods: Sequence[Callable] = [broyden1, broyden2, linearmixing]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
 equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
 minimize.__doc__ = get_methods_docstr(minimize, rf_methods)

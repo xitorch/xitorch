@@ -1,15 +1,13 @@
 import itertools
 import torch
-import xitorch as xt
 import pytest
-import argparse
-from typing import Mapping, List, ClassVar, Callable, Optional, Tuple
+from typing import Mapping, List, Callable, Optional, Tuple
 
 __all__ = ["device_dtype_float_test"]
 
-def device_dtype_float_test(only64:int=False, onlycpu:bool=False,
-        additional_kwargs:Mapping[str,List]={},
-        skip_fcn:Optional[Callable[...,Tuple[bool,str]]]=None) -> Callable:
+def device_dtype_float_test(only64: int = False, onlycpu: bool = False,
+                            additional_kwargs: Mapping[str, List] = {},
+                            skip_fcn: Optional[Callable[..., Tuple[bool, str]]] = None) -> Callable:
 
     dtypes = [torch.float, torch.float64]
     devices = [torch.device("cpu"), torch.device("cuda")]

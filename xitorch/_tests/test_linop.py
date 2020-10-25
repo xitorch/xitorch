@@ -6,10 +6,10 @@ from xitorch.linalg import solve
 class LinOpWithoutGetParamNames(LinearOperator):
     def __init__(self, mat, is_hermitian=False):
         super(LinOpWithoutGetParamNames, self).__init__(
-            shape = mat.shape,
-            is_hermitian = is_hermitian,
-            dtype = mat.dtype,
-            device = mat.device
+            shape=mat.shape,
+            is_hermitian=is_hermitian,
+            dtype=mat.dtype,
+            device=mat.device
         )
         self.mat = mat
         self.implemented_methods = []
@@ -28,16 +28,16 @@ class LinOpWithoutInit(LinearOperator):
 class BaseLinOp(LinearOperator):
     def __init__(self, mat, is_hermitian=False):
         super(BaseLinOp, self).__init__(
-            shape = mat.shape,
-            is_hermitian = is_hermitian,
-            dtype = mat.dtype,
-            device = mat.device
+            shape=mat.shape,
+            is_hermitian=is_hermitian,
+            dtype=mat.dtype,
+            device=mat.device
         )
         self.mat = mat
         self.implemented_methods = []
 
     def _getparamnames(self, prefix=""):
-        return [prefix+"mat"]
+        return [prefix + "mat"]
 
 class LinOpWithoutMv(BaseLinOp):
     # LinearOperator where only nothing is implemented (should produce an error)
@@ -64,7 +64,7 @@ class LinOp2(BaseLinOp):
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1)
 
     def _rmv(self, x):
-        return torch.matmul(self.mat.transpose(-2,-1), x.unsqueeze(-1)).squeeze(-1)
+        return torch.matmul(self.mat.transpose(-2, -1), x.unsqueeze(-1)).squeeze(-1)
 
 class NotLinOp1(BaseLinOp):
     # LinearOperator where only ._mv is implemented (bare minimum)
@@ -76,7 +76,7 @@ class NotLinOp1(BaseLinOp):
         return torch.matmul(self.mat, x.unsqueeze(-1)).squeeze(-1) + 1
 
 def test_linop0_err():
-    mat = torch.rand((3,1,2))
+    mat = torch.rand((3, 1, 2))
     try:
         linop = LinOpWithoutMv(mat)
         msg = ("A RuntimeError must be raised when creating a "
@@ -86,9 +86,9 @@ def test_linop0_err():
         pass
 
 def test_linop_no_getparamnames_err():
-    mat = torch.rand((3,2,2))
+    mat = torch.rand((3, 2, 2))
     linop = LinOpWithoutGetParamNames(mat)
-    x = torch.rand(2,4)
+    x = torch.rand(2, 4)
     b = linop.mm(x)
     with torch.no_grad():
         solve(linop, b)
@@ -102,7 +102,7 @@ def test_linop_no_getparamnames_err():
         pass
 
 def test_linop_no_init_err():
-    mat = torch.rand((3,1,2))
+    mat = torch.rand((3, 1, 2))
     x = torch.rand(2)
     linop = LinOpWithoutInit(mat)
     try:
@@ -115,7 +115,7 @@ def test_linop_no_init_err():
 
 def test_linop1_shape1_err():
     mat = torch.rand(3)
-    mat2 = torch.rand((3,2))
+    mat2 = torch.rand((3, 2))
     try:
         linop = LinOp1(mat)
         assert False, "A RuntimeError must be raised when creating a LinearOperator with 1 dimension"
@@ -130,8 +130,8 @@ def test_linop1_shape1_err():
 
 def test_linop1_mm():
     # test if mm done correctly if not implemented
-    mat = torch.rand((2,4,2,3))
-    x = torch.rand((3,2))
+    mat = torch.rand((2, 4, 2, 3))
+    x = torch.rand((3, 2))
     xv = torch.rand((3,))
 
     linop = LinOp1(mat)
@@ -142,43 +142,43 @@ def test_linop1_mm():
     assert torch.allclose(ymm, torch.matmul(mat, x))
 
 def test_linop1_fullmatrix():
-    mat = torch.rand((2,4,2,3), dtype=torch.float64)
+    mat = torch.rand((2, 4, 2, 3), dtype=torch.float64)
     linop = LinOp1(mat)
     linop_mat = linop.fullmatrix()
     assert torch.allclose(linop_mat, mat)
 
 def test_linop1_rmm():
     # test if rmv and rmm done correctly if not implemented
-    mat = torch.rand((2,4,2,3))
-    rx = torch.rand((2,3))
+    mat = torch.rand((2, 4, 2, 3))
+    rx = torch.rand((2, 3))
     rxv = torch.rand((2,))
 
     linop = LinOp1(mat)
     ymv = linop.rmv(rxv)
-    ymv_true = torch.matmul(mat.transpose(-2,-1), rxv)
+    ymv_true = torch.matmul(mat.transpose(-2, -1), rxv)
     assert torch.allclose(ymv, ymv_true)
 
     ymm = linop.rmm(rx)
-    ymm_true = torch.matmul(mat.transpose(-2,-1), rx)
+    ymm_true = torch.matmul(mat.transpose(-2, -1), rx)
     assert torch.allclose(ymm, ymm_true)
 
 def test_linop2_rmm():
     # test if rmm done correctly if not implemented
-    mat = torch.rand((2,4,2,3))
-    rx = torch.rand((2,3))
+    mat = torch.rand((2, 4, 2, 3))
+    rx = torch.rand((2, 3))
     rxv = torch.rand((2,))
 
     linop = LinOp2(mat)
     ymv = linop.rmv(rxv)
-    assert torch.allclose(ymv, torch.matmul(mat.transpose(-2,-1), rxv))
+    assert torch.allclose(ymv, torch.matmul(mat.transpose(-2, -1), rxv))
 
     ymm = linop.rmm(rx)
-    assert torch.allclose(ymm, torch.matmul(mat.transpose(-2,-1), rx))
+    assert torch.allclose(ymm, torch.matmul(mat.transpose(-2, -1), rx))
 
 def test_linop_repr():
     dtype = torch.float32
     device = torch.device("cpu")
-    mat1 = torch.randn((2,3,2), dtype=dtype, device=device)
+    mat1 = torch.randn((2, 3, 2), dtype=dtype, device=device)
     a = LinOp1(mat1)
 
     arepr = ["LinearOperator", "LinOp1", "(2, 3, 2)", "float32", "cpu"]
@@ -198,8 +198,8 @@ def test_linop_repr():
 
 def test_linop_mat_hermit_err():
     torch.manual_seed(100)
-    mat = torch.rand(3,3)
-    mat2 = torch.rand(3,4)
+    mat = torch.rand(3, 3)
+    mat2 = torch.rand(3, 4)
     msg = "Expecting a RuntimeError for non-symmetric matrix "\
           "indicated as a Hermitian"
 
@@ -242,7 +242,7 @@ def test_linop_op_err():
         pass
 
     try:
-        linop1.rmm(mat1.transpose(-2,-1))
+        linop1.rmm(mat1.transpose(-2, -1))
         assert False, errmsg
     except RuntimeError:
         pass
@@ -254,7 +254,7 @@ def test_linop_op_err():
         pass
 
 def test_check_linop():
-    mat1 = torch.rand(3,4)
+    mat1 = torch.rand(3, 4)
     linop1 = LinOp1(mat1)
     nlinop1 = NotLinOp1(mat1)
 

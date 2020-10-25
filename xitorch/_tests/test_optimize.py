@@ -10,7 +10,7 @@ from xitorch._tests.utils import device_dtype_float_test
 class DummyModule(xt.EditableModule):
     def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
         super(DummyModule, self).__init__()
-        self.A = A # (nr, nr)
+        self.A = A  # (nr, nr)
         self.addx = addx
         self.activation = {
             "sigmoid": torch.nn.Sigmoid(),
@@ -31,10 +31,10 @@ class DummyModule(xt.EditableModule):
         # bias: (nbatch, nr)
         nbatch, nr = x.shape
         x = x.unsqueeze(-1)
-        A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
-        A = A + torch.diag_embed(self.diag) # (nbatch, nr, nr)
-        y = torch.bmm(A, x).squeeze(-1) # (nbatch, nr)
-        yr = self.activation(2*y) + 2*self.bias
+        A = self.A.unsqueeze(0).expand(nbatch, -1, -1)  # (nbatch, nr, nr)
+        A = A + torch.diag_embed(self.diag)  # (nbatch, nr, nr)
+        y = torch.bmm(A, x).squeeze(-1)  # (nbatch, nr)
+        yr = self.activation(2 * y) + 2 * self.bias
         if self.addx:
             yr = yr + x.squeeze(-1)
         if self.sumoutput:
@@ -42,7 +42,7 @@ class DummyModule(xt.EditableModule):
         return yr
 
     def getparamnames(self, methodname, prefix=""):
-        return [prefix+"A", prefix+"diag"] + ([prefix+"bias"] if self.biasdiff else [])
+        return [prefix + "A", prefix + "diag"] + ([prefix + "bias"] if self.biasdiff else [])
 
 class DummyNNModule(torch.nn.Module):
     def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
@@ -68,10 +68,10 @@ class DummyNNModule(torch.nn.Module):
         # bias: (nbatch, nr)
         nbatch, nr = x.shape
         x = x.unsqueeze(-1)
-        A = self.A.unsqueeze(0).expand(nbatch, -1, -1) # (nbatch, nr, nr)
-        A = A + torch.diag_embed(self.diag) # (nbatch, nr, nr)
-        y = torch.bmm(A, x).squeeze(-1) # (nbatch, nr)
-        yr = self.activation(2*y) + 2*self.bias
+        A = self.A.unsqueeze(0).expand(nbatch, -1, -1)  # (nbatch, nr, nr)
+        A = A + torch.diag_embed(self.diag)  # (nbatch, nr, nr)
+        y = torch.bmm(A, x).squeeze(-1)  # (nbatch, nr)
+        yr = self.activation(2 * y) + 2 * self.bias
         if self.addx:
             yr = yr + x.squeeze(-1)
         if self.sumoutput:
@@ -90,7 +90,7 @@ class DummyModuleExplicit(xt.EditableModule):
         A = A.unsqueeze(0).expand(nbatch, -1, -1)
         A = A + torch.diag_embed(diag)
         y = torch.bmm(A, x).squeeze(-1)
-        yr = self.activation(2*y) + 2*bias
+        yr = self.activation(2 * y) + 2 * bias
         if self.addx:
             yr = yr + x.squeeze(-1)
         return yr
@@ -113,7 +113,7 @@ def test_rootfinder(dtype, device, clss):
         "alpha": -0.5,
     }
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
     y0 = torch.randn((nbatch, nr)).to(dtype)
@@ -122,7 +122,7 @@ def test_rootfinder(dtype, device, clss):
     model.set_diag_bias(diag, bias)
     y = rootfinder(model.forward, y0, **fwd_options)
     f = model.forward(y)
-    assert torch.allclose(f*0, f)
+    assert torch.allclose(f * 0, f)
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=True)
@@ -151,7 +151,7 @@ def test_equil(dtype, device, clss):
         "method": "cg",
     }
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
     y0 = torch.randn((nbatch, nr)).to(dtype)
@@ -187,7 +187,7 @@ def test_rootfinder_with_params(dtype, device, bias_is_tensor):
     }
 
     clss = DummyModuleExplicit
-    A    = (torch.randn((nr, nr))*0.5).to(dtype).requires_grad_()
+    A    = (torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_()
     diag = torch.randn((nbatch, nr)).to(dtype).requires_grad_()
     if bias_is_tensor:
         bias = torch.zeros((nbatch, nr)).to(dtype).requires_grad_()
@@ -198,7 +198,7 @@ def test_rootfinder_with_params(dtype, device, bias_is_tensor):
     model = clss(addx=True)
     y = rootfinder(model.forward, y0, (A, diag, bias), **fwd_options)
     f = model.forward(y, A, diag, bias)
-    assert torch.allclose(f*0, f)
+    assert torch.allclose(f * 0, f)
 
     def getloss(y0, A, diag, bias):
         model = clss(addx=True)
@@ -218,7 +218,7 @@ def test_minimize(dtype, device, clss):
     nr = 3
     nbatch = 2
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     # bias will be detached from the optimization line, so set it undifferentiable
     bias = torch.zeros((nbatch, nr)).to(dtype)
@@ -229,7 +229,7 @@ def test_minimize(dtype, device, clss):
         "f_tol": 1e-9,
         "alpha": -0.5,
     }
-    activation = "square" # square activation makes it easy to optimize
+    activation = "square"  # square activation makes it easy to optimize
 
     model = clss(A, addx=False, activation=activation, sumoutput=True)
     model.set_diag_bias(diag, bias)
@@ -240,7 +240,7 @@ def test_minimize(dtype, device, clss):
         y1 = y.clone().requires_grad_()
         f = model.forward(y1)
     grady, = torch.autograd.grad(f, (y1,))
-    assert torch.allclose(grady, grady*0)
+    assert torch.allclose(grady, grady * 0)
 
     # check the hessian (must be posdef)
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()
@@ -278,7 +278,7 @@ def test_rootfinder_methods(dtype, device, method):
         "linearmixing": default_fwd_options,
     }[method]
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
     y0 = torch.randn((nbatch, nr)).to(dtype)
@@ -288,7 +288,7 @@ def test_rootfinder_methods(dtype, device, method):
     model.set_diag_bias(diag, bias)
     y = rootfinder(model.forward, y0, **fwd_options)
     f = model.forward(y)
-    assert torch.allclose(f*0, f)
+    assert torch.allclose(f * 0, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "method": ["broyden1", "broyden2", "linearmixing"],
@@ -310,12 +310,12 @@ def test_equil_methods(dtype, device, method):
         "linearmixing": default_fwd_options,
     }[method]
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
     y0 = torch.randn((nbatch, nr)).to(dtype)
 
-    fwd_options = {**options, "method":method}
+    fwd_options = {**options, "method": method}
     model = DummyModule(A, addx=False)
     model.set_diag_bias(diag, bias)
     y = equilibrium(model.forward, y0, **fwd_options)
@@ -352,12 +352,12 @@ def test_minimize_methods(dtype, device, method):
     atol = defaultdict(lambda: 1e-8)
     atol["linearmixing"] = 3e-6
 
-    A    = torch.nn.Parameter((torch.randn((nr, nr))*0.5).to(dtype).requires_grad_())
+    A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
     # bias will be detached from the optimization line, so set it undifferentiable
     bias = torch.zeros((nbatch, nr)).to(dtype)
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    activation = "square" # square activation makes it easy to optimize
+    activation = "square"  # square activation makes it easy to optimize
 
     fwd_options = {**options, "method": method}
     model = DummyModule(A, addx=False, activation=activation, sumoutput=True)
@@ -369,7 +369,7 @@ def test_minimize_methods(dtype, device, method):
         y1 = y.clone().requires_grad_()
         f = model.forward(y1)
     grady, = torch.autograd.grad(f, (y1,))
-    assert torch.allclose(grady, grady*0, atol=atol[method])
+    assert torch.allclose(grady, grady * 0, atol=atol[method])
 
     # check the hessian (must be posdef)
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()

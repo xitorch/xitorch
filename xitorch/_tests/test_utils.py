@@ -113,19 +113,19 @@ def test_create_random_matrix(is_hermitian, minmaxeival):
     n = 100
     min_eival, max_eival = minmaxeival
     a = create_random_square_matrix(
-            n, is_hermitian=is_hermitian,
-            min_eival=min_eival, max_eival=max_eival)
+        n, is_hermitian=is_hermitian,
+        min_eival=min_eival, max_eival=max_eival)
     assert a.shape[0] == n
     assert a.shape[1] == n
     assert a.dtype == torch.float64
     dtype = a.dtype
     if is_hermitian:
-        assert torch.allclose(a, a.transpose(-2,-1))
+        assert torch.allclose(a, a.transpose(-2, -1))
         eivals, _ = torch.symeig(a)
     else:
         eivals, _ = torch.eig(a)
-        assert torch.allclose(eivals[:,1], eivals[:,1] * 0, atol=1e-4)
-        eivals = eivals[:,0]
+        assert torch.allclose(eivals[:, 1], eivals[:, 1] * 0, atol=1e-4)
+        eivals = eivals[:, 0]
     assert torch.allclose(eivals.min(), torch.tensor(min_eival, dtype=dtype),
                           atol=1e-4)
     assert torch.allclose(eivals.max(), torch.tensor(max_eival, dtype=dtype),

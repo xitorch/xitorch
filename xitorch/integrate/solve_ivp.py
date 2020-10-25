@@ -1,5 +1,5 @@
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence, Optional
+from typing import Callable, Union, Mapping, Any, Sequence
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
@@ -12,12 +12,12 @@ from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["solve_ivp"]
 
-def solve_ivp(fcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
-              ts:torch.Tensor,
-              y0:torch.Tensor,
-              params:Sequence[Any]=[],
-              bck_options:Mapping[str,Any]={},
-              method:Union[str, Callable, None]=None,
+def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[torch.Tensor]]],
+              ts: torch.Tensor,
+              y0: torch.Tensor,
+              params: Sequence[Any] = [],
+              bck_options: Mapping[str, Any] = {},
+              method: Union[str, Callable, None] = None,
               **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Solve the initial value problem (IVP) or also commonly known as ordinary
@@ -144,10 +144,11 @@ class _SolveIVP(torch.autograd.Function):
         grad_enabled = torch.is_grad_enabled()
         # custom function to evaluate the input `pfcn` based on whether we want
         # to connect the graph or not
+
         def pfunc2(t, y, tensor_params):
             if not grad_enabled:
                 # if graph is not constructed, then use the default tensor_params
-                ycopy = y.detach().requires_grad_() # [yi.detach().requires_grad_() for yi in y]
+                ycopy = y.detach().requires_grad_()  # [yi.detach().requires_grad_() for yi in y]
                 tcopy = t.detach().requires_grad_()
                 f = pfcn(tcopy, ycopy, *params)
                 return f, tcopy, ycopy, tensor_params
@@ -168,8 +169,9 @@ class _SolveIVP(torch.autograd.Function):
         y_index = 0
         dLdy_index = 1
         dLdt_index = 2
-        dLdt_slice = slice(dLdt_index, dLdt_index+1, None) # [2:3]
-        dLdp_slice = slice(-ntensor_params, None, None) if ntensor_params > 0 else slice(0,0,None) # [-ntensor_params:]
+        dLdt_slice = slice(dLdt_index, dLdt_index + 1, None)  # [2:3]
+        dLdp_slice = slice(-ntensor_params, None, None) if ntensor_params > 0 else slice(0,
+                                                                                         0, None)  # [-ntensor_params:]
         state_size = 3 + ntensor_params
         states = [None for _ in range(state_size)]
 
@@ -181,27 +183,27 @@ class _SolveIVP(torch.autograd.Function):
                 f, t2, y2, tensor_params2 = pfunc2(t, y, tensor_params)
             allgradinputs = ([y2] + [t2] + list(tensor_params2))
             allgrads = torch.autograd.grad(f,
-                inputs=allgradinputs,
-                grad_outputs=dLdy,
-                retain_graph=True,
-                allow_unused=True,
-                create_graph=torch.is_grad_enabled()) # list of (*ny)
+                                           inputs=allgradinputs,
+                                           grad_outputs=dLdy,
+                                           retain_graph=True,
+                                           allow_unused=True,
+                                           create_graph=torch.is_grad_enabled())  # list of (*ny)
             allgrads = convert_none_grads_to_zeros(allgrads, allgradinputs)
             outs = (
-                f, # dydt
+                f,  # dydt
                 *allgrads,
             )
             return outs
 
         ts_flip = ts.flip(0)
         t_flip_idx = -1
-        states[y_index   ] = yt[t_flip_idx]
+        states[y_index] = yt[t_flip_idx]
         states[dLdy_index] = grad_yt[t_flip_idx]
         states[dLdt_index] = torch.zeros_like(ts[0])
         states[dLdp_slice] = [torch.zeros_like(tp) for tp in tensor_params]
         grad_ts = [None for _ in range(len(ts))] if ts_requires_grad else None
 
-        for i in range(len(ts_flip)-1):
+        for i in range(len(ts_flip) - 1):
             if ts_requires_grad:
                 feval = pfunc2(ts_flip[i], states[y_index], tensor_params)[0]
                 dLdt1 = torch.dot(feval.reshape(-1), grad_yt[t_flip_idx].reshape(-1))
@@ -209,11 +211,11 @@ class _SolveIVP(torch.autograd.Function):
                 grad_ts[t_flip_idx] = dLdt1.reshape(-1)
 
             t_flip_idx -= 1
-            outs = solve_ivp(new_pfunc, ts_flip[i:i+2], states, tensor_params,
-                fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
+            outs = solve_ivp(new_pfunc, ts_flip[i:i + 2], states, tensor_params,
+                             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
             # only take the output for the earliest time
             states = [out[-1] for out in outs]
-            states[y_index   ] = yt[t_flip_idx]
+            states[y_index] = yt[t_flip_idx]
             # gyt is the contribution from the input grad_y
             # gy0 is the propagated gradients from the later time step
             states[dLdy_index] = grad_yt[t_flip_idx] + states[dLdy_index]
@@ -221,13 +223,14 @@ class _SolveIVP(torch.autograd.Function):
         if ts_requires_grad:
             grad_ts[0] = states[dLdt_index].reshape(-1)
 
-        grad_y0 = states[dLdy_index] # dL/dy0, (*ny)
+        grad_y0 = states[dLdy_index]  # dL/dy0, (*ny)
         if ts_requires_grad:
             grad_ts = torch.cat(grad_ts).reshape(*ts.shape)
         grad_tensor_params = states[dLdp_slice]
-        grad_ntensor_params = [None for _ in range(len(allparams)-ntensor_params)]
+        grad_ntensor_params = [None for _ in range(len(allparams) - ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
         return (None, grad_ts, None, None, None, grad_y0, *grad_params)
+
 
 # docstring completion
 ivp_methods = {

@@ -5,7 +5,7 @@ __all__ = ["is_debug_enabled", "set_debug_mode", "enable_debug", "disable_debug"
 class DebugSingleton(object):
     class __DebugSingleton:
         def __init__(self):
-            self._isdebug = False # default mode is not in the debug mode
+            self._isdebug = False  # default mode is not in the debug mode
 
         def set_debug_mode(self, mode):
             self._isdebug = mode
@@ -14,6 +14,7 @@ class DebugSingleton(object):
             return self._isdebug
 
     instance = None
+
     def __init__(self):
         if DebugSingleton.instance is None:
             DebugSingleton.instance = DebugSingleton.__DebugSingleton()

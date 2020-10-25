@@ -3,7 +3,7 @@ from xitorch._core.editable_module import EditableModule
 from xitorch._impls.integrate.samples_quad import CubicSplineSQuad, TrapzSQuad, SimpsonSQuad
 from xitorch._utils.misc import get_method
 from xitorch._docstr.api_docstr import get_methods_docstr
-from typing import Optional, List, Union, Callable
+from typing import List, Union, Callable
 
 __all__ = ["SQuad"]
 
@@ -29,9 +29,10 @@ class SQuad(EditableModule):
     **fwd_options
         Method-specific options (see method section below)
     """
-    def __init__(self, x:torch.Tensor,
-            method:Union[str, Callable, None]=None,
-            **fwd_options):
+
+    def __init__(self, x: torch.Tensor,
+                 method: Union[str, Callable, None] = None,
+                 **fwd_options):
         if method is None:
             method = "cspline"
         if not (isinstance(x, torch.Tensor) and len(x.shape) == 1):
@@ -46,7 +47,7 @@ class SQuad(EditableModule):
         self.obj = clss(x, **fwd_options)
         self.nx = x.shape[-1]
 
-    def cumsum(self, y:torch.Tensor, dim:int=-1) -> torch.Tensor:
+    def cumsum(self, y: torch.Tensor, dim: int = -1) -> torch.Tensor:
         r"""
         Perform the cumulative integration of the samples :math:`\mathbf{y}`
         over the specified dimension.
@@ -74,7 +75,7 @@ class SQuad(EditableModule):
             res = res.transpose(dim, -1)
         return res
 
-    def integrate(self, y:torch.Tensor, dim:int=-1, keepdim:bool=False) -> torch.Tensor:
+    def integrate(self, y: torch.Tensor, dim: int = -1, keepdim: bool = False) -> torch.Tensor:
         r"""
         Perform the full integration of the samples :math:`\mathbf{y}`
         over the specified dimension.
@@ -107,9 +108,10 @@ class SQuad(EditableModule):
             res = res.transpose(dim, -1)
         return res
 
-    def getparamnames(self, methodname:str, prefix:str="") -> List[str]:
+    def getparamnames(self, methodname: str, prefix: str = "") -> List[str]:
         """"""
-        return self.obj.getparamnames(methodname, prefix=prefix+"obj.")
+        return self.obj.getparamnames(methodname, prefix=prefix + "obj.")
+
 
 # docstring completion
 _squad_methods = {

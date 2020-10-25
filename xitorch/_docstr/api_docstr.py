@@ -1,11 +1,11 @@
 import inspect
 from typing import Union, Any, Mapping, Sequence, Optional, Callable, List, \
-    Generator, Tuple, ItemsView, ClassVar
+    Generator, Tuple, ItemsView
 
 def get_methods_docstr(
-        cls_or_func:Callable,
-        methods:Union[Sequence[Callable], Mapping[str,Any]],
-        ignore_kwargs:Optional[List[str]]=None) -> str:
+        cls_or_func: Callable,
+        methods: Union[Sequence[Callable], Mapping[str, Any]],
+        ignore_kwargs: Optional[List[str]] = None) -> str:
     """
     Get the full docstring of a class or a function. Full docstring is the
     main docstring of the class or function plus docstrings of the methods
@@ -55,8 +55,8 @@ def get_methods_docstr(
     for name, method in generator:
         # get the signatures
         sigparams = inspect.signature(method).parameters
-        kwargs_sig_list = ['method="%s"'%name]
-        kwargs_sig_list2 = ["%s=%s"%(pname,val) for pname,val in _get_default_parameters(sigparams, ignore_kwargs)]
+        kwargs_sig_list = ['method="%s"' % name]
+        kwargs_sig_list2 = ["%s=%s" % (pname, val) for pname, val in _get_default_parameters(sigparams, ignore_kwargs)]
         kwargs_sig_list = kwargs_sig_list + (["*"] if len(kwargs_sig_list2) > 0 else []) + kwargs_sig_list2
         kwargs_sig = ", ".join(kwargs_sig_list)
 
@@ -68,11 +68,11 @@ def get_methods_docstr(
             kwargs_sig=kwargs_sig,
         )
         if methoddoc is not None:
-            method_doc = _add_indent(method.__doc__, " "*4)
+            method_doc = _add_indent(method.__doc__, " " * 4)
             res = res + method_doc
     return res
 
-def _get_default_parameters(parameters, ignore_kwargs:Sequence[str]):
+def _get_default_parameters(parameters, ignore_kwargs: Sequence[str]):
     empty = inspect.Parameter.empty
     for paramname in parameters:
         if paramname in ignore_kwargs:
@@ -80,8 +80,8 @@ def _get_default_parameters(parameters, ignore_kwargs:Sequence[str]):
         defval = parameters[paramname].default
         if defval == empty:
             continue
-        defval = defval if not isinstance(defval, str) else '"%s"'%defval
+        defval = defval if not isinstance(defval, str) else '"%s"' % defval
         yield paramname, defval
 
-def _add_indent(s:str, indent:str) -> str:
-    return "\n".join([indent+line for line in s.split("\n")])
+def _add_indent(s: str, indent: str) -> str:
+    return "\n".join([indent + line for line in s.split("\n")])

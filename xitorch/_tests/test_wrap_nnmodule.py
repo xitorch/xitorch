@@ -4,7 +4,7 @@ from xitorch._core.pure_function import get_pure_function
 class NNModule(torch.nn.Module):
     def __init__(self, a):
         super(NNModule, self).__init__()
-        self.a = a # must be a param
+        self.a = a  # must be a param
 
     def forward(self, x):
         return self.a * x
@@ -15,6 +15,7 @@ class NNModule0(torch.nn.Module):
 
     def forward(self, x):
         return 2 * x
+
 
 dtype = torch.float64
 
@@ -29,6 +30,6 @@ def test_wrap_nnmodule():
         module = modules[i]
         pfcn = get_pure_function(module)
         objparams = pfcn.objparams()
-        assert len(objparams) == nparams[i]-1 # 1 for the parameter x
+        assert len(objparams) == nparams[i] - 1  # 1 for the parameter x
         if len(objparams) == 1:
             assert objparams[0] is a

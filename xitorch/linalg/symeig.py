@@ -1,6 +1,5 @@
 import torch
 from typing import Union, Mapping, Any, Optional, Tuple, Callable
-import functools
 from xitorch import LinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
@@ -12,25 +11,25 @@ from xitorch._impls.linalg.symeig import exacteig, davidson
 
 __all__ = ["lsymeig", "usymeig", "symeig", "svd"]
 
-def lsymeig(A:LinearOperator, neig:Optional[int]=None,
-        M:Optional[LinearOperator]=None,
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
-        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
+def lsymeig(A: LinearOperator, neig: Optional[int] = None,
+            M: Optional[LinearOperator] = None,
+            bck_options: Mapping[str, Any] = {},
+            method: Union[str, Callable, None] = None,
+            **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     return symeig(A, neig, "lowest", M, method=method, bck_options=bck_options, **fwd_options)
 
-def usymeig(A:LinearOperator, neig:Optional[int]=None,
-        M:Optional[LinearOperator]=None,
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
-        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
+def usymeig(A: LinearOperator, neig: Optional[int] = None,
+            M: Optional[LinearOperator] = None,
+            bck_options: Mapping[str, Any] = {},
+            method: Union[str, Callable, None] = None,
+            **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     return symeig(A, neig, "uppest", M, method=method, bck_options=bck_options, **fwd_options)
 
-def symeig(A:LinearOperator, neig:Optional[int]=None,
-        mode:str="lowest", M:Optional[LinearOperator]=None,
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
-        **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
+def symeig(A: LinearOperator, neig: Optional[int] = None,
+           mode: str = "lowest", M: Optional[LinearOperator] = None,
+           bck_options: Mapping[str, Any] = {},
+           method: Union[str, Callable, None] = None,
+           **fwd_options) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""
     Obtain ``neig`` lowest eigenvalues and eigenvectors of a linear operator,
 
@@ -88,7 +87,7 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
     mode = mode.lower()
     if mode == "uppermost":
         mode = "uppest"
-    if method is None: # TODO: do a proper method selection based on size
+    if method is None:  # TODO: do a proper method selection based on size
         method = "exacteig"
     if neig is None:
         neig = A.shape[-1]
@@ -108,12 +107,12 @@ def symeig(A:LinearOperator, neig:Optional[int]=None,
         mparams = M.getlinopparams() if M is not None else []
         na = len(params)
         return symeig_torchfcn.apply(A, neig, mode, M,
-            fwd_options, bck_options,
-            na, *params, *mparams)
+                                     fwd_options, bck_options,
+                                     na, *params, *mparams)
 
-def svd(A:LinearOperator, k:Optional[int]=None,
-        mode:str="uppest", bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
+def svd(A: LinearOperator, k: Optional[int] = None,
+        mode: str = "uppest", bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable, None] = None,
         **fwd_options) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""
     Perform the singular value decomposition (SVD):
@@ -182,20 +181,20 @@ def svd(A:LinearOperator, k:Optional[int]=None,
         min_nm = n
 
     eivals, eivecs = symeig(AAsym, k, mode,
-        bck_options=bck_options, method=method,
-        **fwd_options) # (*BA, k) and (*BA, min(mn), k)
+                            bck_options=bck_options, method=method,
+                            **fwd_options)  # (*BA, k) and (*BA, min(mn), k)
 
     # clamp the eigenvalues to a small positive values to avoid numerical
     # instability
     eivals = torch.clamp(eivals, min=0.0)
-    s = torch.sqrt(eivals) # (*BA, k)
-    sdiv = torch.clamp(s, min=1e-12).unsqueeze(-2) # (*BA, 1, k)
+    s = torch.sqrt(eivals)  # (*BA, k)
+    sdiv = torch.clamp(s, min=1e-12).unsqueeze(-2)  # (*BA, 1, k)
     if m < n:
-        u = eivecs # (*BA, m, k)
-        v = A.rmm(u) / sdiv # (*BA, n, k)
+        u = eivecs  # (*BA, m, k)
+        v = A.rmm(u) / sdiv  # (*BA, n, k)
     else:
-        v = eivecs # (*BA, n, k)
-        u = A.mm(v) / sdiv # (*BA, m, k)
+        v = eivecs  # (*BA, n, k)
+        u = A.mm(v) / sdiv  # (*BA, m, k)
     vh = v.transpose(-2, -1)
     return u, s, vh
 
@@ -225,8 +224,8 @@ class symeig_torchfcn(torch.autograd.Function):
             evals, evecs = method_fcn(A, neig, mode, M, **config)
 
         # save for the backward
-        ctx.evals = evals # (*BAM, neig)
-        ctx.evecs = evecs # (*BAM, na, neig)
+        ctx.evals = evals  # (*BAM, neig)
+        ctx.evecs = evecs  # (*BAM, na, neig)
         ctx.params = params
         ctx.A = A
         ctx.M = M
@@ -252,10 +251,10 @@ class symeig_torchfcn(torch.autograd.Function):
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
             with A.uselinopparams(*params):
-                loss = A.mm(evecs) # (*BAM, na, neig)
+                loss = A.mm(evecs)  # (*BAM, na, neig)
 
         # calculate the contributions from the eigenvalues
-        gevalsA = grad_evals.unsqueeze(-2) * evecs # (*BAM, na, neig)
+        gevalsA = grad_evals.unsqueeze(-2) * evecs  # (*BAM, na, neig)
 
         # calculate the contributions from the eigenvectors
         with M.uselinopparams(*ctx.mparams) if M is not None else dummy_context_manager():
@@ -280,12 +279,13 @@ class symeig_torchfcn(torch.autograd.Function):
             with torch.enable_grad():
                 mparams = [p.clone().requires_grad_() for p in ctx.mparams]
                 with M.uselinopparams(*mparams):
-                    mloss = M.mm(evecs) # (*BAM, na, neig)
+                    mloss = M.mm(evecs)  # (*BAM, na, neig)
             gevalsM = -gevalsA * evals.unsqueeze(-2)
             gevecsM = -gevecsA * evals.unsqueeze(-2)
 
             # the contribution from the parallel elements
-            gevecsM_par = (-0.5 * torch.einsum("...ae,...ae->...e", grad_evecs, evecs)).unsqueeze(-2) * evecs # (*BAM, na, neig)
+            gevecsM_par = (-0.5 * torch.einsum("...ae,...ae->...e", grad_evecs, evecs)
+                           ).unsqueeze(-2) * evecs  # (*BAM, na, neig)
 
             gaccumM = gevalsM + gevecsM + gevecsM_par
             grad_mparams = torch.autograd.grad(
@@ -299,6 +299,7 @@ class symeig_torchfcn(torch.autograd.Function):
 
 def custom_exacteig(A, neig, mode, M=None, **options):
     return exacteig(A, neig, mode, M)
+
 
 # docstring completion
 _symeig_methods = {

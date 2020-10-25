@@ -1,31 +1,30 @@
 import torch
-import copy
-from typing import Union, Sequence, Any, Callable, Optional, Mapping
+from typing import Union, Sequence, Any, Callable, Mapping
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
     TensorPacker, get_method
-from xitorch._utils.tupleops import tuple_axpy1
+from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.integrate.mcsamples.mcmc import mh, mhcustom, dummy1d
 from xitorch._docstr.api_docstr import get_methods_docstr
 
 __all__ = ["mcquad"]
 
 def mcquad(
-        ffcn:Union[Callable[...,torch.Tensor], Callable[...,Sequence[torch.Tensor]]],
-        log_pfcn:Callable[...,torch.Tensor],
-        x0:torch.Tensor,
-        fparams:Sequence[Any]=[],
-        pparams:Sequence[Any]=[],
-        bck_options:Mapping[str,Any]={},
-        method:Union[str, Callable, None]=None,
+        ffcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[torch.Tensor]]],
+        log_pfcn: Callable[..., torch.Tensor],
+        x0: torch.Tensor,
+        fparams: Sequence[Any] = [],
+        pparams: Sequence[Any] = [],
+        bck_options: Mapping[str, Any] = {},
+        method: Union[str, Callable, None] = None,
         **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Performing monte carlo quadrature to calculate the expectation value:
 
     .. math::
-
-       \mathbb{E}_p[f] = \frac{\int f(\mathbf{x},\theta_f) p(\mathbf{x},\theta_p)\ \mathrm{d}\mathbf{x} }{ \int p(\mathbf{x},\theta_p)\ \mathrm{d}\mathbf{x} }
+       \mathbb{E}_p[f] = \frac{\int f(\mathbf{x},\theta_f) p(\mathbf{x},\theta_p)
+       \ \mathrm{d}\mathbf{x} }{ \int p(\mathbf{x},\theta_p)\ \mathrm{d}\mathbf{x} }
 
     Arguments
     ---------
@@ -59,7 +58,7 @@ def mcquad(
     if method is None:
         method = "mh"
     return _mcquad(ffcn, log_pfcn, x0, None, None, fparams, pparams,
-        method, bck_options, **fwd_options)
+                   method, bck_options, **fwd_options)
 
 def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, method,
             bck_options, **fwd_options):
@@ -84,33 +83,34 @@ def _mcquad(ffcn, log_pfcn, x0, xsamples, wsamples, fparams, pparams, method,
 
     if is_tuple_out:
         packer = TensorPacker(out)
+
         @make_sibling(pure_ffcn)
         def pure_ffcn2(x, *fparams):
             y = pure_ffcn(x, *fparams)
             return packer.flatten(y)
         res = _MCQuad.apply(pure_ffcn2, pure_logpfcn, x0, None, None,
-            method, fwd_options, bck_options,
-            nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
+                            method, fwd_options, bck_options,
+                            nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
         return packer.pack(res)
     else:
         return _MCQuad.apply(pure_ffcn, pure_logpfcn, x0, None, None,
-            method, fwd_options, bck_options,
-            nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
+                             method, fwd_options, bck_options,
+                             nfparams, nf_objparams, npparams, *fparams, *fobjparams, *pparams, *pobjparams)
 
 class _MCQuad(torch.autograd.Function):
     @staticmethod
     def forward(ctx, ffcn, log_pfcn, x0, xsamples, wsamples,
-            method, fwd_options, bck_options,
-            nfparams, nf_objparams, npparams, *all_fpparams):
+                method, fwd_options, bck_options,
+                nfparams, nf_objparams, npparams, *all_fpparams):
         # set up the default options
         config = fwd_options
         ctx.bck_config = set_default_option(config, bck_options)
 
         # split the parameters
         fparams    = all_fpparams[:nfparams]
-        fobjparams = all_fpparams[nfparams:nfparams+nf_objparams]
-        pparams    = all_fpparams[nfparams+nf_objparams:nfparams+nf_objparams+npparams]
-        pobjparams = all_fpparams[nfparams+nf_objparams+npparams:]
+        fobjparams = all_fpparams[nfparams:nfparams + nf_objparams]
+        pparams    = all_fpparams[nfparams + nf_objparams:nfparams + nf_objparams + npparams]
+        pobjparams = all_fpparams[nfparams + nf_objparams + npparams:]
 
         # select the method for the sampling
         if xsamples is None:
@@ -150,8 +150,8 @@ class _MCQuad(torch.autograd.Function):
         nftensorparams = ctx.nftensorparams
         nptensorparams = ctx.nptensorparams
         epf = alltensors[0]
-        ftensor_params = alltensors[1:1+nftensorparams]
-        ptensor_params = alltensors[1+nftensorparams:]
+        ftensor_params = alltensors[1:1 + nftensorparams]
+        ptensor_params = alltensors[1 + nftensorparams:]
         fptensor_params = alltensors[1:]
 
         # get the parameters and the object parameters
@@ -203,17 +203,17 @@ class _MCQuad(torch.autograd.Function):
             dLdthetaf = []
             if len(ftensor_params) > 0:
                 dLdthetaf = torch.autograd.grad(fout, ftensor_params,
-                    grad_outputs=grad_epf,
-                    retain_graph=True,
-                    create_graph=local_grad_enabled)
+                                                grad_outputs=grad_epf,
+                                                retain_graph=True,
+                                                create_graph=local_grad_enabled)
             # derivative of pparams
             dLdthetap = []
             if len(ptensor_params) > 0:
                 dLdef = torch.dot((fout - epf).reshape(-1), grad_epf.reshape(-1))
                 dLdthetap = torch.autograd.grad(pout, ptensor_params,
-                    grad_outputs=dLdef.reshape(pout.shape),
-                    retain_graph=True,
-                    create_graph=local_grad_enabled)
+                                                grad_outputs=dLdef.reshape(pout.shape),
+                                                retain_graph=True,
+                                                create_graph=local_grad_enabled)
             # combine the states needed for backward
             outs = (
                 *dLdthetaf,
@@ -227,14 +227,14 @@ class _MCQuad(torch.autograd.Function):
             fptensor_params_copy = fptensor_params
 
         aug_epfs = _mcquad(aug_function, log_pfcn,
-            x0=xsamples[0], # unused because xsamples is set
-            xsamples=xsamples,
-            wsamples=wsamples,
-            fparams=(grad_epf, epf, *fptensor_params_copy),
-            pparams=pparams,
-            method=ctx.method,
-            bck_options=ctx.bck_config,
-            **ctx.bck_config)
+                           x0=xsamples[0],  # unused because xsamples is set
+                           xsamples=xsamples,
+                           wsamples=wsamples,
+                           fparams=(grad_epf, epf, *fptensor_params_copy),
+                           pparams=pparams,
+                           method=ctx.method,
+                           bck_options=ctx.bck_config,
+                           **ctx.bck_config)
         dLdthetaf = aug_epfs[:nftensorparams]
         dLdthetap = aug_epfs[nftensorparams:]
 
@@ -249,9 +249,10 @@ class _MCQuad(torch.autograd.Function):
 def _integrate(ffcn, xsamples, wsamples, fparams):
     nsamples = len(xsamples)
     res = 0.0
-    for x,w in zip(xsamples, wsamples):
+    for x, w in zip(xsamples, wsamples):
         res = res + ffcn(x, *fparams) * w
     return res
+
 
 # docstring completion
 mcquad.__doc__ = get_methods_docstr(mcquad, [mh, mhcustom])

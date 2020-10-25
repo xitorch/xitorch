@@ -17,7 +17,7 @@ def mh(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, step_size=1.0, **unu
     """
     x, dtype, device = _mh_sample(logpfcn, x0, pparams, nburnout, step_size, False)
     samples = _mh_sample(logpfcn, x, pparams, nsamples, step_size, True)
-    weights = torch.zeros((samples.shape[0],), dtype=dtype, device=device) + (1./samples.shape[0])
+    weights = torch.zeros((samples.shape[0],), dtype=dtype, device=device) + (1. / samples.shape[0])
     return samples, weights
 
 def _mh_sample(logpfcn, x0, pparams, nsamples, step_size, collect_samples):
@@ -75,7 +75,7 @@ def mhcustom(logpfcn, x0, pparams, nsamples=10000, nburnout=5000, custom_step=No
 
     x, dtype, device = _mhcustom_sample(logpfcn, x0, pparams, nburnout, custom_step, False)
     xsamples = _mhcustom_sample(logpfcn, x0, pparams, nburnout, custom_step, True)
-    wsamples = torch.zeros((xsamples.shape[0],), dtype=dtype, device=device) + (1./xsamples.shape[0])
+    wsamples = torch.zeros((xsamples.shape[0],), dtype=dtype, device=device) + (1. / xsamples.shape[0])
     return xsamples, wsamples
 
 def _mhcustom_sample(logpfcn, x0, pparams, nsamples, custom_step, collect_samples):
@@ -87,7 +87,7 @@ def _mhcustom_sample(logpfcn, x0, pparams, nsamples, custom_step, collect_sample
         samples = torch.empty((nsamples, *x0.shape), dtype=x.dtype, device=x.device)
         samples[0] = x
 
-    for i in range(1,nsamples):
+    for i in range(1, nsamples):
         x = custom_step(x, *pparams)
         if collect_samples:
             samples[i] = x
@@ -112,7 +112,7 @@ def dummy1d(logpfcn, x0, pparams, nsamples=100, lb=-np.inf, ub=np.inf, **unused)
     tlg = torch.tensor(tlg, dtype=dtype, device=device)
     wlg = torch.tensor(wlg, dtype=dtype, device=device)
     wlg *= 0.5 * (tu - tl)
-    tsamples = tlg * (0.5 * (tu - tl)) + (0.5 * (tu + tl)) # (n, *nx)
+    tsamples = tlg * (0.5 * (tu - tl)) + (0.5 * (tu + tl))  # (n, *nx)
     xsamples = torch.tan(tsamples)
     wt = torch.cos(tsamples)**(-2.)
     wp = torch.empty_like(wt)

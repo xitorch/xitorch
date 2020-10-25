@@ -5,4 +5,12 @@ exclude =
   build,
   dist
 max-line-length = 120
-ignore = E302, E731, W391
+ignore = E302,E731,W391,E221,E266,F841
+per-file-ignores:
+  xitorch/__init__.py: F401, F403
+  xitorch/optimize/__init__.py: F401, F403
+  xitorch/linalg/__init__.py: F401, F403
+  xitorch/interpolate/__init__.py: F401, F403
+  xitorch/integrate/__init__.py: F401, F403
+  xitorch/grad/__init__.py: F401, F403
+  xitorch/debug/__init__.py: F401, F403

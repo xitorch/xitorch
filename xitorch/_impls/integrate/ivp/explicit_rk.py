@@ -41,9 +41,9 @@ def explicit_rk(tableau, fcn, t, y0, params):
     y = y0
     # see https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Explicit_Runge.E2.80.93Kutta_methods
     # for the implementation
-    for i in range(nt-1):
+    for i in range(nt - 1):
         t0 = t[i]
-        t1 = t[i+1]
+        t1 = t[i + 1]
         h = t1 - t0
         ks = []
         ksum = 0.0
@@ -58,25 +58,26 @@ def explicit_rk(tableau, fcn, t, y0, params):
             ks.append(k)
             ksum += b[j] * k
         y = h * ksum + y
-        yt[i+1] = y
+        yt[i + 1] = y
     return yt
+
 
 ############################# list of tableaus #############################
 rk4_tableau = {
     "c": [0.0, 0.5, 0.5, 1.0],
-    "b": [1/6., 1/3., 1/3., 1/6.],
+    "b": [1 / 6., 1 / 3., 1 / 3., 1 / 6.],
     "a": [[0.0, 0.0, 0.0, 0.0],
           [0.5, 0.0, 0.0, 0.0],
           [0.0, 0.5, 0.0, 0.0],
           [0.0, 0.0, 1.0, 0.0]]
 }
 rk38_tableau = {
-    "c": [0.0, 1/3, 2/3, 1.0],
-    "b": [1/8, 3/8, 3/8, 1/8],
-    "a": [[ 0.0, 0.0, 0.0, 0.0],
-          [ 1/3, 0.0, 0.0, 0.0],
-          [-1/3, 1.0, 0.0, 0.0],
-          [ 1.0,-1.0, 1.0, 0.0]]
+    "c": [0.0, 1 / 3, 2 / 3, 1.0],
+    "b": [1 / 8, 3 / 8, 3 / 8, 1 / 8],
+    "a": [[0.0, 0.0, 0.0, 0.0],
+          [1 / 3, 0.0, 0.0, 0.0],
+          [-1 / 3, 1.0, 0.0, 0.0],
+          [1.0, -1.0, 1.0, 0.0]]
 }
 
 ############################# list of methods #############################
@@ -97,15 +98,15 @@ def rk4_ivp(fcn, t, y0, params, **kwargs):
 
     yt[0] = y0
     y = y0
-    for i in range(nt-1):
+    for i in range(nt - 1):
         t0 = t[i]
-        t1 = t[i+1]
+        t1 = t[i + 1]
         h = t1 - t0
         h2 = h * 0.5
         k1 = fcn(t0, y, *params)
         k2 = fcn(t0 + h2, h2 * k1 + y, *params)
         k3 = fcn(t0 + h2, h2 * k2 + y, *params)
-        k4 = fcn(t0 + h , h  * k3 + y, *params)
-        y = h/6. * (k1 + 2*k2 + 2*k3 + k4) + y
-        yt[i+1] = y
+        k4 = fcn(t0 + h, h  * k3 + y, *params)
+        y = h / 6. * (k1 + 2 * k2 + 2 * k3 + k4) + y
+        yt[i + 1] = y
     return yt

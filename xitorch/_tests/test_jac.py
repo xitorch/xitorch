@@ -27,7 +27,7 @@ class func2(EditableModule):
 
     def getparamnames(self, methodname, prefix=""):
         if methodname == "__call__":
-            return [prefix+"b"]
+            return [prefix + "b"]
         else:
             raise KeyError("Params for method %s cannot be found" % methodname)
 
@@ -42,7 +42,7 @@ class hfunc2(EditableModule):
 
     def getparamnames(self, methodname, prefix=""):
         if methodname == "__call__":
-            return [prefix+"b"]
+            return [prefix + "b"]
         else:
             raise KeyError("Params for method %s cannot be found" % methodname)
 
@@ -58,13 +58,13 @@ def getfnscalarparams():
     return (A, b, x)
 
 def getfnparams(na):
-    A = torch.rand((na,na), dtype=dtype, requires_grad=True)
-    b = torch.rand((na,1 ), dtype=dtype, requires_grad=True)
-    x = torch.rand((na,1 ), dtype=dtype, requires_grad=True)
+    A = torch.rand((na, na), dtype=dtype, requires_grad=True)
+    b = torch.rand((na, 1), dtype=dtype, requires_grad=True)
+    x = torch.rand((na, 1), dtype=dtype, requires_grad=True)
     return (A, b, x)
 
 def getnnparams(na):
-    b = torch.rand((na,1), dtype=dtype, requires_grad=True)
+    b = torch.rand((na, 1), dtype=dtype, requires_grad=True)
     return (b,)
 
 def test_jac_func():
@@ -72,7 +72,7 @@ def test_jac_func():
     params = getfnparams(na)
     nnparams = getnnparams(na)
     nparams = len(params)
-    all_idxs = [None, (0,), (1,), (0,1), (0,1,2)]
+    all_idxs = [None, (0,), (1,), (0, 1), (0, 1, 2)]
     funcs = [func1, func2(*nnparams)]
 
     for func in funcs:
@@ -99,7 +99,8 @@ def test_jac_func():
 
             # calculate the mv
             w = [torch.rand_like(p) for p in gradparams]
-            jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[0] for i in range(len(jacs))]
+            jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[
+                0] for i in range(len(jacs))]
             jacs_lmv0 = [jacs[i].mv(w[i].view(-1)) for i in range(len(jacs))]
 
             for i in range(len(jacs)):
@@ -125,7 +126,7 @@ def test_jac_grad():
         fmv = get_pure_function(jacs[i].rmv)
         params0 = v.view(-1)
         params1 = fmv.objparams()
-        params12 = [p1*p2 for p1,p2 in zip(params1, params2)]
+        params12 = [p1 * p2 for p1, p2 in zip(params1, params2)]
         with fmv.useobjparams(params12):
             return fmv(params0)
 
@@ -133,20 +134,20 @@ def test_jac_grad():
         fmv = get_pure_function(jacs[i].mv)
         params0 = w.view(-1)
         params1 = fmv.objparams()
-        params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
+        params12 = [p1 * p2 for (p1, p2) in zip(params1, params2)]
         with fmv.useobjparams(params12):
             return fmv(params0)
 
     v = torch.rand((na,), dtype=dtype, requires_grad=True)
     w = [torch.rand_like(p).requires_grad_() for p in params]
     for i in range(len(jacs)):
-        gradcheck    (fcnr, (i, v, *params))
+        gradcheck(fcnr, (i, v, *params))
         gradgradcheck(fcnr, (i, v, *params))
-        gradcheck    (fcnl, (i, w[i], *params))
+        gradcheck(fcnl, (i, w[i], *params))
         gradgradcheck(fcnl, (i, w[i], *params))
-        gradcheck    (fcnr2, (i, v, *params2))
+        gradcheck(fcnr2, (i, v, *params2))
         gradgradcheck(fcnr2, (i, v, *params2))
-        gradcheck    (fcnl2, (i, w[i], *params2))
+        gradcheck(fcnl2, (i, w[i], *params2))
         gradgradcheck(fcnl2, (i, w[i], *params2))
 
 def test_jac_method_grad():
@@ -172,15 +173,15 @@ def test_jac_method_grad():
     v = torch.rand((na,), dtype=dtype, requires_grad=True)
     w = [torch.rand_like(p).requires_grad_() for p in params]
     for i in range(len(jacs)):
-        gradcheck    (fcnr, (i, v, *nnparams, *params))
+        gradcheck(fcnr, (i, v, *nnparams, *params))
         gradgradcheck(fcnr, (i, v, *nnparams, *params))
-        gradcheck    (fcnl, (i, w[i], *nnparams, *params))
+        gradcheck(fcnl, (i, w[i], *nnparams, *params))
         gradgradcheck(fcnl, (i, w[i], *nnparams, *params))
 
 def test_jac_scalar_func():
     params = getfnscalarparams()
     nparams = len(params)
-    all_idxs = [None, (0,), (1,), (0,1), (0,1,2)]
+    all_idxs = [None, (0,), (1,), (0, 1), (0, 1, 2)]
     func = scalar_func
 
     for idxs in all_idxs:
@@ -206,7 +207,8 @@ def test_jac_scalar_func():
 
         # calculate the mv
         w = [torch.rand_like(p) for p in gradparams]
-        jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[0] for i in range(len(jacs))]
+        jacs_lmv = [torch.autograd.grad(jacs_rmv[i], (v,), grad_outputs=w[i], retain_graph=True)[0]
+                    for i in range(len(jacs))]
         jacs_lmv0 = [jacs[i].mv(w[i].view(-1)) for i in range(len(jacs))]
 
         for i in range(len(jacs)):
@@ -218,7 +220,7 @@ def test_hess_func():
     params = getfnparams(na)
     nnparams = getnnparams(na)
     nparams = len(params)
-    all_idxs = [None, (0,), (1,), (0,1), (0,1,2)]
+    all_idxs = [None, (0,), (1,), (0, 1), (0, 1, 2)]
     funcs = [hfunc1, hfunc2(*nnparams)]
 
     for func in funcs:
@@ -240,8 +242,8 @@ def test_hess_func():
             # assert the values
             dfdy = torch.autograd.grad(y, gradparams, create_graph=True)
             hs_mv_man = [torch.autograd.grad(dfdy[i], (gradparams[i],), grad_outputs=w[i],
-                retain_graph=True)[0] for i in range(len(dfdy))]
-            hs_mv = [hs[i].mv(w[i].reshape(-1,nins[i])) for i in range(len(dfdy))]
+                                             retain_graph=True)[0] for i in range(len(dfdy))]
+            hs_mv = [hs[i].mv(w[i].reshape(-1, nins[i])) for i in range(len(dfdy))]
             for i in range(len(dfdy)):
                 assert torch.allclose(hs_mv[i].view(-1), hs_mv_man[i].view(-1))
 
@@ -259,13 +261,13 @@ def test_hess_grad():
         fmv = get_pure_function(hs[i].mv)
         params0 = v.view(-1)
         params1 = fmv.objparams()
-        params12 = [p1*p2 for (p1,p2) in zip(params1, params2)]
+        params12 = [p1 * p2 for (p1, p2) in zip(params1, params2)]
         with fmv.useobjparams(params12):
             return fmv(params0)
 
     w = [torch.rand_like(p).requires_grad_() for p in params]
     for i in range(len(hs)):
-        gradcheck    (fcnl, (i, w[i], *params))
+        gradcheck(fcnl, (i, w[i], *params))
         gradgradcheck(fcnl, (i, w[i], *params))
-        gradcheck    (fcnl2, (i, w[i], *params2))
+        gradcheck(fcnl2, (i, w[i], *params2))
         gradgradcheck(fcnl2, (i, w[i], *params2))
