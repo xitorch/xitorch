@@ -4,7 +4,7 @@ def normalize_bcast_dims(*shapes):
     The shapes are padded at the front by 1 to make the lengths equal.
     """
     maxlens = max([len(shape) for shape in shapes])
-    res = [[1]*(maxlens - len(shape)) + list(shape) for shape in shapes]
+    res = [[1] * (maxlens - len(shape)) + list(shape) for shape in shapes]
     return res
 
 def get_bcasted_dims(*shapes):

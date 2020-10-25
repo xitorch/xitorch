@@ -1,14 +1,15 @@
 import contextlib
 import torch
-from typing import Mapping, Callable, Union, List, Optional, Dict
+from typing import Mapping, Callable, Union, Dict
 
-def set_default_option(defopt:Dict, opt:Dict) -> Dict:
+def set_default_option(defopt: Dict, opt: Dict) -> Dict:
     defopt.update(opt)
     return defopt
 
-def get_method(algname:str,
-        methods:Mapping[str,Callable],
-        method:Union[str,Callable]) -> Callable:
+def get_method(
+        algname: str,
+        methods: Mapping[str, Callable],
+        method: Union[str, Callable]) -> Callable:
 
     if isinstance(method, str):
         methodname = method.lower()
@@ -44,7 +45,7 @@ class TensorNonTensorSeparator(object):
         self.nontensor_idxs = []
         self.nontensor_params = []
         self.nparams = len(params)
-        for (i,p) in enumerate(params):
+        for (i, p) in enumerate(params):
             if isinstance(p, torch.Tensor) and ((varonly and p.requires_grad) or (not varonly)):
                 self.tensor_idxs.append(i)
                 self.tensor_params.append(p)
@@ -66,16 +67,17 @@ class TensorNonTensorSeparator(object):
         if nontensor_params is None:
             nontensor_params = self.nontensor_params
         if len(tensor_params) + len(nontensor_params) != self.nparams:
-            raise ValueError("The total length of tensor and nontensor params "\
-                "do not match with the expected length: %d instead of %d" % \
-                (len(tensor_params)+len(nontensor_params), self.nparams))
+            raise ValueError(
+                "The total length of tensor and nontensor params "
+                "do not match with the expected length: %d instead of %d" %
+                (len(tensor_params) + len(nontensor_params), self.nparams))
         if self.alltensors:
             return tensor_params
 
         params = [None for _ in range(self.nparams)]
-        for nidx,p in zip(self.nontensor_idxs, nontensor_params):
+        for nidx, p in zip(self.nontensor_idxs, nontensor_params):
             params[nidx] = p
-        for idx,p in zip(self.tensor_idxs, tensor_params):
+        for idx, p in zip(self.tensor_idxs, tensor_params):
             params[idx] = p
         return params
 
@@ -83,7 +85,7 @@ class TensorPacker(object):
     def __init__(self, tensors):
         self.idx_shapes = []
         istart = 0
-        for i,p in enumerate(tensors):
+        for i, p in enumerate(tensors):
             ifinish = istart + torch.numel(p)
             self.idx_shapes.append((istart, ifinish, p.shape))
             istart = ifinish
@@ -93,4 +95,7 @@ class TensorPacker(object):
 
     def pack(self, y):
         yshapem1 = y.shape[:-1]
-        return tuple([y[...,istart:ifinish].reshape((*yshapem1, *shape)) for (istart,ifinish,shape) in self.idx_shapes])
+        return tuple([
+            y[..., istart:ifinish].reshape((*yshapem1, *shape))
+            for (istart, ifinish, shape) in self.idx_shapes
+        ])

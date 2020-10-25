@@ -1,7 +1,7 @@
 import re
 import ast
 
-__all__ = ["get_attr", "set_attr", "del_attr", "has_attr"]
+__all__ = ["get_attr", "set_attr", "del_attr"]
 
 # pattern to split the names, e.g. "model.params[1]" into ["model", "params", "[1]"]
 sp = re.compile(r"\[{0,1}[\"']{0,1}\w+[\"']{0,1}\]{0,1}")
@@ -31,9 +31,10 @@ def _set_attr(obj, names, val):
 def _del_attr(obj, names):
     attrfcn = lambda obj, name: delattr(obj, name)
     dictfcn = lambda obj, key: obj.__delitem__(key)
+
     def listfcn(obj, key):
         obj.__delitem__(key)
-        obj.insert(key, None) # to preserve the length
+        obj.insert(key, None)  # to preserve the length
     return _traverse_attr(obj, names, attrfcn, dictfcn, listfcn)
 
 
