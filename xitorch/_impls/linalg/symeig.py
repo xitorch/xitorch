@@ -100,11 +100,6 @@ def davidson(A: LinearOperator, neig: int,
                        bcast_dims, na, nguess,
                        M=M)  # (*BAM, na, nguess)
 
-    # estimating the lowest eigenvalues
-    eig_est, rms_eig = _estimate_eigvals(A, neig, mode,
-                                         bcast_dims=bcast_dims, na=na, ntest=20,
-                                         dtype=V.dtype, device=V.device)
-
     best_resid: Union[float, torch.Tensor] = float("inf")
     AV = A.mm(V)
     for i in range(max_niter):
@@ -150,23 +145,7 @@ def davidson(A: LinearOperator, neig: int,
         prev_eigvalT = eigvalT
 
         # apply the preconditioner
-        # initial guess of the eigenvalues are actually help really much
-        if not shift_is_eigvalT:
-            z = eig_est  # (*BAM,neig)
-        else:
-            z = eigvalT  # (*BAM,neig)
         t = -resid  # (*BAM, na, neig)
-
-        # set the estimate of the eigenvalues
-        if not shift_is_eigvalT:
-            eigvalT_pred = eigvalT + torch.einsum('...ae,...ae->...e', eigvecA, A.mm(t))  # (*BAM, neig)
-            diff_eigvalT = (eigvalT - eigvalT_pred)  # (*BAM, neig)
-            if diff_eigvalT.abs().max() < rms_eig * 1e-2:
-                shift_is_eigvalT = True
-            else:
-                change_idx = eig_est > eigvalT
-                next_value = eigvalT - 2 * diff_eigvalT
-                eig_est[change_idx] = next_value[change_idx]
 
         # orthogonalize t with the rest of the V
         t = to_fortran_order(t)
@@ -213,23 +192,6 @@ def _set_initial_v(vinit_type: str,
     else:
         V, R = tallqr(V)
     return V
-
-def _estimate_eigvals(A, neig, mode, bcast_dims, na, ntest, dtype, device):
-    # estimate the lowest eigen value
-    x = torch.randn((*bcast_dims, na, ntest), dtype=dtype, device=device)  # (*BAM, na, ntest)
-    x = x / x.norm(dim=-2, keepdim=True)
-    Ax = A.mm(x)  # (*BAM, na, ntest)
-    xTAx = (x * Ax).sum(dim=-2)  # (*BAM, ntest)
-    mean_eig = xTAx.mean(dim=-1)  # (*BAM,)
-    std_f = (xTAx).std(dim=-1)  # (*BAM,)
-    std_x2 = (x * x).std()
-    rms_eig = (std_f / std_x2) / (na**0.5)  # (*BAM,)
-    if mode == "lowest":
-        eig_est = mean_eig - 2 * rms_eig  # (*BAM,)
-    else:  # uppest
-        eig_est = mean_eig + 2 * rms_eig  # (*BAM,)
-    eig_est = eig_est.unsqueeze(-1).repeat_interleave(repeats=neig, dim=-1)  # (*BAM,neig)
-    return eig_est, rms_eig.max()
 
 def _take_eigpairs(eival, eivec, neig, mode):
     # eival: (*BV, na)
