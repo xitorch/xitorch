@@ -71,6 +71,7 @@ class CubicSpline1D(BaseInterp1D):
         * ``"not-a-knot"``: The first and second segments are the same polynomial
         * ``"natural"``: 2nd grad at the boundaries are 0
         * ``"clamped"``: 1st grad at the boundaries are 0
+        * ``"periodic"``: periodic boundary condition (`new in version 0.2`)
 
         If ``None``, it will choose ``"not-a-knot"``
 
