@@ -1,6 +1,7 @@
 import torch
 from typing import Union, Mapping, Any, Optional, Tuple, Callable
-from xitorch import LinearOperator, MatrixLinearOperator
+from xitorch import LinearOperator
+from xitorch._core.linop import MatrixLinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._utils.assertfuncs import assert_runtime
