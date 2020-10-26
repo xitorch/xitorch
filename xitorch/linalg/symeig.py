@@ -1,6 +1,6 @@
 import torch
 from typing import Union, Mapping, Any, Optional, Tuple, Callable
-from xitorch import LinearOperator
+from xitorch import LinearOperator, MatrixLinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._utils.assertfuncs import assert_runtime
@@ -87,8 +87,13 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
     mode = mode.lower()
     if mode == "uppermost":
         mode = "uppest"
-    if method is None:  # TODO: do a proper method selection based on size
-        method = "exacteig"
+    if method is None:
+        if isinstance(A, MatrixLinearOperator) and \
+           (M is None or isinstance(M, MatrixLinearOperator)):
+            method = "exacteig"
+        else:
+            # TODO: implement robust LOBPCG and put it here
+            method = "exacteig"
     if neig is None:
         neig = A.shape[-1]
 
