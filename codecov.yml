@@ -3,3 +3,5 @@ ignore:
   - "**/write_functions.py"
   - "**/generated/*"
   - "benchmarks/*"
+github_checks:
+    annotations: false
