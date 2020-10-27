@@ -394,6 +394,13 @@ class LinearOperator(EditableModule):
             raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (self.shape, b.shape))
         return MatmulLinearOperator(self, b, is_hermitian=is_hermitian)
 
+    def __add__(self, b):
+        if self.shape[-2:] != b.shape[-2:]:
+            raise RuntimeError("Mismatch shape of add operation: %s and %s" % (self.shape, b.shape))
+        if isinstance(self, MatrixLinearOperator) and isinstance(b, MatrixLinearOperator):
+            return LinearOperator.m(self.fullmatrix() + b.fullmatrix())
+        return AddLinearOperator(self, b)
+
     ############# properties ################
     @property
     def dtype(self) -> torch.dtype:
@@ -554,6 +561,36 @@ class MatmulLinearOperator(LinearOperator):
 
     def _rmv(self, x: torch.Tensor) -> torch.Tensor:
         return self.b.rmv(self.a.rmv(x))
+
+    def _getparamnames(self, prefix: str = "") -> List[str]:
+        return self.a._getparamnames(prefix=prefix + "a.") + \
+            self.b._getparamnames(prefix=prefix + "b.")
+
+class AddLinearOperator(LinearOperator):
+    def __init__(self, a: LinearOperator, b: LinearOperator):
+        shape = (*get_bcasted_dims(a.shape[:-2], b.shape[:-2]), a.shape[-2], b.shape[-1])
+        is_hermitian = a.is_hermitian and b.is_hermitian
+        super(AddLinearOperator, self).__init__(
+            shape=shape,
+            is_hermitian=is_hermitian,
+            dtype=a.dtype,
+            device=a.device,
+            _suppress_hermit_warning=True,
+        )
+        self.a = a
+        self.b = b
+
+    def __repr__(self):
+        return "AddLinearOperator with shape %s of:\n * %s\n * %s" % \
+            (_shape2str(self.shape),
+             _indent(self.a.__repr__(), 3),
+             _indent(self.b.__repr__(), 3))
+
+    def _mv(self, x: torch.Tensor) -> torch.Tensor:
+        return self.a._mv(x) + self.b._mv(x)
+
+    def _rmv(self, x: torch.Tensor) -> torch.Tensor:
+        return self.a.rmv(x) + self.b.rmv(x)
 
     def _getparamnames(self, prefix: str = "") -> List[str]:
         return self.a._getparamnames(prefix=prefix + "a.") + \

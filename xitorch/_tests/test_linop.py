@@ -196,6 +196,10 @@ def test_linop_repr():
     drepr = ["MatrixLinearOperator", "(2, 3, 2)"]
     _assert_str_contains(d.__repr__(), drepr)
 
+    e = d + a
+    erepr = ["AddLinearOperator", "(2, 3, 2)"]
+    _assert_str_contains(d.__repr__(), drepr)
+
 def test_linop_mat_hermit_err():
     torch.manual_seed(100)
     mat = torch.rand(3, 3)
@@ -253,6 +257,12 @@ def test_linop_op_err():
     except RuntimeError:
         pass
 
+    try:
+        linop1.H + linop2
+        assert False, errmsg
+    except RuntimeError:
+        pass
+
 def test_check_linop():
     mat1 = torch.rand(3, 4)
     linop1 = LinOp1(mat1)
@@ -271,6 +281,21 @@ def test_check_linop():
             pass
         assert len(w) == 1
         assert "slow down" in str(w[0].message)
+
+def test_linop_add():
+    mat = torch.randn((2, 3, 2))
+    linop1 = LinOp1(mat)
+    linop2 = LinOp2(mat + 1)
+
+    # test using non-matrix linop
+    c = linop1 + linop2
+    assert torch.allclose(c.fullmatrix(), 2 * mat + 1)
+
+    # test using matrix linear operator
+    m1 = LinearOperator.m(mat)
+    m2 = LinearOperator.m(mat + 1)
+    m12 = m1 + m2
+    assert torch.allclose(m12.fullmatrix(), 2 * mat + 1)
 
 def _assert_str_contains(s, slist):
     for c in slist:
