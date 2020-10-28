@@ -664,19 +664,21 @@ def checklinop(linop: LinearOperator) -> None:
             raise RuntimeError(msg)
         msg = "The output shape of .%s is not correct. Input: %s, expected output: %s, output: %s" % \
             (methodname, tuple(x.shape), tuple(yshape), tuple(y.shape))
+        msg += "\n" + str(linop)
         assert list(y.shape) == list(yshape), msg
 
         # linearity test
         x2 = 1.25 * x
         y2 = fcn(x2)
-        assert torch.allclose(y2, 1.25 * y), "Linearity check fails"
+        msg = "Linearity check fails\n%s\n" % str(linop)
+        assert torch.allclose(y2, 1.25 * y), msg
         y0 = fcn(0 * x)
-        assert torch.allclose(y0, y * 0), "Linearity check (with 0) fails"
+        assert torch.allclose(y0, y * 0), "Linearity check (with 0) fails\n" + str(linop)
 
         # batched test
         xnew = torch.cat((x.unsqueeze(0), x2.unsqueeze(0)), dim=0)
         ynew = fcn(xnew)  # (2, ..., q)
-        msg = "Batched test fails (expanding batches changes the results)"
+        msg = "Batched test fails (expanding batches changes the results)" + str(linop)
         assert torch.allclose(ynew[0], y), msg
         assert torch.allclose(ynew[1], y2), msg
 
