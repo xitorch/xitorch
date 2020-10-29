@@ -267,7 +267,7 @@ class symeig_torchfcn(torch.autograd.Function):
             # orthogonalize the grad_evecs with evecs
             B = ortho(grad_evecs, evecs, dim=-2, M=M, mright=False)
             with A.uselinopparams(*ctx.params):
-                gevecs = solve(A, -B, evals, M, fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
+                gevecs = solve(A, -B, evals, M, bck_options=ctx.bck_config, **ctx.bck_config)
             # orthogonalize gevecs w.r.t. evecs
             gevecsA = ortho(gevecs, evecs, dim=-2, M=M, mright=True)
 

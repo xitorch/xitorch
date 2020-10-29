@@ -2,6 +2,7 @@ import torch
 import warnings
 from typing import Union, Any, Mapping, Optional, Callable
 from xitorch import LinearOperator
+from xitorch._core.linop import MatrixLinearOperator
 from xitorch._utils.assertfuncs import assert_runtime
 from xitorch._utils.misc import set_default_option, dummy_context_manager, get_method
 from xitorch._docstr.api_docstr import get_methods_docstr
@@ -93,8 +94,12 @@ def solve(A: LinearOperator, B: torch.Tensor, E: Union[torch.Tensor, None] = Non
             M.check()
 
     if method is None:
-        is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
-        method = "cg" if is_hermit else "bicgstab"
+        if isinstance(A, MatrixLinearOperator) and \
+           (M is None or isinstance(M, MatrixLinearOperator)):
+            method = "exactsolve"
+        else:
+            is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
+            method = "cg" if is_hermit else "bicgstab"
 
     if method == "exactsolve":
         return exactsolve(A, B, E, M)
@@ -165,7 +170,7 @@ class solve_torchfcn(torch.autograd.Function):
         with AT.uselinopparams(*ctx.params), \
              MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
             v = solve(AT, grad_x, ctx.E, MT,
-                      fwd_options=ctx.bck_config, bck_options=ctx.bck_config)  # (*BABEM, nr, ncols)
+                      bck_options=ctx.bck_config, **ctx.bck_config)  # (*BABEM, nr, ncols)
         grad_B = v
 
         # calculate the grad of matrices parameters
