@@ -1,7 +1,7 @@
 Derivatives of :obj:`xitorch.linalg.symeig`
 ===========================================
 
-Author: Muhammad Firmansyah Kasim
+Author: Muhammad Firmansyah Kasim (2020)
 
 Problem
 -------
@@ -12,7 +12,7 @@ The function :obj:`xitorch.linalg.symeig` decomposes a linear operator to its
 .. math::
     \mathbf{AX} = \mathbf{MXE}
 
-where :math:`\mathbf{A}, \mathbf{M}` are :math:`n\times n` linear operators
+where :math:`\mathbf{A}, \mathbf{M}` are symmetric :math:`n\times n` linear operators
 that act as the inputs of the function.
 The outputs: :math:`\mathbf{X}` is an :math:`n\times k` matrix containing the eigenvectors
 on its column, and :math:`\mathbf{E}` is a :math:`k\times k` diagonal matrix
@@ -27,10 +27,10 @@ trivially because the obtained expression will be similar to other parameters.
 
 In this page, we will derive the expression for backward derivative (a.k.a.
 the vector-Jacobian product) of the linear operators parameters:
-:math:`\partial \mathcal{L}/\partial \theta_A` and
-:math:`\partial \mathcal{L}/\partial \theta_M` as functions of
-:math:`\partial \mathcal{L}/\partial \mathbf{X}` and
-:math:`\partial \mathcal{L}/\partial \mathbf{E}` for a loss value
+:math:`\overline{\theta_A} \equiv \partial \mathcal{L}/\partial \theta_A` and
+:math:`\overline{\theta_M} \equiv \partial \mathcal{L}/\partial \theta_M` as functions of
+:math:`\mathbf{\overline{X}} \equiv \partial \mathcal{L}/\partial \mathbf{X}` and
+:math:`\mathbf{\overline{E}} \equiv \partial \mathcal{L}/\partial \mathbf{E}` for a loss value
 :math:`\mathcal{L}`.
 One challenge is that we only have implicit linear operators :math:`\mathbf{A}`
 and :math:`\mathbf{M}` where they are expressed by their matrix-vector
@@ -42,8 +42,8 @@ calculations involving full eigenvectors and eigenvalues cannot be used.
 This derivation assumes the eigenvalues are all unique.
 Cases with degenerate eigenvalues are treated differently.
 
-Forward derivative
-------------------
+Forward derivative of a single eigenpair
+----------------------------------------
 
 Let's start with the eigendecomposition expression for one eigenvector and
 eigenvalue,
@@ -140,12 +140,12 @@ Moving the matrix :math:`(\mathbf{A} - \lambda \mathbf{M})` on the second equati
 of :eq:`eq:two-eqs-two-components` to the right hand side gives us
 
 .. math::
-    \mathbf{x_M'} = -(\mathbf{I} - \mathbf{xxM}^T)(\mathbf{A} - \lambda \mathbf{M})^{+}
+    \mathbf{x_M'} = -(\mathbf{I} - \mathbf{xx}^T\mathbf{M})(\mathbf{A} - \lambda \mathbf{M})^{+}
       (\mathbf{I} - \mathbf{Mxx}^T)(\mathbf{A'} - \lambda \mathbf{M'})\mathbf{x},
     :label: eq:fwdderiv-eivecs-ortho
 
 where the symbol :math:`\mathbf{C}^{+}` indicates the pseudo-inverse of the matrix.
-The additional term :math:`(\mathbf{I} - \mathbf{xxM}^T)` is to make sure
+The additional term :math:`(\mathbf{I} - \mathbf{xx}^T\mathbf{M})` is to make sure
 the result is orthogonal.
 The calculation of the pseudo-inverse can be obtained using standard linear equation
 solver.
@@ -155,5 +155,72 @@ To summarize, the forward derivatives are given by
 .. math::
     \lambda' &= \mathbf{x}^T(\mathbf{A'} - \lambda\mathbf{M'})\mathbf{x}. \\
     \mathbf{x'} &= -\frac{1}{2}\mathbf{xx}^T\mathbf{M'x} -
-      (\mathbf{I} - \mathbf{xxM}^T)(\mathbf{A} - \lambda \mathbf{M})^{+}
+      (\mathbf{I} - \mathbf{xx}^T\mathbf{M})(\mathbf{A} - \lambda \mathbf{M})^{+}
       (\mathbf{I} - \mathbf{Mxx}^T)(\mathbf{A'} - \lambda \mathbf{M'})\mathbf{x}.
+
+Backward derivative
+-------------------
+From the forward derivatives, it is relatively straightforward to get the
+backward derivatives.
+Using the relation
+
+.. math::
+    \mathbf{P'} = \mathbf{QR'S} \implies
+    \mathbf{\overline{R}} = \mathbf{Q}^T\mathbf{\overline{P}}\mathbf{S}^T,
+
+we get
+
+.. math::
+    \mathbf{\overline{A}} &= \mathbf{xx}^T \overline{\lambda} -
+    (\mathbf{I} - \mathbf{xx}^T\mathbf{M})(\mathbf{A} - \lambda \mathbf{M})^{+}
+    (\mathbf{I} - \mathbf{Mxx}^T)\mathbf{\overline{x}} \mathbf{x}^T \\
+    \mathbf{\overline{M}} &= -\mathbf{xx}^T \lambda \overline{\lambda}
+    -\frac{1}{2}\mathbf{xx}^T\mathbf{\overline{x}}\mathbf{x}^T +
+    \lambda (\mathbf{I} - \mathbf{xx}^T\mathbf{M})(\mathbf{A} - \lambda \mathbf{M})^{+}
+    (\mathbf{I} - \mathbf{Mxx}^T)\mathbf{\overline{x}} \mathbf{x}^T.
+
+For cases with multiple eigenpairs, the contributions should be summed from
+all eigenvalues and eigenvectors,
+
+.. math::
+    \mathbf{\overline{A}} &= \mathbf{X\overline{E}X}^T - \mathbf{\overline{Y}X}^T\\
+    \mathbf{\overline{M}} &= \mathbf{XE\overline{E}X}^T -
+        \frac{1}{2}\mathbf{X}(\mathbf{I}\circ\mathbf{X}^T\mathbf{\overline{X}})\mathbf{X}^T +
+        \mathbf{\overline{Y}EX}^T.
+    :label: eq:multi-contrib-bckderiv
+
+where :math:`\circ` indicates element-wise multiplication and
+
+.. math::
+    \mathbf{\overline{Y}} &= \mathbf{\overline{V}} -
+        \mathbf{U}\left(\mathbf{I}\circ\mathbf{U}^T\mathbf{MV}\right) \\
+    \mathbf{\overline{V}} &:
+        \mathrm{solve}\ \mathbf{A\overline{V}} - \mathbf{M\overline{V}E} =
+        \mathbf{\overline{U}} -
+        \mathbf{MU} \left(\mathbf{I}\circ\mathbf{U}^T \mathbf{\overline{U}}\right).
+    :label: eq:y-and-v
+
+Given the gradient of each elements in the linear operator,
+the gradient with respect to the parameters of :math:`\mathbf{A}` and
+:math:`\mathbf{M}` are
+
+.. math::
+    \overline{\theta_A} &= \mathrm{tr}\left(\mathbf{\overline{A}}^T
+        \frac{\partial \mathbf{A}}{\partial \theta_A}\right) \\
+    \overline{\theta_M} &= \mathrm{tr}\left(\mathbf{\overline{M}}^T
+        \frac{\partial \mathbf{M}}{\partial \theta_M}\right)
+
+or more conveniently written as
+
+.. math::
+    \overline{\theta_A} &= \mathrm{tr}\left[(\mathbf{X\overline{E} - \overline{Y}})^T
+        \frac{\partial (\mathbf{AX})}{\partial \theta_A}\right] \\
+    \overline{\theta_M} &= \mathrm{tr}\left[
+        \left(\mathbf{XE\overline{E}} - \frac{1}{2}\mathbf{X}(\mathbf{I}\circ\mathbf{X}^T\mathbf{\overline{X}}) +
+        \mathbf{\overline{Y}E}\right)^T
+        \frac{\partial (\mathbf{MX})}{\partial \theta_M}\right].
+
+In PyTorch, the terms above can be calculated by propagating the gradient from
+:math:`\mathbf{AX}` or :math:`\mathbf{MX}` with initial gradient given on the
+left term, e.g. :math:`(\mathbf{X\overline{E}} - \mathbf{\overline{Y}})` for
+:math:`\overline{\theta_A}`.
