@@ -23,6 +23,7 @@ It is inspired by SciPy, a popular Python library for scientific computing.
    getstart/debugging
    getstart/custom_method
    getstart/contribute
+   notes/index
 
 .. toctree::
    :maxdepth: 1
