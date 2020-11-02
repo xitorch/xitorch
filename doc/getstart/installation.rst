@@ -20,6 +20,6 @@ Or if you want to install from source, type:
 
 .. code-block::
 
-    git clone https://github.com/mfkasim1/xitorch/
+    git clone https://github.com/xitorch/xitorch/
     cd xitorch
     pip install -e .

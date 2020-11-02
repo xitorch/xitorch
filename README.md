@@ -52,7 +52,7 @@ After fulfilling all the requirements, type the commands below to install `xitor
 
 Or if you want to install from source:
 
-    git clone https://github.com/mfkasim1/xitorch/
+    git clone https://github.com/xitorch/xitorch/
     cd xitorch
     python -m pip install -e .
 
