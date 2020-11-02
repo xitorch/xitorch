@@ -1,10 +1,16 @@
 import contextlib
 import torch
-from typing import Mapping, Callable, Union, Dict
+from typing import Mapping, Callable, Union, Dict, List
 
 def set_default_option(defopt: Dict, opt: Dict) -> Dict:
     defopt.update(opt)
     return defopt
+
+def get_and_pop_keys(dct: Dict, keys: List) -> Dict:
+    res = {}
+    for k in keys:
+        res[k] = dct.pop(k)
+    return res
 
 def get_method(
         algname: str,
