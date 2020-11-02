@@ -13,6 +13,14 @@ xitorch provides analytic first and higher order derivatives automatically
 using PyTorch's autograd engine.
 It is inspired by SciPy, a popular Python library for scientific computing.
 
+Example operations available in xitorch:
+
+* :obj:`xitorch.linalg.symeig`: symetric eigendecomposition for large sparse
+  matrix or implicit linear operator,
+* :obj:`xitorch.optimize.rootfinder`: multivariate root finder,
+* :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
+  known as ordinary differential equations (ODE) solver.
+
 .. toctree::
    :maxdepth: 1
    :caption: Getting started
