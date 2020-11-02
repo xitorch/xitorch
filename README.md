@@ -1,8 +1,8 @@
 # `xitorch`: differentiable scientific computing library
 
-![Build](https://img.shields.io/github/workflow/status/mfkasim1/xitorch/Python%20package)
+![Build](https://img.shields.io/github/workflow/status/xitorch/xitorch/Python%20package)
 [![Docs](https://img.shields.io/readthedocs/xitorch)](https://xitorch.readthedocs.io/)
-[![Code coverage](https://img.shields.io/codecov/c/github/mfkasim1/xitorch)](https://codecov.io/gh/mfkasim1/xitorch)
+[![Code coverage](https://img.shields.io/codecov/c/github/xitorch/xitorch)](https://codecov.io/gh/xitorch/xitorch)
 
 `xitorch` is a PyTorch-based library of differentiable functions and functionals that
 can be widely used in scientific computing applications as well as deep learning.
