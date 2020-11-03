@@ -21,6 +21,8 @@ Example operations available in xitorch:
 * :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
   known as ordinary differential equations (ODE) solver.
 
+Source code: https://github.com/xitorch/xitorch/
+
 .. toctree::
    :maxdepth: 1
    :caption: Getting started
