@@ -17,7 +17,7 @@ Example operations available in xitorch:
 
 * :obj:`xitorch.linalg.symeig`: symetric eigendecomposition for large sparse
   matrix or implicit linear operator,
-* :obj:`xitorch.optimize.rootfinder`: multivariate root finder,
+* :obj:`xitorch.optimize.rootfinder`: multivariate root finder, and
 * :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
   known as ordinary differential equations (ODE) solver.
 
