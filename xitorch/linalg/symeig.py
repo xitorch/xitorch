@@ -229,8 +229,8 @@ class symeig_torchfcn(torch.autograd.Function):
         }, bck_options)
 
         # options for calculating the backward (not for `solve`)
-        ctx.bck_alg_config = get_and_pop_keys(ctx.bck_config,
-            ["degen_atol", "degen_rtol"])
+        alg_keys = ["degen_atol", "degen_rtol"]
+        ctx.bck_alg_config = get_and_pop_keys(ctx.bck_config, alg_keys)
 
         method = config.pop("method")
         with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
