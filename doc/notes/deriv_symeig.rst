@@ -193,11 +193,11 @@ where :math:`\circ` indicates element-wise multiplication and
 
 .. math::
     \mathbf{\overline{Y}} &= \mathbf{\overline{V}} -
-        \mathbf{U}\left(\mathbf{I}\circ\mathbf{U}^T\mathbf{M\overline{V}}\right) \\
+        \mathbf{X}\left(\mathbf{I}\circ\mathbf{X}^T\mathbf{M\overline{V}}\right) \\
     \mathbf{\overline{V}} &:
         \mathrm{solve}\ \mathbf{A\overline{V}} - \mathbf{M\overline{V}E} =
-        \mathbf{\overline{U}} -
-        \mathbf{MU} \left(\mathbf{I}\circ\mathbf{U}^T \mathbf{\overline{U}}\right).
+        \mathbf{\overline{X}} -
+        \mathbf{MX} \left(\mathbf{I}\circ\mathbf{X}^T \mathbf{\overline{X}}\right).
     :label: eq:y-and-v
 
 Given the gradient of each elements in the linear operator,
