@@ -5,8 +5,8 @@ from xitorch._core.linop import MatrixLinearOperator
 from xitorch.linalg.solve import solve
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._utils.assertfuncs import assert_runtime
-from xitorch._utils.misc import set_default_option, dummy_context_manager, get_method
-from xitorch._utils.tensor import ortho
+from xitorch._utils.misc import set_default_option, \
+    dummy_context_manager, get_method, get_and_pop_keys
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch._impls.linalg.symeig import exacteig, davidson
 
@@ -59,7 +59,14 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
         If specified, it must be a Hermitian with shape ``(*BM, q, q)``.
     bck_options: dict
         Method-specific options for :func:`solve` which used in backpropagation
-        calculation.
+        calculation with some additional arguments for computing the backward
+        derivatives:
+
+        * ``degen_atol`` (`float`): Minimum absolute difference between two eigenvalues
+          to be treated as degenerate (default: 0.0)
+        * ``degen_rtol`` (`float`): Minimum relative difference between two eigenvalues
+          to be treated as degenerate (default: 0.0)
+
     method: str or callable or None
         Method for the eigendecomposition. If ``None``, it will choose
         ``"exacteig"``.
@@ -217,8 +224,13 @@ class symeig_torchfcn(torch.autograd.Function):
         config = set_default_option({
         }, fwd_options)
         ctx.bck_config = set_default_option({
-            # "method": ???
+            "degen_atol": 0.0,
+            "degen_rtol": 0.0,
         }, bck_options)
+
+        # options for calculating the backward (not for `solve`)
+        ctx.bck_alg_config = get_and_pop_keys(ctx.bck_config,
+            ["degen_atol", "degen_rtol"])
 
         method = config.pop("method")
         with A.uselinopparams(*params), M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
@@ -248,6 +260,17 @@ class symeig_torchfcn(torch.autograd.Function):
         evecs = ctx.evecs
         M = ctx.M
         A = ctx.A
+        degen_atol = ctx.bck_alg_config["degen_atol"]
+        degen_rtol = ctx.bck_alg_config["degen_rtol"]
+
+        # check the degeneracy
+        if degen_atol > 0 or degen_rtol > 0:
+            # idx_degen: (*BAM, neig, neig)
+            idx_degen, isdegenerate = _check_degen(evals, degen_atol, degen_rtol)
+        else:
+            isdegenerate = False
+        if not isdegenerate:
+            idx_degen = None
 
         # the loss function where the gradient will be retrieved
         # warnings: if not all params have the connection to the output of A,
@@ -265,11 +288,14 @@ class symeig_torchfcn(torch.autograd.Function):
         # calculate the contributions from the eigenvectors
         with M.uselinopparams(*ctx.mparams) if M is not None else dummy_context_manager():
             # orthogonalize the grad_evecs with evecs
-            B = ortho(grad_evecs, evecs, dim=-2, M=M, mright=False)
+            B = _ortho(grad_evecs, evecs, D=idx_degen, M=M, mright=False)
+
             with A.uselinopparams(*ctx.params):
-                gevecs = solve(A, -B, evals, M, bck_options=ctx.bck_config, **ctx.bck_config)
+                gevecs = solve(A, -B, evals, M, bck_options=ctx.bck_config,
+                               **ctx.bck_config)  # (*BAM, na, neig)
+
             # orthogonalize gevecs w.r.t. evecs
-            gevecsA = ortho(gevecs, evecs, dim=-2, M=M, mright=True)
+            gevecsA = _ortho(gevecs, evecs, D=None, M=M, mright=True)
 
         # accummulate the gradient contributions
         gaccumA = gevalsA + gevecsA
@@ -302,6 +328,51 @@ class symeig_torchfcn(torch.autograd.Function):
             )
 
         return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
+
+def _check_degen(evals: torch.Tensor, degen_atol: float, degen_rtol: float) -> \
+        Tuple[torch.Tensor, bool]:
+    # evals: (*BAM, neig)
+
+    # get the index of degeneracies
+    neig = evals.shape[-1]
+    evals_diff = torch.abs(evals.unsqueeze(-2) - evals.unsqueeze(-1))  # (*BAM, neig, neig)
+    degen_thrsh = degen_atol + degen_rtol * evals.unsqueeze(-1)
+    idx_degen = (evals_diff < degen_thrsh).to(evals.dtype)
+    isdegenerate = torch.sum(idx_degen) > torch.numel(evals)
+    return idx_degen, isdegenerate
+
+def _ortho(A: torch.Tensor, B: torch.Tensor, *,
+           D: Optional[torch.Tensor] = None,
+           M: Optional[LinearOperator] = None,
+           mright: bool = False) -> torch.Tensor:
+    # orthogonalize every column in A w.r.t. columns in B
+    # D is the degeneracy map, if None, it is identity matrix
+    # M is the overlap matrix (in LinearOperator)
+    # mright indicates whether to operate M at the right or at the left
+
+    # shapes:
+    # A: (*BAM, na, neig)
+    # B: (*BAM, na, neig)
+    Ar = A if (M is None or not mright) else M.mm(A)
+    if D is None:
+        # contracted using opt_einsum
+        str1 = "...rc,...rc->...c"
+        if M is None:
+            return A - torch.einsum(str1, A, B).unsqueeze(-2) * B
+        elif mright:
+            return A - torch.einsum(str1, M.mm(A), B).unsqueeze(-2) * B
+        else:
+            return A - M.mm(torch.einsum(str1, A, B).unsqueeze(-2) * B)
+    else:
+        if M is None:
+            DBTA = D * torch.matmul(B.transpose(-2, -1), A)
+            return A - torch.matmul(B, DBTA)
+        elif mright:
+            DBTA = D * torch.matmul(B.transpose(-2, -1), M.mm(A))
+            return A - torch.matmul(B, DBTA)
+        else:
+            DBTA = D * torch.matmul(B.transpose(-2, -1), A)
+            return A - M.mm(torch.matmul(B, DBTA))
 
 def custom_exacteig(A, neig, mode, M=None, **options):
     return exacteig(A, neig, mode, M)

@@ -31,18 +31,6 @@ def to_fortran_order(V):
     else:
         raise RuntimeError("Only the last two dimensions can be made Fortran order.")
 
-def ortho(A, B, dim=-2, M=None, mright=True):
-    """
-    Orthogonalize each column in matrix A w.r.t. matrix B in M basis.
-    M is a LinearOperator.
-    """
-    if M is None:
-        return A - (A * B).sum(dim=dim, keepdim=True) * B
-    elif mright:
-        return A - (M.mm(A) * B).sum(dim=dim, keepdim=True) * B
-    else:
-        return A - M.mm((A * B).sum(dim=dim, keepdim=True) * B)
-
 def convert_none_grads_to_zeros(grads, inputs):
     is_tuple = isinstance(grads, tuple)
     if is_tuple:

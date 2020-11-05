@@ -169,6 +169,109 @@ def test_symeig_A_large_methods(dtype, device, shape, method, mode):
     xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
     assert torch.allclose(ax, xe)
 
+@device_dtype_float_test(only64=True)
+def test_symeig_A_degenerate(dtype, device):
+    # test if the gradient can be stably propagated if the loss function
+    # does not depend on which degenerate eigenvectors are used
+    # (note: the variable is changed in a certain way so that the degeneracy
+    # is kept)
+
+    torch.manual_seed(126)
+    n = 5
+    neig = 3
+    kwargs = {
+        "dtype": dtype,
+        "device": device,
+    }
+    # random matrix to be orthogonalized for the eigenvectors
+    mat = torch.randn((n, n), **kwargs).requires_grad_()
+
+    # matrix for the loss function
+    P2 = torch.randn((n, n), **kwargs).requires_grad_()
+
+    # the degenerate eigenvalues
+    a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
+    bck_options = {
+        "degen_atol": 1e-10,
+        "method": "exactsolve",
+    }
+
+    def get_loss(a, mat, P2):
+        # get the orthogonal vector for the eigenvectors
+        P, _ = torch.qr(mat)
+
+        # line up the eigenvalues
+        b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
+
+        # construct the matrix
+        diag = torch.diag_embed(b)
+        A = torch.matmul(torch.matmul(P.T, diag), P)
+        Alinop = LinearOperator.m(A)
+
+        eivals, eivecs = symeig(
+            Alinop, neig=neig,
+            method="custom_exacteig",
+            bck_options=bck_options)
+        U = eivecs[:, 1:3]  # the degenerate eigenvectors
+
+        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U)
+        return loss
+
+    gradcheck(get_loss, (a, mat, P2))
+    gradgradcheck(get_loss, (a, mat, P2))
+
+@device_dtype_float_test(only64=True)
+def test_symeig_AM_degenerate(dtype, device):
+    # same as test_symeig_A_degenerate, but now with the overlap matrix
+
+    torch.manual_seed(126)
+    n = 5
+    neig = 3
+    kwargs = {
+        "dtype": dtype,
+        "device": device,
+    }
+    # random matrix to be orthogonalized for the eigenvectors
+    matA = torch.randn((n, n), **kwargs)
+    matM = torch.rand((n, n), **kwargs)
+
+    # matrix for the loss function
+    P2 = torch.randn((n, n), **kwargs).requires_grad_()
+
+    # the degenerate eigenvalues
+    a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
+    bck_options = {
+        "degen_atol": 1e-10,
+        "method": "exactsolve",
+    }
+
+    def get_loss(a, matA, matM, P2):
+        # get the orthogonal vector for the eigenvectors
+        P, _ = torch.qr(matA)
+        PM, _ = torch.qr(matM)
+
+        # line up the eigenvalues
+        b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
+
+        # construct the matrix
+        diag = torch.diag_embed(b)
+        A = torch.matmul(torch.matmul(P.T, diag), P)
+        M = torch.matmul(PM.T, PM)
+        Alinop = LinearOperator.m(A)
+        Mlinop = LinearOperator.m(M)
+
+        eivals, eivecs = symeig(
+            Alinop, M=Mlinop, neig=neig,
+            method="custom_exacteig",
+            bck_options=bck_options)
+        U = eivecs[:, 1:3]  # the degenerate eigenvectors
+
+        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U)
+        return loss
+
+    gradcheck(get_loss, (a, matA, matM, P2))
+    gradgradcheck(get_loss, (a, matA, matM, P2))
+
 ############## svd #############
 @device_dtype_float_test(only64=True, additional_kwargs={
     "shape": [(4, 3), (2, 1, 3, 4)],
