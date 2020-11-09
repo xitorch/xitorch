@@ -192,7 +192,6 @@ def test_symeig_A_degenerate(dtype, device):
     # the degenerate eigenvalues
     a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
     bck_options = {
-        "degen_atol": 1e-10,
         "method": "exactsolve",
     }
 
@@ -241,7 +240,6 @@ def test_symeig_AM_degenerate(dtype, device):
     # the degenerate eigenvalues
     a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
     bck_options = {
-        "degen_atol": 1e-10,
         "method": "exactsolve",
     }
 
@@ -290,7 +288,6 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
     # the degenerate eigenvalues
     a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
     bck_options = {
-        "degen_atol": 1e-10,
         "method": "exactsolve",
     }
 

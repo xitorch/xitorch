@@ -64,10 +64,18 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
         calculation with some additional arguments for computing the backward
         derivatives:
 
-        * ``degen_atol`` (`float`): Minimum absolute difference between two eigenvalues
-          to be treated as degenerate (default: 0.0)
-        * ``degen_rtol`` (`float`): Minimum relative difference between two eigenvalues
-          to be treated as degenerate (default: 0.0)
+        * ``degen_atol`` (``float`` or None): Minimum absolute difference between
+          two eigenvalues to be treated as degenerate. If None, it is
+          ``torch.finfo(dtype).eps**0.6``. If 0.0, no special treatment on
+          degeneracy is applied. (default: None)
+        * ``degen_rtol`` (``float`` or None): Minimum relative difference between
+          two eigenvalues to be treated as degenerate. If None, it is
+          ``torch.finfo(dtype).eps**0.4``. If 0.0, no special treatment on
+          degeneracy is applied. (default: None)
+
+        Note: the default values of ``degen_atol`` and ``degen_rtol`` are going
+        to change in the future. So, for future compatibility, please specify
+        the specific values.
 
     method: str or callable or None
         Method for the eigendecomposition. If ``None``, it will choose
@@ -226,8 +234,8 @@ class symeig_torchfcn(torch.autograd.Function):
         config = set_default_option({
         }, fwd_options)
         ctx.bck_config = set_default_option({
-            "degen_atol": 0.0,
-            "degen_rtol": 0.0,
+            "degen_atol": None,
+            "degen_rtol": None,
         }, bck_options)
 
         # options for calculating the backward (not for `solve`)
@@ -262,8 +270,15 @@ class symeig_torchfcn(torch.autograd.Function):
         evecs = ctx.evecs
         M = ctx.M
         A = ctx.A
-        degen_atol = ctx.bck_alg_config["degen_atol"]
-        degen_rtol = ctx.bck_alg_config["degen_rtol"]
+        degen_atol: Optional[float] = ctx.bck_alg_config["degen_atol"]
+        degen_rtol: Optional[float] = ctx.bck_alg_config["degen_rtol"]
+
+        # set the default values of degen_*tol
+        dtype = evals.dtype
+        if degen_atol is None:
+            degen_atol = torch.finfo(dtype).eps**0.6
+        if degen_rtol is None:
+            degen_rtol = torch.finfo(dtype).eps**0.4
 
         # check the degeneracy
         if degen_atol > 0 or degen_rtol > 0:
