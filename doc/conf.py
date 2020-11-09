@@ -22,9 +22,6 @@ import sys
 import sphinx_rtd_theme
 sys.path.insert(0, os.path.abspath('../xitorch/'))
 
-def setup(app):
-    app.add_stylesheet('css/math.css')
-
 # -- API docs file generators ------------------------------------------------
 import json
 import importlib
@@ -114,6 +111,12 @@ extensions = ['sphinx.ext.autodoc',
 napoleon_include_special_with_doc = True
 napoleon_include_private_with_doc = True
 autodoc_member_order = "bysource"
+
+html_static_path = ['_static']
+html_css_files = [
+    'css/math.css',
+    'css/general.css',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

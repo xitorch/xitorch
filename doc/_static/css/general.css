@@ -1,0 +1,27 @@
+/* inline code or internal link to pyobj */
+.rst-content code {
+    border: 0px;
+    font-size: 85%;
+    padding: 2px 2px;
+}
+.rst-content code.xref {
+    text-decoration: underline;
+}
+.pre {
+    color: #404040;
+}
+
+/* the arguments */
+em.sig-param span.n {
+    font-weight: 600;
+    color: #404040;
+}
+/* the arguments' type */
+em.sig-param span.n:nth-child(3) {
+    font-weight: normal;
+    color: #2980b9;
+}
+/* the arguments' default value */
+em.sig-param span.default_value {
+    font-weight: 600;
+}
