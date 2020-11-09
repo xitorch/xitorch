@@ -41,6 +41,8 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
     where :math:`\mathbf{A}, \mathbf{M}` are linear operators,
     :math:`\mathbf{E}` is a diagonal matrix containing the eigenvalues, and
     :math:`\mathbf{X}` is a matrix containing the eigenvectors.
+    This function can handle derivatives for degenerate cases by setting non-zero
+    ``degen_atol`` and ``degen_rtol`` in the backward option.
 
     Arguments
     ---------
@@ -281,6 +283,22 @@ class symeig_torchfcn(torch.autograd.Function):
             params = [p.clone().requires_grad_() for p in ctx.params]
             with A.uselinopparams(*params):
                 loss = A.mm(evecs)  # (*BAM, na, neig)
+
+        # if degenerate, check the conditions for finite derivative
+        reqsatisfied = True
+        if isdegenerate:
+            xtg = torch.matmul(evecs.transpose(-2, -1), grad_evecs)
+            req1 = idx_degen * (xtg - xtg.transpose(-2, -1))
+            if not torch.all(torch.abs(req1) < degen_atol):
+                reqsatisfied = False
+
+        # if the requirements are not satisfied, return nan
+        if not reqsatisfied:
+            grad_params = [torch.zeros_like(p) + float("nan") for p in ctx.params]
+            grad_mparams = []
+            if ctx.M is not None:
+                grad_mparams = [torch.zeros_like(p) + float("nan") for p in ctx.mparams]
+            return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
 
         # calculate the contributions from the eigenvalues
         gevalsA = grad_evals.unsqueeze(-2) * evecs  # (*BAM, na, neig)

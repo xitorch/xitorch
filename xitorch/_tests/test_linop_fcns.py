@@ -272,6 +272,53 @@ def test_symeig_AM_degenerate(dtype, device):
     gradcheck(get_loss, (a, matA, matM, P2))
     gradgradcheck(get_loss, (a, matA, matM, P2))
 
+
+@device_dtype_float_test(only64=True)
+def test_symeig_A_degenerate_req_not_sat(dtype, device):
+    # test if the degenerate gradient returns nan if the requirments are not satisfied
+
+    torch.manual_seed(126)
+    n = 5
+    neig = 3
+    kwargs = {
+        "dtype": dtype,
+        "device": device,
+    }
+    # random matrix to be orthogonalized for the eigenvectors
+    mat = torch.randn((n, n), **kwargs).requires_grad_()
+
+    # the degenerate eigenvalues
+    a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
+    bck_options = {
+        "degen_atol": 1e-10,
+        "method": "exactsolve",
+    }
+
+    def get_loss(a, mat):
+        # get the orthogonal vector for the eigenvectors
+        P, _ = torch.qr(mat)
+
+        # line up the eigenvalues
+        b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
+
+        # construct the matrix
+        diag = torch.diag_embed(b)
+        A = torch.matmul(torch.matmul(P.T, diag), P)
+        Alinop = LinearOperator.m(A)
+
+        eivals, eivecs = symeig(
+            Alinop, neig=neig,
+            method="custom_exacteig",
+            bck_options=bck_options)
+        U = eivecs[:, :3]  # the degenerate eigenvectors are in 1,2
+        loss = torch.sum(U**4)
+        return loss
+
+    loss = get_loss(a, mat)
+    loss.backward()
+    assert torch.any(torch.isnan(mat.grad))
+    assert torch.any(torch.isnan(a.grad))
+
 ############## svd #############
 @device_dtype_float_test(only64=True, additional_kwargs={
     "shape": [(4, 3), (2, 1, 3, 4)],
