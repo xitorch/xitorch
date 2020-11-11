@@ -3,6 +3,7 @@
     border: 0px;
     font-size: 85%;
     padding: 2px 2px;
+    background-color: #fcfcfc;
 }
 .rst-content code.xref {
     text-decoration: underline;
