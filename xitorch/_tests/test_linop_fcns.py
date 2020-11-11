@@ -351,7 +351,7 @@ def test_svd_A(dtype, device, shape, method):
                 return u_, s_, vh_
 
         gradcheck(svd_fcn, (mat1,))
-        gradgradcheck(svd_fcn, (mat1, True))
+        gradgradcheck(svd_fcn, (mat1,))
 
 ############## solve ##############
 @device_dtype_float_test()
