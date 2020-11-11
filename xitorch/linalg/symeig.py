@@ -42,7 +42,8 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
     :math:`\mathbf{E}` is a diagonal matrix containing the eigenvalues, and
     :math:`\mathbf{X}` is a matrix containing the eigenvectors.
     This function can handle derivatives for degenerate cases by setting non-zero
-    ``degen_atol`` and ``degen_rtol`` in the backward option.
+    ``degen_atol`` and ``degen_rtol`` in the backward option using the expressions
+    in [1]_.
 
     Arguments
     ---------
@@ -89,6 +90,13 @@ def symeig(A: LinearOperator, neig: Optional[int] = None,
         It will return eigenvalues and eigenvectors with shapes respectively
         ``(*BAM, neig)`` and ``(*BAM, na, neig)``, where ``*BAM`` is the
         broadcasted shape of ``*BA`` and ``*BM``.
+
+    References
+    ----------
+    .. [1] Muhammad F. Kasim,
+           "Derivatives of partial eigendecomposition of a real symmetric matrix for degenerate cases".
+           arXiv:2011.04366 (2020)
+           `https://arxiv.org/abs/2011.04366 <https://arxiv.org/abs/2011.04366>`_
     """
     assert_runtime(A.is_hermitian, "The linear operator A must be Hermitian")
     assert_runtime(
@@ -147,6 +155,9 @@ def svd(A: LinearOperator, k: Optional[int] = None,
     where :math:`\mathbf{U}` and :math:`\mathbf{V}` are semi-unitary matrix and
     :math:`\mathbf{\Sigma}` is a diagonal matrix containing real non-negative
     numbers.
+    This function can handle derivatives for degenerate singular values by setting non-zero
+    ``degen_atol`` and ``degen_rtol`` in the backward option using the expressions
+    in [1]_.
 
     Arguments
     ---------
@@ -162,7 +173,22 @@ def svd(A: LinearOperator, k: Optional[int] = None,
         If ``"uppest"``, it will take the uppermost ``k``.
     bck_options: dict
         Method-specific options for :func:`solve` which used in backpropagation
-        calculation.
+        calculation with some additional arguments for computing the backward
+        derivatives:
+
+        * ``degen_atol`` (``float`` or None): Minimum absolute difference between
+          two singular values to be treated as degenerate. If None, it is
+          ``torch.finfo(dtype).eps**0.6``. If 0.0, no special treatment on
+          degeneracy is applied. (default: None)
+        * ``degen_rtol`` (``float`` or None): Minimum relative difference between
+          two singular values to be treated as degenerate. If None, it is
+          ``torch.finfo(dtype).eps**0.4``. If 0.0, no special treatment on
+          degeneracy is applied. (default: None)
+
+        Note: the default values of ``degen_atol`` and ``degen_rtol`` are going
+        to change in the future. So, for future compatibility, please specify
+        the specific values.
+
     method: str or callable or None
         Method for the svd (same options for :func:`symeig`). If ``None``,
         it will choose ``"exacteig"``.
@@ -180,12 +206,12 @@ def svd(A: LinearOperator, k: Optional[int] = None,
     It is a naive implementation of symmetric eigendecomposition of ``A.H @ A``
     or ``A @ A.H`` (depending which one is cheaper)
 
-    Warnings
-    --------
-    * If ``s`` contains very small numbers or degenerate values, the
-      calculation and its gradient might be inaccurate.
-    * The second derivative through U or V might be unstable.
-      Extra care must be taken.
+    References
+    ----------
+    .. [1] Muhammad F. Kasim,
+           "Derivatives of partial eigendecomposition of a real symmetric matrix for degenerate cases".
+           arXiv:2011.04366 (2020)
+           `https://arxiv.org/abs/2011.04366 <https://arxiv.org/abs/2011.04366>`_
     """
     # A: (*BA, m, n)
     # adapted from scipy.sparse.linalg.svds

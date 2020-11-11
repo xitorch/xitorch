@@ -49,7 +49,7 @@ def davidson(A: LinearOperator, neig: int,
              verbose: bool = False,
              **unused) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Using Davidson method for large sparse matrix eigendecomposition [1]_.
+    Using Davidson method for large sparse matrix eigendecomposition [2]_.
 
     Arguments
     ---------
@@ -67,7 +67,7 @@ def davidson(A: LinearOperator, neig: int,
 
     References
     ----------
-    .. [1] P. Arbenz, "Lecture Notes on Solving Large Scale Eigenvalue Problems"
+    .. [2] P. Arbenz, "Lecture Notes on Solving Large Scale Eigenvalue Problems"
            http://people.inf.ethz.ch/arbenz/ewp/Lnotes/chapter12.pdf
     """
     # TODO: optimize for large linear operator and strict min_eps
