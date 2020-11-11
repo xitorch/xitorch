@@ -12,6 +12,11 @@
     color: #404040;
 }
 
+/* code-block */
+.highlight {
+    background: #f7f7f7;
+}
+
 /* the arguments */
 em.sig-param span.n {
     font-weight: 600;
