@@ -395,7 +395,7 @@ def _check_degen(evals: torch.Tensor, degen_atol: float, degen_rtol: float) -> \
     # get the index of degeneracies
     neig = evals.shape[-1]
     evals_diff = torch.abs(evals.unsqueeze(-2) - evals.unsqueeze(-1))  # (*BAM, neig, neig)
-    degen_thrsh = degen_atol + degen_rtol * evals.unsqueeze(-1)
+    degen_thrsh = degen_atol + degen_rtol * torch.abs(evals).unsqueeze(-1)
     idx_degen = (evals_diff < degen_thrsh).to(evals.dtype)
     isdegenerate = torch.sum(idx_degen) > torch.numel(evals)
     return idx_degen, isdegenerate

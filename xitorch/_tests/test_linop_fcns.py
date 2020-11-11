@@ -169,8 +169,10 @@ def test_symeig_A_large_methods(dtype, device, shape, method, mode):
     xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
     assert torch.allclose(ax, xe)
 
-@device_dtype_float_test(only64=True)
-def test_symeig_A_degenerate(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "eivaloffset": [0, -4]
+})
+def test_symeig_A_degenerate(dtype, device, eivaloffset):
     # test if the gradient can be stably propagated if the loss function
     # does not depend on which degenerate eigenvectors are used
     # (note: the variable is changed in a certain way so that the degeneracy
@@ -190,7 +192,7 @@ def test_symeig_A_degenerate(dtype, device):
     P2 = torch.randn((n, n), **kwargs).requires_grad_()
 
     # the degenerate eigenvalues
-    a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
+    a = (torch.tensor([1.0, 2.0, 3.0], **kwargs) + eivaloffset).requires_grad_()
     bck_options = {
         "method": "exactsolve",
     }
