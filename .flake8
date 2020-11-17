@@ -5,7 +5,7 @@ exclude =
   build,
   dist
 max-line-length = 120
-ignore = E302,E731,W391,E221,E266,F841
+ignore = E302,E731,W391,E221,E266,F841,E305
 per-file-ignores:
   xitorch/__init__.py: F401, F403
   xitorch/optimize/__init__.py: F401, F403
