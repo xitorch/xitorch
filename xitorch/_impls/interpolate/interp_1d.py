@@ -258,7 +258,7 @@ CubicSpline1D.__doc__ = """
 """
 
 LinearInterp1D.__doc__ = """
-    Perform 1D linear interpolation for non-uniform ``x`` [1]_ [2]_.
+    Perform 1D linear interpolation for non-uniform ``x``.
 
     Keyword arguments
     -----------------""" + extrap_docstr + """
