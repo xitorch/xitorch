@@ -60,49 +60,6 @@ class BaseInterp1D(BaseInterp):
         pass
 
 class CubicSpline1D(BaseInterp1D):
-    """
-    Perform 1D cubic spline interpolation for non-uniform ``x`` [1]_ [2]_.
-
-    Keyword arguments
-    -----------------
-    bc_type: str or None
-        Boundary condition:
-
-        * ``"not-a-knot"``: The first and second segments are the same polynomial
-        * ``"natural"``: 2nd grad at the boundaries are 0
-        * ``"clamped"``: 1st grad at the boundaries are 0
-        * ``"periodic"``: periodic boundary condition (`new in version 0.2`)
-
-        If ``None``, it will choose ``"not-a-knot"``
-
-    extrap: int, float, 1-element torch.Tensor, str, or None
-        Extrapolation option:
-
-        * ``int``, ``float``, or 1-element ``torch.Tensor``: it will pad the extrapolated
-          values with the specified values
-        * ``"mirror"``: the extrapolation values are mirrored
-        * ``"periodic"``: periodic boundary condition. ``y[...,0] == y[...,-1]`` must
-          be fulfilled for this condition.
-        * ``"bound"``: fill in the extrapolated values with the left or right bound
-          values.
-        * ``"nan"``: fill the extrapolated values with nan
-        * callable: apply this extrapolation function with the extrapolated
-          positions and use the output as the values
-        * ``None``: choose the extrapolation based on the ``bc_type``. These are the
-          pairs:
-
-          * ``"clamped"``: ``"mirror"``
-          * other: ``"nan"``
-
-        Default: ``None``
-
-    References
-    ----------
-    .. [1] SplineInterpolation on Wikipedia,
-           https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline)
-    .. [2] Carl de Boor, "A Practical Guide to Splines", Springer-Verlag, 1978.
-    """
-
     def __init__(self, x, y=None, bc_type=None, extrap=None, **unused):
         # x: (nr,)
         # y: (*BY, nr)
@@ -205,6 +162,107 @@ class CubicSpline1D(BaseInterp1D):
         else:
             res = ["spline_mat_inv", "x"]
         return res
+
+class LinearInterp1D(BaseInterp1D):
+    def __init__(self, x, y=None, extrap=None, **unused):
+        super(LinearInterp1D, self).__init__(x, y, extrap=extrap)
+        self.x = x
+        if x.ndim != 1:
+            raise RuntimeError("The input x must be a 1D tensor")
+        self.y_is_given = y is not None
+        self.y = y
+
+    def _interp(self, xq, y):
+        if self.y_is_given:
+            y = self.y
+
+        x = self.x
+
+        nr = x.shape[-1]
+        idxr = torch.searchsorted(x.detach(), xq.detach(), right=False)  # (nrq)
+        idxr = torch.clamp(idxr, 1, nr - 1)
+        idxl = idxr - 1  # (nrq) from (0 to nr-2)
+
+        if torch.numel(xq) > torch.numel(x):
+            yl = y[..., :-1]  # (*BY, nr-1)
+            xl = x[..., :-1]  # (nr-1)
+            dy = y[..., 1:] - yl  # (*BY, nr-1)
+            dx = x[..., 1:] - xl  # (nr-1)
+            t = (xq - torch.gather(xl, -1, idxl)) / torch.gather(dx, -1, idxl)  # (nrq)
+            yq = dy[..., idxl] * t
+            yq += yl[..., idxl]
+            return yq
+        else:
+            xl = torch.gather(x, -1, idxl)
+            xr = torch.gather(x, -1, idxr)
+            yl = y[..., idxl].contiguous()
+            yr = y[..., idxr].contiguous()
+
+            dxrl = xr - xl  # (nrq,)
+            dyrl = yr - yl  # (nbatch, nrq)
+            t = (xq - xl) / dxrl  # (nrq,)
+            yq = yl + dyrl * t
+            return yq
+
+    def getparamnames(self):
+        if self.y_is_given:
+            res = ["x", "y"]
+        else:
+            res = ["x"]
+        return res
+
+##### docstrings #####
+extrap_docstr = """
+    extrap: int, float, 1-element torch.Tensor, str, or None
+        Extrapolation option:
+
+        * ``int``, ``float``, or 1-element ``torch.Tensor``: it will pad the extrapolated
+          values with the specified values
+        * ``"mirror"``: the extrapolation values are mirrored
+        * ``"periodic"``: periodic boundary condition. ``y[...,0] == y[...,-1]`` must
+          be fulfilled for this condition.
+        * ``"bound"``: fill in the extrapolated values with the left or right bound
+          values.
+        * ``"nan"``: fill the extrapolated values with nan
+        * callable: apply this extrapolation function with the extrapolated
+          positions and use the output as the values
+        * ``None``: choose the extrapolation based on the ``bc_type``. These are the
+          pairs:
+
+          * ``"clamped"``: ``"mirror"``
+          * other: ``"nan"``
+
+        Default: ``None``"""
+
+CubicSpline1D.__doc__ = """
+    Perform 1D cubic spline interpolation for non-uniform ``x`` [1]_ [2]_.
+
+    Keyword arguments
+    -----------------
+    bc_type: str or None
+        Boundary condition:
+
+        * ``"not-a-knot"``: The first and second segments are the same polynomial
+        * ``"natural"``: 2nd grad at the boundaries are 0
+        * ``"clamped"``: 1st grad at the boundaries are 0
+        * ``"periodic"``: periodic boundary condition (`new in version 0.2`)
+
+        If ``None``, it will choose ``"not-a-knot"``
+    """ + extrap_docstr + """
+
+    References
+    ----------
+    .. [1] SplineInterpolation on Wikipedia,
+           https://en.wikipedia.org/wiki/Spline_interpolation#Algorithm_to_find_the_interpolating_cubic_spline)
+    .. [2] Carl de Boor, "A Practical Guide to Splines", Springer-Verlag, 1978.
+"""
+
+LinearInterp1D.__doc__ = """
+    Perform 1D linear interpolation for non-uniform ``x`` [1]_ [2]_.
+
+    Keyword arguments
+    -----------------""" + extrap_docstr + """
+"""
 
 def check_and_get_extrap(extrap, bc_type):
     if extrap is None:

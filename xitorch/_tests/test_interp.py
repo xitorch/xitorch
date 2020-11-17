@@ -138,22 +138,97 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
     gradgradcheck(interp, (x, y2, xq1))
     gradgradcheck(interp, (x, y2, xq2))
 
-@device_dtype_float_test(only64=True)
-def test_interp1_editable_module(dtype, device):
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "scramble": [False, True]
+})
+def test_interp1_linear(dtype, device, scramble):
+    dtype_device_kwargs = {"dtype": dtype, "device": device}
+    x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
+    y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
+    y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
+                       [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
+
+    # points are well inside to avoid extrapolation in numerical gradient calculations
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
+
+    if scramble:
+        idx1 = torch.randperm(len(xq1))
+        idx2 = torch.randperm(len(xq2))
+        xq1 = xq1[..., idx1]
+        xq2 = xq2[..., idx2]
+    xq1 = xq1.requires_grad_()
+    xq2 = xq2.requires_grad_()
+
+    # # true results (obtained from scipy.interpolate.interp1d)
+    # from scipy.interpolate import interp1d
+    # print("yq11:", interp1d(x.detach(), y1.detach())(xq1.detach()))
+    # print("yq12:", interp1d(x.detach(), y1.detach())(xq2.detach()))
+    # print("yq21:", interp1d(x.detach(), y2[1].detach())(xq1.detach()))
+    # print("yq22:", interp1d(x.detach(), y2[1].detach())(xq2.detach()))
+
+    yq11_true = torch.tensor([1.125, 1.375, 1.8, 1.85, 1.35, 1.3, 1.7, 2.1, 2.35, 2.45],
+                             **dtype_device_kwargs)
+    yq12_true = torch.tensor([1.125, 1.85, 1.7, 2.45], **dtype_device_kwargs)
+    yq21_true = torch.tensor([[1.125, 1.375, 1.8, 1.85, 1.35, 1.3, 1.7, 2.1, 2.35, 2.45],
+                              [0.9, 1.1, 1.7, 1.75, 0.85, 0.86666667, 1.8, 2.73333333, 2.7, 1.7]],
+                             **dtype_device_kwargs)
+    yq22_true = torch.tensor([[1.125, 1.85, 1.7, 2.45],
+                              [0.9, 1.75, 1.8, 1.7]],
+                             **dtype_device_kwargs)
+
+    if scramble:
+        yq11_true = yq11_true[..., idx1]
+        yq12_true = yq12_true[..., idx2]
+        yq21_true = yq21_true[..., idx1]
+        yq22_true = yq22_true[..., idx2]
+
+    def interp(x, y, xq):
+        return Interp1D(x, y, method="linear")(xq)
+
+    yq11 = interp(x, y1, xq1)
+    yq12 = interp(x, y1, xq2)
+    yq21 = interp(x, y2, xq1)
+    yq22 = interp(x, y2, xq2)
+    # import matplotlib.pyplot as plt
+    # from scipy.interpolate import interp1d
+    # xx = torch.linspace(0, 1, 1000, **dtype_device_kwargs)
+    # xx2 = torch.linspace(-1, 2, 1000, **dtype_device_kwargs)
+    # plt.plot(xx2, interp(x, y1, xx2).detach().numpy())
+    # plt.plot(xx, interp1d(x.detach(), y1.detach())(xx.detach()))
+    # plt.plot(x.detach(), y1.detach(), 'x')
+    # plt.show()
+    assert torch.allclose(yq11, yq11_true)
+    assert torch.allclose(yq12, yq12_true)
+    assert torch.allclose(yq21, yq21_true)
+    assert torch.allclose(yq22, yq22_true)
+
+    gradcheck(interp, (x, y1, xq1))
+    gradcheck(interp, (x, y1, xq2))
+    gradcheck(interp, (x, y2, xq1))
+    gradcheck(interp, (x, y2, xq2))
+
+    gradgradcheck(interp, (x, y1, xq1))
+    gradgradcheck(interp, (x, y1, xq2))
+    gradgradcheck(interp, (x, y2, xq1))
+    gradgradcheck(interp, (x, y2, xq2))
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "method": ["cspline", "linear"]
+})
+def test_interp1_editable_module(dtype, device, method):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
     x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
     y = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
                       [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
     xq = torch.linspace(0, 1, 10, **dtype_device_kwargs).requires_grad_()
 
-    methods = ["cspline"]
-    for method in methods:
-        cls1 = Interp1D(x, y, method=method)
-        cls2 = Interp1D(x, method=method)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            cls1.assertparams(cls1.__call__, xq)
-            cls2.assertparams(cls2.__call__, xq, y)
+    cls1 = Interp1D(x, y, method=method)
+    cls2 = Interp1D(x, method=method)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        cls1.assertparams(cls1.__call__, xq)
+        cls2.assertparams(cls2.__call__, xq, y)
 
 @device_dtype_float_test(only64=True)
 def test_extrap(dtype, device):

@@ -1,7 +1,7 @@
 from typing import Optional, List, Union, Callable
 import torch
 from xitorch._core.editable_module import EditableModule
-from xitorch._impls.interpolate.interp_1d import CubicSpline1D
+from xitorch._impls.interpolate.interp_1d import CubicSpline1D, LinearInterp1D
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch._utils.misc import get_method
 
@@ -34,6 +34,7 @@ class Interp1D(EditableModule):
             method = "cspline"
         methods = {
             "cspline": CubicSpline1D,
+            "linear": LinearInterp1D,
         }
         method_cls = get_method("Interp1D", methods, method)
         self.obj = method_cls(x, y, **fwd_options)
@@ -65,5 +66,6 @@ class Interp1D(EditableModule):
 # docstring completion
 interp1d_methods = {
     "cspline": CubicSpline1D,
+    "linear": LinearInterp1D,
 }
 Interp1D.__doc__ = get_methods_docstr(Interp1D, interp1d_methods)
