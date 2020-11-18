@@ -3,5 +3,6 @@ ignore:
   - "**/write_functions.py"
   - "**/generated/*"
   - "benchmarks/*"
+  - "xitorch/debug/__main__.py"
 github_checks:
     annotations: false
