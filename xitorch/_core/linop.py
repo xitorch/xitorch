@@ -24,22 +24,25 @@ class LinearOperator(EditableModule):
     method implemented and ``._getparamnames()`` if used in xitorch's
     functionals with torch grad enabled.
     """
-    _is_mv_implemented = None
-    _is_mm_implemented = None
-    _is_rmv_implemented = None
-    _is_rmm_implemented = None
-    _is_fullmatrix_implemented = None
-    _is_gpn_implemented = None
+    _implementation_checked    = False
+    _is_mv_implemented         = False
+    _is_mm_implemented         = False
+    _is_rmv_implemented        = False
+    _is_rmm_implemented        = False
+    _is_fullmatrix_implemented = False
+    _is_gpn_implemented        = False
 
     def __new__(cls, *args, **kwargs):
         # check the implemented functions in the class
-        if cls._is_mv_implemented is None:
+        if not cls._implementation_checked:
             cls._is_mv_implemented = cls.__check_if_implemented("_mv")
             cls._is_mm_implemented = cls.__check_if_implemented("_mm")
             cls._is_rmv_implemented = cls.__check_if_implemented("_rmv")
             cls._is_rmm_implemented = cls.__check_if_implemented("_rmm")
             cls._is_fullmatrix_implemented = cls.__check_if_implemented("_fullmatrix")
             cls._is_gpn_implemented = cls.__check_if_implemented("_getparamnames")
+
+            cls._implementation_checked = True
 
             if not cls._is_mv_implemented:
                 raise RuntimeError("LinearOperator must have at least _mv(self) "
