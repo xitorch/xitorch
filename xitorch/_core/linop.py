@@ -24,6 +24,34 @@ class LinearOperator(EditableModule):
     method implemented and ``._getparamnames()`` if used in xitorch's
     functionals with torch grad enabled.
     """
+    _is_mv_implemented = None
+    _is_mm_implemented = None
+    _is_rmv_implemented = None
+    _is_rmm_implemented = None
+    _is_fullmatrix_implemented = None
+    _is_gpn_implemented = None
+
+    def __new__(cls, *args, **kwargs):
+        # check the implemented functions in the class
+        if cls._is_mv_implemented is None:
+            cls._is_mv_implemented = cls.__check_if_implemented("_mv")
+            cls._is_mm_implemented = cls.__check_if_implemented("_mm")
+            cls._is_rmv_implemented = cls.__check_if_implemented("_rmv")
+            cls._is_rmm_implemented = cls.__check_if_implemented("_rmm")
+            cls._is_fullmatrix_implemented = cls.__check_if_implemented("_fullmatrix")
+            cls._is_gpn_implemented = cls.__check_if_implemented("_getparamnames")
+
+            if not cls._is_mv_implemented:
+                raise RuntimeError("LinearOperator must have at least _mv(self) "
+                                   "method implemented")
+        return super(LinearOperator, cls).__new__(cls)
+
+    @classmethod
+    def __check_if_implemented(cls, methodname: str) -> bool:
+        this_method = getattr(cls, methodname)
+        base_method = getattr(LinearOperator, methodname)
+        return this_method is not base_method
+
     @classmethod
     def m(cls, mat: torch.Tensor, is_hermitian: Optional[bool] = None):
         """
@@ -92,14 +120,6 @@ class LinearOperator(EditableModule):
             raise RuntimeError("The object is indicated as Hermitian, but the shape is not square")
 
         # check which methods are implemented
-        self._is_mm_implemented = self.__check_if_implemented("_mm")
-        self._is_rmv_implemented = self.__check_if_implemented("_rmv")
-        self._is_rmm_implemented = self.__check_if_implemented("_rmm")
-        self._is_fullmatrix_implemented = self.__check_if_implemented("_fullmatrix")
-        self._is_gpn_implemented = self.__check_if_implemented("_getparamnames")
-        if not self.__check_if_implemented("_mv"):
-            raise RuntimeError("LinearOperator must have at least _mv(self) "
-                               "method implemented")
         if not _suppress_hermit_warning and self._is_hermitian and \
            (self._is_rmv_implemented or self._is_rmm_implemented):
             warnings.warn("The LinearOperator is Hermitian with implemented "
@@ -497,10 +517,10 @@ class LinearOperator(EditableModule):
                                   create_graph=torch.is_grad_enabled())[0]  # (*BAY, q)
         return res
 
-    def __check_if_implemented(self, methodname: str) -> bool:
-        this_method = getattr(self, methodname).__func__
-        base_method = getattr(LinearOperator, methodname)
-        return this_method is not base_method
+    # def __check_if_implemented(self, methodname: str) -> bool:
+    #     this_method = getattr(self, methodname).__func__
+    #     base_method = getattr(LinearOperator, methodname)
+    #     return this_method is not base_method
 
     def __assert_if_init_executed(self):
         if not hasattr(self, "_shape"):
