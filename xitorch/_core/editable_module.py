@@ -217,14 +217,23 @@ class EditableModule(object):
         # now assert if all_params0 == all_params1
         clsname = method.__self__.__class__.__name__
         methodname = method.__name__
-        msg = "The method %s.%s does not preserve the object's float tensors" % (clsname, methodname)
+        msg = "The method %s.%s does not preserve the object's float tensors: \n" % (clsname, methodname)
         if len(all_params0) != len(all_params1):
+            msg += "The number of parameters changed:\n"
+            msg += "* number of object's parameters before: %d\n" % len(all_params0)
+            msg += "* number of object's parameters after : %d\n" % len(all_params1)
             raise GetSetParamsError(msg)
 
-        for p0, p1 in zip(all_params0, all_params1):
+        for pname, p0, p1 in zip(names0, all_params0, all_params1):
             if p0.shape != p1.shape:
+                msg += "The shape of %s changed\n" % pname
+                msg += "* (before) %s.shape: %s\n" % (pname, p0.shape)
+                msg += "* (after ) %s.shape: %s\n" % (pname, p1.shape)
                 raise GetSetParamsError(msg)
             if not torch.allclose(p0, p1):
+                msg += "The value of %s changed\n" % pname
+                msg += "* (before) %s: %s\n" % (pname, p0)
+                msg += "* (after ) %s: %s\n" % (pname, p1)
                 raise GetSetParamsError(msg)
 
     def __assert_get_correct_params(self, method, *args, **kwargs):
