@@ -72,6 +72,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
         rtol: float = 1e-6,
         atol: float = 1e-8,
         eps: float = 1e-12,
+        verbose: bool = False,
         **unused) -> torch.Tensor:
     r"""
     Solve the linear equations using Conjugate-Gradient (CG) method.
@@ -94,6 +95,8 @@ def cg(A: LinearOperator, B: torch.Tensor,
     eps: float
         Substitute the absolute zero in the algorithm's denominator with this
         value to avoid nan.
+    verbose: bool
+        Verbosity of the algorithm.
     """
     nr = A.shape[-1]
     ncols = B.shape[-1]
@@ -140,6 +143,10 @@ def cg(A: LinearOperator, B: torch.Tensor,
         # check for the stopping condition
         resid = rk_1  # B2 - A_fcn(xk_1)
         resid_norm = resid.norm(dim=-2, keepdim=True)
+        if verbose:
+            if k < 10 or k % 10 == 0:
+                print("%4d: |dy|=%.3e" % (k, resid_norm))
+
         if torch.all(resid_norm < stop_matrix):
             converge = True
             break
@@ -174,6 +181,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
              rtol: float = 1e-6,
              atol: float = 1e-8,
              eps: float = 1e-12,
+             verbose: bool = False,
              **unused) -> torch.Tensor:
     r"""
     Solve the linear equations using stabilized Biconjugate-Gradient method.
@@ -199,6 +207,8 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     eps: float
         Substitute the absolute zero in the algorithm's denominator with this
         value to avoid nan.
+    verbose: bool
+        Verbosity of the algorithm.
     """
     nr, ncols = B.shape[-2:]
     if max_niter is None:
@@ -260,6 +270,10 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
         # check for the stopping conditions
         resid = rk
         resid_norm = resid.norm(dim=-2, keepdim=True)
+        if verbose:
+            if k < 10 or k % 10 == 0:
+                print("%4d: |dy|=%.3e" % (k, resid_norm))
+
         if torch.all(resid_norm < stop_matrix):
             converge = True
             break
