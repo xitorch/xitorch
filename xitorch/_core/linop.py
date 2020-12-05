@@ -130,10 +130,6 @@ class LinearOperator(EditableModule):
                           "instead",
                           stacklevel=2)
 
-        # caches
-        self._matrix_defined = False
-        self._matrix = torch.tensor([])
-
     def __repr__(self) -> str:
         return "LinearOperator (%s) with shape %s, dtype = %s, device = %s" % \
             (self.__class__.__name__, _shape2str(self.shape), self.dtype, self.device)
@@ -348,16 +344,13 @@ class LinearOperator(EditableModule):
             return y
 
     def fullmatrix(self) -> torch.Tensor:
-        if not self._matrix_defined:
-            if self._is_fullmatrix_implemented:
-                self._matrix = self._fullmatrix()
-            else:
-                self.__assert_if_init_executed()
-                nq = self._shape[-1]
-                V = torch.eye(nq, dtype=self._dtype, device=self._device)  # (nq,nq)
-                self._matrix = self.mm(V)  # (B1,B2,...,Bb,np,nq)
-            self._matrix_defined = True
-        return self._matrix
+        if self._is_fullmatrix_implemented:
+            return self._fullmatrix()
+        else:
+            self.__assert_if_init_executed()
+            nq = self._shape[-1]
+            V = torch.eye(nq, dtype=self._dtype, device=self._device)  # (nq,nq)
+            return self.mm(V)  # (B1,B2,...,Bb,np,nq)
 
     def scipy_linalg_op(self):
         to_tensor = lambda x: torch.tensor(x, dtype=self.dtype, device=self.device)
@@ -374,10 +367,8 @@ class LinearOperator(EditableModule):
         # just to remove the docstring from EditableModule because user
         # does not need to know about this function
 
-        if methodname in ["mv", "rmv", "mm", "rmm"]:
+        if methodname in ["mv", "rmv", "mm", "rmm", "fullmatrix"]:
             return self._getparamnames(prefix=prefix)
-        elif methodname == "fullmatrix":
-            return [prefix + "_matrix"]
         else:
             raise KeyError("getparamnames for method %s is not implemented" % methodname)
 

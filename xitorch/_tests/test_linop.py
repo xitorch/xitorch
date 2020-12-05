@@ -1,7 +1,7 @@
 import warnings
 import torch
-from xitorch import LinearOperator
-from xitorch.linalg import solve
+from xitorch import LinearOperator, EditableModule
+from xitorch.linalg import solve, symeig
 
 class LinOpWithoutGetParamNames(LinearOperator):
     def __init__(self, mat, is_hermitian=False):
@@ -300,3 +300,47 @@ def test_linop_add():
 def _assert_str_contains(s, slist):
     for c in slist:
         assert c in s
+
+############# special case tests #############
+
+# #1 case: various cases uses linop in editable module
+class ClassWithLinop(EditableModule):
+    def __init__(self):
+        mat = torch.randn(3, 3)
+        mat = (mat + mat.transpose(-2, -1)) * 0.5
+        # using LinOp1 instead of LinearOperator.m to detach .fullmatrix()
+        # output with mat
+        self.linop = LinOp1(mat, is_hermitian=True)
+
+    def symeig1(self, method):
+        return symeig(self.linop, method=method)[1]
+
+    def getparamnames(self, methodname, prefix=""):
+        if methodname == "symeig1":
+            return self.linop._getparamnames(prefix=prefix + "linop.")
+        else:
+            raise KeyError()
+
+def test_assertparams_if_fullmatrix_is_called_1():
+    a = ClassWithLinop()
+    # if fullmatrix stores cache, then assertparams will fail because the
+    # method a.symeig1 changes the object's states
+    a.assertparams(a.symeig1, "exacteig")
+
+def test_assertparams_if_fullmatrix_is_called_2():
+    # This test is involving the linear algebra method that requires the
+    # fullmatrix.
+    # If ClassWithLinop.symeig2 is called, the method depends on the full matrix
+    # of the linop, so if fullmatrix() cache is stored, then it does
+    # not directly depend on parameters of linop (but related to the
+    # fullmatrix of linop), which makes assertparams raises warnings
+
+    a = ClassWithLinop()
+
+    # calling symeig1 first
+    a.symeig1(method="exacteig")
+    # doing assert params to make sure there is no cache is stored in
+    # fullmatrix (in the old version, this failed)
+    with warnings.catch_warnings(record=True) as w:
+        a.assertparams(a.symeig1, "exacteig")
+        assert len(w) == 0
