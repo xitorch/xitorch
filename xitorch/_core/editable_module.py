@@ -307,7 +307,10 @@ class EditableModule(object):
         _set_tensors(self, copy_tensors)
 
         # run the method and see which one has the gradients
-        output = method(*args, **kwargs).sum()
+        output = method(*args, **kwargs)
+        if not isinstance(output, torch.Tensor):
+            raise RuntimeError("The method to be asserted must have a tensor output")
+        output = output.sum()
         grad_tensors = torch.autograd.grad(output, copy_tensors0, retain_graph=True, allow_unused=True)
 
         # return the original tensor
