@@ -452,7 +452,13 @@ def _setup_linear_problem(A: LinearOperator, B: torch.Tensor,
     if need_hermit:
         is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
         if not is_hermit:
+            # set posdef to False to make the operator becomes AT * A so it is
+            # hermitian
             posdef = False
+
+    # TODO: the posdef check by largest eival only works for Hermitian/symmetric
+    # matrix, but it doesn't always work for non-symmetric matrix.
+    # In non-symmetric case, one need to do Cholesky LDL decomposition
     if posdef is None:
         nr, ncols = B.shape[-2:]
         x0shape = (ncols, *batchdims, nr, 1) if col_swapped else (*batchdims, nr, ncols)
@@ -464,6 +470,8 @@ def _setup_linear_problem(A: LinearOperator, B: torch.Tensor,
         # if the largest eigenvalue is negative, then it's not posdef
         if torch.all(negeival):
             posdef = False
+
+        # otherwise, calculate the lowest eigenvalue to check if it's positive
         else:
             offset = torch.clamp(largest_eival, min=0.0)
             A_fcn2 = lambda x: A_fcn(x) - offset * x
