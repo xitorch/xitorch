@@ -371,41 +371,46 @@ def _traverse_obj(obj, prefix, action, crit, max_depth=20, exception_ids=None):
         # invokes of _get_tensors without exception_ids argument
         exception_ids = set()
 
-    if hasattr(obj, "__dict__"):
-        generator = obj.__dict__.items()
+    if isinstance(obj, torch.nn.Module):
+        generators = [obj._parameters.items(), obj._modules.items()]
         name_format = "{prefix}{key}"
-        objdict = obj.__dict__
+        objdicts = [obj._parameters, obj._modules]
+    elif hasattr(obj, "__dict__"):
+        generators = [obj.__dict__.items()]
+        name_format = "{prefix}{key}"
+        objdicts = [obj.__dict__]
     elif hasattr(obj, "__iter__"):
-        generator = obj.items() if isinstance(obj, dict) else enumerate(obj)
+        generators = [obj.items() if isinstance(obj, dict) else enumerate(obj)]
         name_format = "{prefix}[{key}]"
-        objdict = obj
+        objdicts = [obj]
     else:
         raise RuntimeError("The object must be iterable or keyable")
 
-    for key, elmt in generator:
-        name = name_format.format(prefix=prefix, key=key)
-        if crit(elmt):
-            action(elmt, name, objdict, key)
-            continue
-
-        hasdict = hasattr(elmt, "__dict__")
-        hasiter = hasattr(elmt, "__iter__")
-        if hasdict or hasiter:
-            # add exception to avoid infinite loop if there is a mutual dependant on objects
-            if id(elmt) in exception_ids:
+    for generator, objdict in zip(generators, objdicts):
+        for key, elmt in generator:
+            name = name_format.format(prefix=prefix, key=key)
+            if crit(elmt):
+                action(elmt, name, objdict, key)
                 continue
-            else:
-                exception_ids.add(id(elmt))
 
-            if max_depth > 0:
-                _traverse_obj(elmt,
-                              action=action,
-                              crit=crit,
-                              prefix=name + "." if hasdict else name,
-                              max_depth=max_depth - 1,
-                              exception_ids=exception_ids)
-            else:
-                raise RecursionError("Maximum number of recursion reached")
+            hasdict = hasattr(elmt, "__dict__")
+            hasiter = hasattr(elmt, "__iter__")
+            if hasdict or hasiter:
+                # add exception to avoid infinite loop if there is a mutual dependant on objects
+                if id(elmt) in exception_ids:
+                    continue
+                else:
+                    exception_ids.add(id(elmt))
+
+                if max_depth > 0:
+                    _traverse_obj(elmt,
+                                  action=action,
+                                  crit=crit,
+                                  prefix=name + "." if hasdict else name,
+                                  max_depth=max_depth - 1,
+                                  exception_ids=exception_ids)
+                else:
+                    raise RecursionError("Maximum number of recursion reached")
 
 def _get_tensors(obj, prefix="", max_depth=20):
     """
