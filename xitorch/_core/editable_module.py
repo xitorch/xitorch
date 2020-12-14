@@ -5,7 +5,7 @@ import copy
 import torch
 from typing import Sequence, Union, Dict, List
 from xitorch._utils.exceptions import GetSetParamsError
-from xitorch._utils.attr import get_attr, set_attr
+from xitorch._utils.attr import get_attr, set_attr, del_attr
 
 __all__ = ["EditableModule"]
 
@@ -20,7 +20,7 @@ class EditableModule(object):
     def getparams(self, methodname: str) -> Sequence[torch.Tensor]:
         # Returns a list of tensor parameters used in the object's operations
 
-        paramnames = self.getparamnames(methodname)
+        paramnames = self.cached_getparamnames(methodname)
         return [get_attr(self, name) for name in paramnames]
 
     def setparams(self, methodname: str, *params) -> int:
@@ -28,10 +28,24 @@ class EditableModule(object):
         # the operations.
         # *params is an excessive list of the parameters to be set and the
         # method will return the number of parameters it sets.
-        paramnames = self.getparamnames(methodname)
+        paramnames = self.cached_getparamnames(methodname)
         for name, val in zip(paramnames, params):
-            set_attr(self, name, val)
+            try:
+                set_attr(self, name, val)
+            except TypeError as e:  # failed because val should be param
+                del_attr(self, name)
+                set_attr(self, name, val)
+
         return len(params)
+
+    def cached_getparamnames(self, methodname: str, refresh: bool = False):
+        # getparamnames, but cached, so it is only called once
+        if not hasattr(self, "_paramnames_"):
+            self._paramnames_ = {}
+
+        if methodname not in self._paramnames_:
+            self._paramnames_[methodname] = self.getparamnames(methodname)
+        return self._paramnames_[methodname]
 
     @abstractmethod
     def getparamnames(self, methodname: str, prefix: str = "") -> List[str]:

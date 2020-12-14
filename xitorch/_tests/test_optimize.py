@@ -78,6 +78,22 @@ class DummyNNModule(torch.nn.Module):
             yr = yr.sum()
         return yr
 
+class DummyNNInEditableModule(xt.EditableModule):
+    # test to see if it still works if torch nn module in EditableModule
+
+    def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
+        self.module = DummyNNModule(A, addx=addx, activation=activation, sumoutput=sumoutput)
+
+    def set_diag_bias(self, diag, bias):
+        self.module.set_diag_bias(diag, bias)
+
+    def forward(self, x):
+        return self.module.forward(x)
+
+    def getparamnames(self, methodname, prefix=""):
+        nnprefix = prefix + "module"  # torch nn prefix does not have no dot at the end while ours does
+        return [name for (name, param) in self.module.named_parameters(prefix=nnprefix)]
+
 class DummyModuleExplicit(xt.EditableModule):
     def __init__(self, addx=True):
         super(DummyModuleExplicit, self).__init__()
@@ -99,7 +115,7 @@ class DummyModuleExplicit(xt.EditableModule):
         return []
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "clss": [DummyModule, DummyNNModule],
+    "clss": [DummyModule, DummyNNModule, DummyNNInEditableModule],
 })
 def test_rootfinder(dtype, device, clss):
     torch.manual_seed(100)
