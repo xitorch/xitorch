@@ -179,6 +179,20 @@ def test_warning_getsetparams():
         with pytest.warns(UserWarning):
             model.assertparams(getattr(model, methodname), b)
 
+def test_get_unique_params_leaves():
+    # test getuniqueparams in EditableModule
+
+    # redefine the model in this case only
+    a = torch.tensor([1.], requires_grad=True)
+    model = ModuleTest(a)
+
+    params = model.getuniqueparams(methodname="method_list_correct", onlyleaves=True)
+    assert len(params) == 1
+    assert params[0] is a
+
+    params = model.getuniqueparams(methodname="method_list_correct")
+    assert len(params) == 6
+
 ##############
 # test the wrap function to make it a functional
 def test_edit_simple():

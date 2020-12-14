@@ -83,10 +83,30 @@ class EditableModule(object):
         """
         pass
 
-    def getuniqueparams(self, methodname: str) -> List[torch.Tensor]:
+    def getuniqueparams(self, methodname: str, onlyleaves: bool = False) -> List[torch.Tensor]:
+        """
+        Returns the list of unique parameters involved in the method specified
+        by `methodname`.
+
+        Arguments
+        ---------
+        methodname: str
+            Name of the method where the returned parameters play roles.
+        onlyleaves: bool
+            If True, only returns leaf tensors. Otherwise, returns all tensors.
+
+        Returns
+        -------
+        list of tensors
+            List of tensors that are involved in the specified method of the
+            object.
+        """
         allparams = self.getparams(methodname)
         idxs = self._get_unique_params_idxs(methodname, allparams)
-        return [allparams[i] for i in idxs]
+        if onlyleaves:
+            return [allparams[i] for i in idxs if allparams[i].is_leaf]
+        else:
+            return [allparams[i] for i in idxs]
 
     def setuniqueparams(self, methodname: str, *uniqueparams) -> int:
         nparams = self._number_of_params[methodname]
