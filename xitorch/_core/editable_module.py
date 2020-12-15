@@ -38,10 +38,10 @@ class EditableModule(object):
 
         return len(params)
 
-    def cached_getparamnames(self, methodname: str, refresh: bool = False):
+    def cached_getparamnames(self, methodname: str, refresh: bool = False) -> List[str]:
         # getparamnames, but cached, so it is only called once
         if not hasattr(self, "_paramnames_"):
-            self._paramnames_ = {}
+            self._paramnames_: Dict[str, List[str]] = {}
 
         if methodname not in self._paramnames_:
             self._paramnames_[methodname] = self.getparamnames(methodname)
