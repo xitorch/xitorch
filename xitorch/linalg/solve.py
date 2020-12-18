@@ -152,7 +152,7 @@ class solve_torchfcn(torch.autograd.Function):
         ctx.A = A
         ctx.M = M
         ctx.E = E
-        ctx.x = x
+        ctx.save_for_backward(x)
         ctx.params = params
         ctx.mparams = mparams
         ctx.na = na
@@ -161,7 +161,8 @@ class solve_torchfcn(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_x):
         # grad_x: (*BABEM, nr, ncols)
-        # ctx.x: (*BABEM, nr, ncols)
+        # x: (*BABEM, nr, ncols)
+        x, = ctx.saved_tensors
 
         # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
@@ -177,7 +178,7 @@ class solve_torchfcn(torch.autograd.Function):
         with torch.enable_grad():
             params = [p.clone().requires_grad_() for p in ctx.params]
             with ctx.A.uselinopparams(*params):
-                loss = -ctx.A.mm(ctx.x)  # (*BABEM, nr, ncols)
+                loss = -ctx.A.mm(x)  # (*BABEM, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
                                           create_graph=torch.is_grad_enabled())
@@ -186,10 +187,10 @@ class solve_torchfcn(torch.autograd.Function):
         grad_E = None
         if ctx.E is not None:
             if ctx.M is None:
-                Mx = ctx.x
+                Mx = x
             else:
                 with ctx.M.uselinopparams(*ctx.mparams):
-                    Mx = ctx.M.mm(ctx.x)  # (*BABEM, nr, ncols)
+                    Mx = ctx.M.mm(x)  # (*BABEM, nr, ncols)
             grad_E = torch.einsum('...rc,...rc->...c', v, Mx)  # (*BABEM, ncols)
 
         # calculate the gradient to the biases matrices
@@ -197,7 +198,7 @@ class solve_torchfcn(torch.autograd.Function):
         if ctx.M is not None and ctx.E is not None:
             with torch.enable_grad():
                 mparams = [p.clone().requires_grad_() for p in ctx.mparams]
-                lmbdax = ctx.x * ctx.E.unsqueeze(-2)
+                lmbdax = x * ctx.E.unsqueeze(-2)
                 with ctx.M.uselinopparams(*mparams):
                     mloss = ctx.M.mm(lmbdax)
 

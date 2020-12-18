@@ -278,8 +278,9 @@ class symeig_torchfcn(torch.autograd.Function):
             evals, evecs = method_fcn(A, neig, mode, M, **config)
 
         # save for the backward
-        ctx.evals = evals  # (*BAM, neig)
-        ctx.evecs = evecs  # (*BAM, na, neig)
+        # evals: (*BAM, neig)
+        # evecs: (*BAM, na, neig)
+        ctx.save_for_backward(evals, evecs)
         ctx.params = params
         ctx.A = A
         ctx.M = M
@@ -292,8 +293,7 @@ class symeig_torchfcn(torch.autograd.Function):
         # grad_evecs: (*BAM, na, neig)
 
         # get the variables from ctx
-        evals = ctx.evals
-        evecs = ctx.evecs
+        evals, evecs = ctx.saved_tensors
         M = ctx.M
         A = ctx.A
         degen_atol: Optional[float] = ctx.bck_alg_config["degen_atol"]
