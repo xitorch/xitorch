@@ -280,11 +280,10 @@ class symeig_torchfcn(torch.autograd.Function):
         # save for the backward
         # evals: (*BAM, neig)
         # evecs: (*BAM, na, neig)
-        ctx.save_for_backward(evals, evecs)
-        ctx.params = params
+        ctx.save_for_backward(evals, evecs, *amparams)
+        ctx.na = na
         ctx.A = A
         ctx.M = M
-        ctx.mparams = mparams
         return evals, evecs
 
     @staticmethod
@@ -293,7 +292,12 @@ class symeig_torchfcn(torch.autograd.Function):
         # grad_evecs: (*BAM, na, neig)
 
         # get the variables from ctx
-        evals, evecs = ctx.saved_tensors
+        evals, evecs = ctx.saved_tensors[:2]
+        na = ctx.na
+        amparams = ctx.saved_tensors[2:]
+        params = amparams[:na]
+        mparams = amparams[na:]
+
         M = ctx.M
         A = ctx.A
         degen_atol: Optional[float] = ctx.bck_alg_config["degen_atol"]
@@ -321,7 +325,7 @@ class symeig_torchfcn(torch.autograd.Function):
         # for the *params node and propagate further backward via the `evecs`
         # path. So make sure all the *params are all connected in the graph.
         with torch.enable_grad():
-            params = [p.clone().requires_grad_() for p in ctx.params]
+            params = [p.clone().requires_grad_() for p in params]
             with A.uselinopparams(*params):
                 loss = A.mm(evecs)  # (*BAM, na, neig)
 
@@ -335,21 +339,21 @@ class symeig_torchfcn(torch.autograd.Function):
 
         # if the requirements are not satisfied, return nan
         if not reqsatisfied:
-            grad_params = [torch.zeros_like(p) + float("nan") for p in ctx.params]
+            grad_params = [torch.zeros_like(p) + float("nan") for p in params]
             grad_mparams = []
             if ctx.M is not None:
-                grad_mparams = [torch.zeros_like(p) + float("nan") for p in ctx.mparams]
+                grad_mparams = [torch.zeros_like(p) + float("nan") for p in mparams]
             return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
 
         # calculate the contributions from the eigenvalues
         gevalsA = grad_evals.unsqueeze(-2) * evecs  # (*BAM, na, neig)
 
         # calculate the contributions from the eigenvectors
-        with M.uselinopparams(*ctx.mparams) if M is not None else dummy_context_manager():
+        with M.uselinopparams(*mparams) if M is not None else dummy_context_manager():
             # orthogonalize the grad_evecs with evecs
             B = _ortho(grad_evecs, evecs, D=idx_degen, M=M, mright=False)
 
-            with A.uselinopparams(*ctx.params):
+            with A.uselinopparams(*params):
                 gevecs = solve(A, -B, evals, M, bck_options=ctx.bck_config,
                                **ctx.bck_config)  # (*BAM, na, neig)
 
@@ -368,7 +372,7 @@ class symeig_torchfcn(torch.autograd.Function):
         grad_mparams = []
         if ctx.M is not None:
             with torch.enable_grad():
-                mparams = [p.clone().requires_grad_() for p in ctx.mparams]
+                mparams = [p.clone().requires_grad_() for p in mparams]
                 with M.uselinopparams(*mparams):
                     mloss = M.mm(evecs)  # (*BAM, na, neig)
             gevalsM = -gevalsA * evals.unsqueeze(-2)

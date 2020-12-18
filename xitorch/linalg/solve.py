@@ -149,12 +149,13 @@ class solve_torchfcn(torch.autograd.Function):
                 method_fcn = get_method("solve", methods, method)
                 x = method_fcn(A, B, E, M, **config)
 
+        ctx.e_is_none = E is None
         ctx.A = A
         ctx.M = M
-        ctx.E = E
-        ctx.save_for_backward(x)
-        ctx.params = params
-        ctx.mparams = mparams
+        if ctx.e_is_none:
+            ctx.save_for_backward(x, *all_params)
+        else:
+            ctx.save_for_backward(x, E, *all_params)
         ctx.na = na
         return x
 
@@ -162,21 +163,26 @@ class solve_torchfcn(torch.autograd.Function):
     def backward(ctx, grad_x):
         # grad_x: (*BABEM, nr, ncols)
         # x: (*BABEM, nr, ncols)
-        x, = ctx.saved_tensors
+        x = ctx.saved_tensors[0]
+        idx_all_params = 1 if ctx.e_is_none else 2
+        all_params = ctx.saved_tensors[idx_all_params:]
+        params = all_params[:ctx.na]
+        mparams = all_params[ctx.na:]
+        E = None if ctx.e_is_none else ctx.saved_tensors[1]
 
         # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
         AT = ctx.A.H  # (*BA, nr, nr)
         MT = ctx.M.H if ctx.M is not None else None  # (*BM, nr, nr)
-        with AT.uselinopparams(*ctx.params), \
-             MT.uselinopparams(*ctx.mparams) if MT is not None else dummy_context_manager():
-            v = solve(AT, grad_x, ctx.E, MT,
+        with AT.uselinopparams(*params), \
+             MT.uselinopparams(*mparams) if MT is not None else dummy_context_manager():
+            v = solve(AT, grad_x, E, MT,
                       bck_options=ctx.bck_config, **ctx.bck_config)  # (*BABEM, nr, ncols)
         grad_B = v
 
         # calculate the grad of matrices parameters
         with torch.enable_grad():
-            params = [p.clone().requires_grad_() for p in ctx.params]
+            params = [p.clone().requires_grad_() for p in params]
             with ctx.A.uselinopparams(*params):
                 loss = -ctx.A.mm(x)  # (*BABEM, nr, ncols)
 
@@ -185,20 +191,20 @@ class solve_torchfcn(torch.autograd.Function):
 
         # calculate the biases gradient
         grad_E = None
-        if ctx.E is not None:
+        if E is not None:
             if ctx.M is None:
                 Mx = x
             else:
-                with ctx.M.uselinopparams(*ctx.mparams):
+                with ctx.M.uselinopparams(*mparams):
                     Mx = ctx.M.mm(x)  # (*BABEM, nr, ncols)
             grad_E = torch.einsum('...rc,...rc->...c', v, Mx)  # (*BABEM, ncols)
 
         # calculate the gradient to the biases matrices
         grad_mparams = []
-        if ctx.M is not None and ctx.E is not None:
+        if ctx.M is not None and E is not None:
             with torch.enable_grad():
-                mparams = [p.clone().requires_grad_() for p in ctx.mparams]
-                lmbdax = x * ctx.E.unsqueeze(-2)
+                mparams = [p.clone().requires_grad_() for p in mparams]
+                lmbdax = x * E.unsqueeze(-2)
                 with ctx.M.uselinopparams(*mparams):
                     mloss = ctx.M.mm(lmbdax)
 
