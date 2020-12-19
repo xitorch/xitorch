@@ -1,5 +1,7 @@
+import warnings
 import torch
 from torch.autograd import gradcheck, gradgradcheck
+from xitorch.debug.modes import enable_debug
 from xitorch import LinearOperator
 from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
@@ -313,10 +315,14 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
         loss = torch.sum(U**4)
         return loss
 
-    loss = get_loss(a, mat)
-    loss.backward()
-    assert torch.any(torch.isnan(mat.grad))
-    assert torch.any(torch.isnan(a.grad))
+    with warnings.catch_warnings(record=True) as w, enable_debug():
+        loss = get_loss(a, mat)
+        loss.backward()
+        assert len(w) == 1
+        wmsg = str(w[0].message).lower()
+        assert "degener" in wmsg
+        assert "loss function" in wmsg
+        assert "incorrect" in wmsg
 
 ############## svd #############
 @device_dtype_float_test(only64=True, additional_kwargs={

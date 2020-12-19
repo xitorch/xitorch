@@ -1,3 +1,4 @@
+import warnings
 import torch
 from typing import Union, Mapping, Any, Optional, Tuple, Callable
 from xitorch import LinearOperator
@@ -330,20 +331,15 @@ class symeig_torchfcn(torch.autograd.Function):
                 loss = A.mm(evecs)  # (*BAM, na, neig)
 
         # if degenerate, check the conditions for finite derivative
-        reqsatisfied = True
-        if isdegenerate:
+        if is_debug_enabled() and isdegenerate:
             xtg = torch.matmul(evecs.transpose(-2, -1), grad_evecs)
             req1 = idx_degen * (xtg - xtg.transpose(-2, -1))
-            if not torch.all(torch.abs(req1) < degen_atol):
-                reqsatisfied = False
+            reqtol = xtg.abs().max() * grad_evecs.shape[-2] * torch.finfo(grad_evecs.dtype).eps
 
-        # if the requirements are not satisfied, return nan
-        if not reqsatisfied:
-            grad_params = [torch.zeros_like(p) + float("nan") for p in params]
-            grad_mparams = []
-            if ctx.M is not None:
-                grad_mparams = [torch.zeros_like(p) + float("nan") for p in mparams]
-            return (None, None, None, None, None, None, None, *grad_params, *grad_mparams)
+            if not torch.all(torch.abs(req1) <= reqtol):
+                # if the requirements are not satisfied, raises a warning
+                warnings.warn("Degeneracy appears but the loss function seem to depend "
+                              "strongly on the eigenvector. The gradient might be incorrect.")
 
         # calculate the contributions from the eigenvalues
         gevalsA = grad_evals.unsqueeze(-2) * evecs  # (*BAM, na, neig)
