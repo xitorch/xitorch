@@ -340,7 +340,10 @@ class symeig_torchfcn(torch.autograd.Function):
             if not torch.all(torch.abs(req1) <= reqtol):
                 # if the requirements are not satisfied, raises a warning
                 msg = ("Degeneracy appears but the loss function seem to depend "
-                       "strongly on the eigenvector. The gradient might be incorrect.")
+                       "strongly on the eigenvector. The gradient might be incorrect.\n")
+                msg += "Eigenvalues:\n%s\n" % str(evals)
+                msg += "Degenerate map:\n%s\n" % str(idx_degen)
+                msg += "Requirements (should be all 0s):\n%s" % str(req1)
                 warnings.warn(MathWarning(msg))
 
         # calculate the contributions from the eigenvalues
