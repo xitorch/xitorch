@@ -7,6 +7,7 @@ from xitorch import LinearOperator
 from scipy.sparse.linalg import gmres
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
+from xitorch._utils.exceptions import ConvergenceWarning
 
 __all__ = ["wrap_gmres", "cg", "bicgstab", "broyden1_solve", "exactsolve"]
 
@@ -56,7 +57,7 @@ def wrap_gmres(A, B, E=None, M=None,
                 msg = "The GMRES iteration does not converge to the desired value "\
                       "(%.3e) after %d iterations" % \
                       (min_eps, info)
-                warnings.warn(msg)
+                warnings.warn(ConvergenceWarning(msg))
             res_np[i, j, :] = x
 
     res = torch.tensor(res_np, dtype=B.dtype, device=B.device)
@@ -164,8 +165,9 @@ def cg(A: LinearOperator, B: torch.Tensor,
         rkzk = rkzk_1
 
     if not converge:
-        warnings.warn("Convergence is not achieved after %d iterations. "
-                      "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
+        msg = ("Convergence is not achieved after %d iterations. "
+               "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
+        warnings.warn(ConvergenceWarning(msg))
     if col_swapped:
         # x: (ncols, *, nr, 1)
         xk_1 = xk_1.transpose(0, -1).squeeze(0)  # (*, nr, ncols)
@@ -281,8 +283,9 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
         rho_k = rho_knew
 
     if not converge:
-        warnings.warn("Convergence is not achieved after %d iterations. "
-                      "Max norm of resid: %.3e" % (max_niter, torch.max(resid_norm)))
+        msg = ("Convergence is not achieved after %d iterations. "
+               "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
+        warnings.warn(ConvergenceWarning(msg))
     if col_swapped:
         # x: (ncols, *, nr, 1)
         xk = xk.transpose(0, -1).squeeze(0)  # (*, nr, ncols)

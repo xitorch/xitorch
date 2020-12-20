@@ -7,6 +7,7 @@ import torch
 import functools
 from xitorch._impls.optimize.root._jacobian import BroydenFirst, \
     BroydenSecond, LinearMixing
+from xitorch._utils.exceptions import ConvergenceWarning
 
 __all__ = ["broyden1", "broyden2", "linearmixing"]
 
@@ -127,9 +128,9 @@ def _nonlin_solver(fcn, x0, params, method,
         x = xnew
         y = ynew
     if not converge:
-        msg = "The rootfinder does not converge after %d iterations. " + \
-              "|dx|=%.3e, |f|=%.3e"
-        warnings.warn(msg % (maxiter, dx_norm, y.norm()))
+        msg = ("The rootfinder does not converge after %d iterations. "
+               "|dx|=%.3e, |f|=%.3e") % (maxiter, dx_norm, y.norm())
+        warnings.warn(ConvergenceWarning(msg))
     return x.reshape(xshape)
 
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',))  # takes only the signature
