@@ -6,6 +6,7 @@ from xitorch import LinearOperator
 from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
+from xitorch._utils.exceptions import MathWarning
 from xitorch._tests.utils import device_dtype_float_test
 
 seed = 12345
@@ -323,6 +324,7 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
         assert "degener" in wmsg
         assert "loss function" in wmsg
         assert "incorrect" in wmsg
+        assert w[0].category == MathWarning
 
 ############## svd #############
 @device_dtype_float_test(only64=True, additional_kwargs={

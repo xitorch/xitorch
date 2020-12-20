@@ -10,6 +10,7 @@ from xitorch._utils.misc import set_default_option, \
     dummy_context_manager, get_method, get_and_pop_keys
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch._impls.linalg.symeig import exacteig, davidson
+from xitorch._utils.exceptions import MathWarning
 
 __all__ = ["lsymeig", "usymeig", "symeig", "svd"]
 
@@ -338,8 +339,9 @@ class symeig_torchfcn(torch.autograd.Function):
 
             if not torch.all(torch.abs(req1) <= reqtol):
                 # if the requirements are not satisfied, raises a warning
-                warnings.warn("Degeneracy appears but the loss function seem to depend "
-                              "strongly on the eigenvector. The gradient might be incorrect.")
+                msg = ("Degeneracy appears but the loss function seem to depend "
+                       "strongly on the eigenvector. The gradient might be incorrect.")
+                warnings.warn(MathWarning(msg))
 
         # calculate the contributions from the eigenvalues
         gevalsA = grad_evals.unsqueeze(-2) * evecs  # (*BAM, na, neig)
