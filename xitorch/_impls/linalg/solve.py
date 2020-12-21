@@ -130,6 +130,8 @@ def cg(A: LinearOperator, B: torch.Tensor,
     rkzk = _dot(rk, zk)
     converge = False
     resid_calc_every = 10
+    best_resid: Optional[float] = None
+    best_xk = xk
     for k in range(1, max_niter + 1):
         Apk = A_fcn(pk)
         alphak = rkzk / _safedenom(_dot(pk, Apk), eps)
@@ -144,6 +146,10 @@ def cg(A: LinearOperator, B: torch.Tensor,
         # check for the stopping condition
         resid = rk_1  # B2 - A_fcn(xk_1)
         resid_norm = resid.norm(dim=-2, keepdim=True)
+        if best_resid is None or resid_norm.item() < best_resid:
+            best_resid = resid_norm.item()
+            best_xk = xk_1
+
         if verbose:
             if k < 10 or k % 10 == 0:
                 print("%4d: |dy|=%.3e" % (k, resid_norm))
@@ -164,6 +170,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
         rk = rk_1
         rkzk = rkzk_1
 
+    xk_1 = best_xk
     if not converge:
         msg = ("Convergence is not achieved after %d iterations. "
                "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
@@ -246,6 +253,8 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     pk: Union[float, torch.Tensor] = 0.0
     converge = False
     resid_calc_every = 10
+    best_resid: Optional[float] = None
+    best_xk = xk
     for k in range(1, max_niter + 1):
         rho_knew = _dot(r0hat, rk)
         omega_denom = _safedenom(omega_k, eps)
@@ -269,19 +278,27 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
         else:
             rk = s - omega_k * t
 
-        # check for the stopping conditions
+        # calculate the residual
         resid = rk
         resid_norm = resid.norm(dim=-2, keepdim=True)
+
+        # save the best results
+        if best_resid is None or resid_norm.item() < best_resid:
+            best_resid = resid_norm.item()
+            best_xk = xk
+
         if verbose:
             if k < 10 or k % 10 == 0:
                 print("%4d: |dy|=%.3e" % (k, resid_norm))
 
+        # check for the stopping conditions
         if torch.all(resid_norm < stop_matrix):
             converge = True
             break
 
         rho_k = rho_knew
 
+    xk = best_xk
     if not converge:
         msg = ("Convergence is not achieved after %d iterations. "
                "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
