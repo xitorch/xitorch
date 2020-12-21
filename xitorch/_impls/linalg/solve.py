@@ -146,8 +146,10 @@ def cg(A: LinearOperator, B: torch.Tensor,
         # check for the stopping condition
         resid = rk_1  # B2 - A_fcn(xk_1)
         resid_norm = resid.norm(dim=-2, keepdim=True)
-        if best_resid is None or resid_norm.item() < best_resid:
-            best_resid = resid_norm.item()
+
+        max_resid_norm = resid_norm.max().item()
+        if best_resid is None or max_resid_norm < best_resid:
+            best_resid = max_resid_norm
             best_xk = xk_1
 
         if verbose:
@@ -173,7 +175,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
     xk_1 = best_xk
     if not converge:
         msg = ("Convergence is not achieved after %d iterations. "
-               "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
+               "Max norm of best resid: %.3e") % (max_niter, best_resid)
         warnings.warn(ConvergenceWarning(msg))
     if col_swapped:
         # x: (ncols, *, nr, 1)
@@ -252,7 +254,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     vk: Union[float, torch.Tensor] = 0.0
     pk: Union[float, torch.Tensor] = 0.0
     converge = False
-    resid_calc_every = 10
+    resid_calc_every = 1
     best_resid: Optional[float] = None
     best_xk = xk
     for k in range(1, max_niter + 1):
@@ -283,8 +285,9 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
         resid_norm = resid.norm(dim=-2, keepdim=True)
 
         # save the best results
-        if best_resid is None or resid_norm.item() < best_resid:
-            best_resid = resid_norm.item()
+        max_resid_norm = resid_norm.max().item()
+        if best_resid is None or max_resid_norm < best_resid:
+            best_resid = max_resid_norm
             best_xk = xk
 
         if verbose:
@@ -301,7 +304,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     xk = best_xk
     if not converge:
         msg = ("Convergence is not achieved after %d iterations. "
-               "Max norm of resid: %.3e") % (max_niter, torch.max(resid_norm))
+               "Max norm of resid: %.3e") % (max_niter, best_resid)
         warnings.warn(ConvergenceWarning(msg))
     if col_swapped:
         # x: (ncols, *, nr, 1)
