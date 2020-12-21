@@ -130,7 +130,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
     rkzk = _dot(rk, zk)
     converge = False
     resid_calc_every = 10
-    best_resid: Optional[float] = None
+    best_resid = rk.norm(dim=-2).max().item()
     best_xk = xk
     for k in range(1, max_niter + 1):
         Apk = A_fcn(pk)
@@ -148,7 +148,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
         resid_norm = resid.norm(dim=-2, keepdim=True)
 
         max_resid_norm = resid_norm.max().item()
-        if best_resid is None or max_resid_norm < best_resid:
+        if max_resid_norm < best_resid:
             best_resid = max_resid_norm
             best_xk = xk_1
 
@@ -255,7 +255,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     pk: Union[float, torch.Tensor] = 0.0
     converge = False
     resid_calc_every = 1
-    best_resid: Optional[float] = None
+    best_resid = rk.norm(dim=-2).max()
     best_xk = xk
     for k in range(1, max_niter + 1):
         rho_knew = _dot(r0hat, rk)
@@ -286,7 +286,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
 
         # save the best results
         max_resid_norm = resid_norm.max().item()
-        if best_resid is None or max_resid_norm < best_resid:
+        if max_resid_norm < best_resid:
             best_resid = max_resid_norm
             best_xk = xk
 
