@@ -73,6 +73,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
         rtol: float = 1e-6,
         atol: float = 1e-8,
         eps: float = 1e-12,
+        resid_calc_every: int = 10,
         verbose: bool = False,
         **unused) -> torch.Tensor:
     r"""
@@ -96,6 +97,11 @@ def cg(A: LinearOperator, B: torch.Tensor,
     eps: float
         Substitute the absolute zero in the algorithm's denominator with this
         value to avoid nan.
+    resid_calc_every: int
+        Calculate the residual in its actual form instead of substitution form
+        with this frequency, to avoid rounding error accummulation.
+        If your linear operator has bad numerical precision, set this to be low.
+        If 0, then never calculate the residual in its actual form.
     verbose: bool
         Verbosity of the algorithm.
     """
@@ -129,7 +135,6 @@ def cg(A: LinearOperator, B: torch.Tensor,
     pk = zk  # (*, nr, nc)
     rkzk = _dot(rk, zk)
     converge = False
-    resid_calc_every = 10
     best_resid = rk.norm(dim=-2).max().item()
     best_xk = xk
     for k in range(1, max_niter + 1):
@@ -138,7 +143,7 @@ def cg(A: LinearOperator, B: torch.Tensor,
         xk_1 = xk + alphak * pk
 
         # correct the residual calculation
-        if k % resid_calc_every == 0:
+        if resid_calc_every != 0 and k % resid_calc_every == 0:
             rk_1 = B2 - A_fcn(xk_1)
         else:
             rk_1 = rk - alphak * Apk  # (*, nr, nc)
@@ -193,6 +198,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
              atol: float = 1e-8,
              eps: float = 1e-12,
              verbose: bool = False,
+             resid_calc_every: int = 10,
              **unused) -> torch.Tensor:
     r"""
     Solve the linear equations using stabilized Biconjugate-Gradient method.
@@ -218,6 +224,11 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     eps: float
         Substitute the absolute zero in the algorithm's denominator with this
         value to avoid nan.
+    resid_calc_every: int
+        Calculate the residual in its actual form instead of substitution form
+        with this frequency, to avoid rounding error accummulation.
+        If your linear operator has bad numerical precision, set this to be low.
+        If 0, then never calculate the residual in its actual form.
     verbose: bool
         Verbosity of the algorithm.
     """
@@ -254,7 +265,6 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
     vk: Union[float, torch.Tensor] = 0.0
     pk: Union[float, torch.Tensor] = 0.0
     converge = False
-    resid_calc_every = 1
     best_resid = rk.norm(dim=-2).max()
     best_xk = xk
     for k in range(1, max_niter + 1):
@@ -275,7 +285,7 @@ def bicgstab(A: LinearOperator, B: torch.Tensor,
         xk = h + omega_k * z
 
         # correct the residual calculation regularly
-        if k % resid_calc_every == 0:
+        if resid_calc_every != 0 and k % resid_calc_every == 0:
             rk = B2 - A_fcn(xk)
         else:
             rk = s - omega_k * t
