@@ -1,9 +1,12 @@
+import warnings
 import functools
 import torch
 from xitorch import LinearOperator
 from typing import Union, Optional, Tuple, Sequence
 from xitorch._utils.bcast import get_bcasted_dims
 from xitorch._utils.tensor import tallqr, to_fortran_order
+from xitorch.debug.modes import is_debug_enabled
+from xitorch._utils.exceptions import MathWarning
 
 def exacteig(A: LinearOperator, neig: int,
              mode: str, M: Optional[LinearOperator]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -18,7 +21,8 @@ def exacteig(A: LinearOperator, neig: int,
     """
     Amatrix = A.fullmatrix()  # (*BA, q, q)
     if M is None:
-        evals, evecs = torch.symeig(Amatrix, eigenvectors=True)  # (*BA, q), (*BA, q, q)
+        # evals, evecs = torch.symeig(Amatrix, eigenvectors=True)  # (*BA, q), (*BA, q, q)
+        evals, evecs = degen_symeig.apply(Amatrix)  # (*BA, q, q)
         return _take_eigpairs(evals, evecs, neig, mode)
     else:
         Mmatrix = M.fullmatrix()  # (*BM, q, q)
@@ -33,10 +37,65 @@ def exacteig(A: LinearOperator, neig: int,
 
         # calculate the eigenvalues and eigenvectors
         # (the eigvecs are normalized in M-space)
-        evals, evecs = torch.symeig(A2, eigenvectors=True)  # (*BAM, q, q)
+        # evals, evecs = torch.symeig(A2, eigenvectors=True)  # (*BAM, q, q)
+        evals, evecs = degen_symeig.apply(A2)  # (*BAM, q, q)
         evals, evecs = _take_eigpairs(evals, evecs, neig, mode)  # (*BAM, neig) and (*BAM, q, neig)
         evecs = torch.matmul(LinvT, evecs)
         return evals, evecs
+
+# temporary solution to https://github.com/pytorch/pytorch/issues/47599
+class degen_symeig(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, A):
+        eival, eivec = torch.symeig(A, eigenvectors=True)
+        ctx.save_for_backward(eival, eivec)
+        return eival, eivec
+
+    @staticmethod
+    def backward(ctx, grad_eival, grad_eivec):
+        in_debug_mode = is_debug_enabled()
+
+        eival, eivec = ctx.saved_tensors
+        min_threshold = torch.finfo(eival.dtype).eps ** 0.6
+        eivect = eivec.transpose(-2, -1)
+
+        # remove the degenerate part
+        # see https://arxiv.org/pdf/2011.04366.pdf
+        if grad_eivec is not None:
+            # take the contribution from the eivec
+            F = eival.unsqueeze(-2) - eival.unsqueeze(-1)
+            idx = torch.abs(F) < min_threshold
+            F[idx] = float("inf")
+
+            # if in debug mode, check the degeneracy requirements
+            if in_debug_mode:
+                degenerate = torch.any(idx)
+                xtg = eivect @ grad_eivec
+                diff_xtg = (xtg - xtg.transpose(-2, -1))[idx]
+                reqsat = torch.allclose(diff_xtg, torch.zeros_like(diff_xtg))
+                # if the requirement is not satisfied, mathematically the derivative
+                # should be `nan`, but here we just raise a warning
+                if not reqsat:
+                    msg = ("Degeneracy appears but the loss function seem to depend "
+                           "strongly on the eigenvector. The gradient might be incorrect.\n")
+                    msg += "Eigenvalues:\n%s\n" % str(eival)
+                    msg += "Degenerate map:\n%s\n" % str(idx)
+                    msg += "Requirements (should be all 0s):\n%s" % str(diff_xtg)
+                    warnings.warn(MathWarning(msg))
+
+            F = F.pow(-1)
+            F = F * torch.matmul(eivect, grad_eivec)
+            result = torch.matmul(eivec, torch.matmul(F, eivect))
+        else:
+            result = torch.zeros_like(eivec)
+
+        # calculate the contribution from the eival
+        if grad_eival is not None:
+            result += torch.matmul(eivec, grad_eival.unsqueeze(-1) * eivect)
+
+        # symmetrize to reduce numerical instability
+        result = (result + result.transpose(-2, -1)) * 0.5
+        return result
 
 def davidson(A: LinearOperator, neig: int,
              mode: str,
