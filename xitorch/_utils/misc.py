@@ -1,10 +1,16 @@
 import contextlib
 import torch
+import copy
 from typing import Mapping, Callable, Union, Dict, List
 
 def set_default_option(defopt: Dict, opt: Dict) -> Dict:
-    defopt.update(opt)
-    return defopt
+    # return a dictionary based on the options and if no item from option,
+    # take it from defopt
+
+    # make a shallow copy to detach the results from defopt
+    res = copy.copy(defopt)
+    res.update(opt)
+    return res
 
 def get_and_pop_keys(dct: Dict, keys: List) -> Dict:
     res = {}

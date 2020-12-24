@@ -36,15 +36,17 @@ class RKAdaptiveStepSolver(object):
         self.error_exponent = -1. / (self.error_estimator_order + 1.)
 
     def setup(self, fcn, ts, y0, params):
-        yshape = y0.shape
-        self.y0 = y0
+        # flatten the y0, will be restore at the end of .solve()
+        self.yshape = y0.shape
+        self.y0 = y0.reshape(-1)
+
         direction = ts[1] - ts[0]
         if direction < 0:
             self.ts = -ts
-            self.func = lambda t, y: -fcn(-t, y.reshape(yshape), *params).reshape(-1)
+            self.func = lambda t, y: -fcn(-t, y.reshape(self.yshape), *params).reshape(-1)
         else:
             self.ts = ts
-            self.func = lambda t, y: fcn(t, y.reshape(yshape), *params).reshape(-1)
+            self.func = lambda t, y: fcn(t, y.reshape(self.yshape), *params).reshape(-1)
         self.dtype = y0.dtype
         self.device = y0.device
         n = torch.numel(y0)
@@ -71,7 +73,7 @@ class RKAdaptiveStepSolver(object):
         for i in range(1, len(ts)):
             rk_state = self._step(rk_state, ts[i])
             yt[i] = rk_state[2]
-        return yt
+        return yt.reshape(-1, *self.yshape)
 
     def _error_norm(self, K, h):
         err = torch.matmul(K.T, self.E) * h

@@ -219,6 +219,7 @@ def test_ivp_methods(dtype, device, method_tol, clss):
     torch.manual_seed(100)
     random.seed(100)
     nr = 2
+    nb = 3  # batch dimension
     nt = 5
     t0 = 0.0
     t1 = 0.2
@@ -226,8 +227,8 @@ def test_ivp_methods(dtype, device, method_tol, clss):
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
     c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
     ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device).requires_grad_()
-    y0 = torch.rand((nr,), dtype=dtype, device=device).requires_grad_()
-    ts1 = ts.unsqueeze(-1)
+    y0 = torch.rand((nb, nr), dtype=dtype, device=device).requires_grad_()
+    ts1 = ts.unsqueeze(-1).unsqueeze(-1)
 
     method, (rtol, atol) = method_tol
     fwd_options = {

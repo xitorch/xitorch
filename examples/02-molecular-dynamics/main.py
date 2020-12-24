@@ -26,7 +26,7 @@ def dydt(t, y):
 
 def get_loss(pos0, vel0, ts, pos_target):
     y0 = torch.cat((pos0.unsqueeze(0), vel0.unsqueeze(0)), dim=0)
-    yt = solve_ivp(dydt, ts, y0, fwd_options={"method": "rk4"})
+    yt = solve_ivp(dydt, ts, y0, method="rk4")
     posf = yt[-1,0] # (nbatch, nparticles, ndim)
     dev = posf - pos_target
     loss = torch.dot(dev.reshape(-1), dev.reshape(-1))

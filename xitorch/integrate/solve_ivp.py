@@ -212,7 +212,7 @@ class _SolveIVP(torch.autograd.Function):
 
             t_flip_idx -= 1
             outs = solve_ivp(new_pfunc, ts_flip[i:i + 2], states, tensor_params,
-                             fwd_options=ctx.bck_config, bck_options=ctx.bck_config)
+                             bck_options=ctx.bck_config, **ctx.bck_config)
             # only take the output for the earliest time
             states = [out[-1] for out in outs]
             states[y_index] = yt[t_flip_idx]
