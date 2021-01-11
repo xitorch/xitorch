@@ -88,7 +88,8 @@ def _nonlin_solver(fcn, x0, params, method,
     converge = False
     best_ynorm = y_norm
     best_x = x
-    best_dxnorm = x
+    best_dxnorm = x.norm()
+    best_iter = 0
     for i in range(maxiter):
         tol = min(eta, eta * y_norm)
         dx = -jacobian.solve(y, tol=tol)
@@ -113,6 +114,7 @@ def _nonlin_solver(fcn, x0, params, method,
             best_x = xnew
             best_dxnorm = dx_norm
             best_ynorm = y_norm_new
+            best_iter = i + 1
 
         jacobian.update(xnew.clone(), ynew)
 
@@ -138,7 +140,7 @@ def _nonlin_solver(fcn, x0, params, method,
         y = ynew
     if not converge:
         msg = ("The rootfinder does not converge after %d iterations. "
-               "Best |dx|=%.3e, |f|=%.3e") % (maxiter, best_dxnorm, best_ynorm)
+               "Best |dx|=%.3e, |f|=%.3e at iter %d") % (maxiter, best_dxnorm, best_ynorm, best_iter)
         warnings.warn(ConvergenceWarning(msg))
         x = best_x
     return x.reshape(xshape)
