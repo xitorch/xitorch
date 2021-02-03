@@ -187,7 +187,8 @@ class solve_torchfcn(torch.autograd.Function):
                 loss = -ctx.A.mm(x)  # (*BABEM, nr, ncols)
 
         grad_params = torch.autograd.grad((loss,), params, grad_outputs=(v,),
-                                          create_graph=torch.is_grad_enabled())
+                                          create_graph=torch.is_grad_enabled(),
+                                          allow_unused=True)
 
         # calculate the biases gradient
         grad_E = None
@@ -210,7 +211,8 @@ class solve_torchfcn(torch.autograd.Function):
 
             grad_mparams = torch.autograd.grad((mloss,), mparams,
                                                grad_outputs=(v,),
-                                               create_graph=torch.is_grad_enabled())
+                                               create_graph=torch.is_grad_enabled(),
+                                               allow_unused=True)
 
         return (None, grad_B, grad_E, None, None, None, None, None,
                 *grad_params, *grad_mparams)
