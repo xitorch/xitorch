@@ -1,5 +1,5 @@
 import torch
-from typing import Callable, Union, Mapping, Any, Sequence
+from typing import Callable, Union, Mapping, Any, Sequence, Dict
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
@@ -233,7 +233,7 @@ class _SolveIVP(torch.autograd.Function):
 
 
 # docstring completion
-ivp_methods = {
+ivp_methods: Dict[str, Callable] = {
     "rk45": rk45_adaptive,
     "rk23": rk23_adaptive,
     "rk4": rk4_ivp,
