@@ -60,7 +60,15 @@ class BroydenFirst(Jacobian):
 
         # setup the approximate inverse Jacobian
         self.Gm = LowRankMatrix(-self.alpha, self.uv0, "restart")
-        self._reduce = lambda: self.Gm.reduce(self.max_rank)
+        # do not uncomment the line below! it causes memory leak
+        # I left it here as a lesson for me and us to never repeat this mistake
+        # self._reduce = lambda: self.Gm.reduce(self.max_rank)
+
+    def _reduce(self):
+        # reduce the size of Gm
+        # initially it was a lambda function, but it causes a leak, so
+        # I arranged into a method to remove the leak
+        self.Gm.reduce(self.max_rank)
 
     def solve(self, v, tol=0):
         res = self.Gm.mv(v)
