@@ -5,7 +5,7 @@ from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
 from xitorch.grad.jachess import hess
 from xitorch.optimize import rootfinder, equilibrium, minimize
-from xitorch._tests.utils import device_dtype_float_test
+from xitorch._tests.utils import device_dtype_float_test, assert_no_memleak
 
 class DummyModule(xt.EditableModule):
     def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
@@ -391,3 +391,107 @@ def test_minimize_methods(dtype, device, method):
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()
     eigval, _ = torch.symeig(h)
     assert torch.all(eigval >= 0)
+
+################ test memory ################
+@device_dtype_float_test(only64=True, onlycpu=True)
+def test_rootfinder_mem(dtype, device):
+    def _test_rf():
+        clss = DummyModule  # only need to test it with one clsas
+        torch.manual_seed(100)
+        random.seed(100)
+
+        nr = 3
+        nbatch = 2000
+        fwd_options = {
+            "method": "broyden1",
+            "f_tol": 1e-9,
+            "alpha": -0.5,
+        }
+
+        A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
+        diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+        bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
+        y0 = torch.randn((nbatch, nr)).to(dtype)
+
+        def getloss(A, y0, diag, bias):
+            model = clss(A, addx=True)
+            model.set_diag_bias(diag, bias)
+            y = rootfinder(model.forward, y0, **fwd_options)
+            return y
+
+        loss = (getloss(A, y0, diag, bias) ** 2).sum()
+        # NOTE: memory leak if create_graph=True, but no leak if no rootfinder
+        # function involved
+        loss.backward(retain_graph=True)
+
+    assert_no_memleak(_test_rf)
+
+@device_dtype_float_test(only64=True, onlycpu=True)
+def test_equil_mem(dtype, device):
+    def _test_equil():
+        clss = DummyModule
+        torch.manual_seed(100)
+        random.seed(100)
+
+        nr = 3
+        nbatch = 2000
+        fwd_options = {
+            "method": "broyden1",
+            "f_tol": 1e-9,
+            "alpha": -0.5,
+        }
+        bck_options = {
+            "method": "cg",
+        }
+
+        A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
+        diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+        bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
+        y0 = torch.randn((nbatch, nr)).to(dtype)
+
+        def getloss(A, y0, diag, bias):
+            model = clss(A, addx=False)
+            model.set_diag_bias(diag, bias)
+            y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
+            return y
+
+        loss = (getloss(A, y0, diag, bias) ** 2).sum()
+        # NOTE: create_graph=True will make memleak test fails
+        loss.backward(retain_graph=True)
+
+    assert_no_memleak(_test_equil)
+
+@device_dtype_float_test(only64=True, onlycpu=True)
+def test_minimize_mem(dtype, device):
+    def _test_min():
+        clss = DummyModule
+        torch.manual_seed(400)
+        random.seed(100)
+
+        nr = 3
+        nbatch = 2
+
+        A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
+        diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
+        # bias will be detached from the optimization line, so set it undifferentiable
+        bias = torch.zeros((nbatch, nr)).to(dtype)
+        y0 = torch.randn((nbatch, nr)).to(dtype)
+        fwd_options = {
+            "method": "broyden1",
+            "max_niter": 50,
+            "f_tol": 1e-9,
+            "alpha": -0.5,
+        }
+        activation = "square"  # square activation makes it easy to optimize
+
+        def getloss(A, y0, diag, bias):
+            model = clss(A, addx=False, activation=activation, sumoutput=True)
+            model.set_diag_bias(diag, bias)
+            y = minimize(model.forward, y0, **fwd_options)
+            return y
+
+        loss = (getloss(A, y0, diag, bias) ** 2).sum()
+        # NOTE: create_graph=True will make memleak test fails
+        loss.backward(retain_graph=True)
+
+    assert_no_memleak(_test_min)

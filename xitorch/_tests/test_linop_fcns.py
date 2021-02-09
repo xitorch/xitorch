@@ -7,7 +7,7 @@ from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
 from xitorch._utils.exceptions import MathWarning
-from xitorch._tests.utils import device_dtype_float_test
+from xitorch._tests.utils import device_dtype_float_test, assert_no_memleak
 
 seed = 12345
 
@@ -644,3 +644,93 @@ def test_solve_AEM_methods(dtype, device, method):
     ax = LinearOperator.m(amat).mm(x)
     mxe = LinearOperator.m(mmat).mm(x) @ torch.diag_embed(emat)
     assert torch.allclose(ax - mxe, bmat)
+
+############## memory-leak test ##############
+@device_dtype_float_test(only64=True, onlycpu=True, additional_kwargs={
+    "ashape": [(3, 3)],
+    "mshape": [(3, 3)],
+    "method": ["custom_exacteig"],
+})
+def test_lsymeig_AM_mem(dtype, device, ashape, mshape, method):
+
+    def _test_lsymeig():
+        torch.manual_seed(seed)
+        mata = torch.rand(ashape, dtype=dtype, device=device)
+        matm = torch.rand(mshape, dtype=dtype, device=device) + \
+            torch.eye(mshape[-1], dtype=dtype, device=device)  # make sure it's not singular
+        mata = mata + mata.transpose(-2, -1)
+        matm = matm + matm.transpose(-2, -1)
+        mata = mata.requires_grad_()
+        matm = matm.requires_grad_()
+        fwd_options = {"method": method}
+
+        na = ashape[-1]
+        bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
+        neig = ashape[-1]
+
+        def lsymeig_fcn(amat, mmat):
+            # symmetrize
+            amat = (amat + amat.transpose(-2, -1)) * 0.5
+            mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+            alinop = LinearOperator.m(amat, is_hermitian=True)
+            mlinop = LinearOperator.m(mmat, is_hermitian=True)
+            eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, **fwd_options)
+            return eigvals_, eigvecs_
+
+        eival, eivec = lsymeig_fcn(mata, matm)
+        loss = (eival * eival).sum() + (eivec * eivec).sum()
+        # NOTE: create_graph=True will make memleak test fails for custom_exacteig
+        # but not for exacteig
+        loss.backward(retain_graph=True)
+
+    assert_no_memleak(_test_lsymeig)
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "abeshape": [(2, 2)],
+    "mshape": [(2, 2)],
+    "method": ["custom_exactsolve"],
+})
+def test_solve_AEM_mem(dtype, device, abeshape, mshape, method):
+    def _test_solve():
+        torch.manual_seed(seed)
+        na = abeshape[-1]
+        ashape = abeshape
+        bshape = abeshape
+        eshape = abeshape
+        checkgrad = method.endswith("exactsolve")
+
+        ncols = bshape[-1] - 1
+        bshape = [*bshape[:-1], ncols]
+        eshape = [*eshape[:-2], ncols]
+        xshape = list(get_bcasted_dims(ashape[:-2], bshape[:-2], eshape[:-1], mshape[:-2])) + [na, ncols]
+        fwd_options = {"method": method, "min_eps": 1e-9}
+        bck_options = {"method": method}  # exactsolve at backward just to test the forward solve
+
+        amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
+            torch.eye(ashape[-1], dtype=dtype, device=device)
+        mmat = torch.rand(mshape, dtype=dtype, device=device) * 0.1 + \
+            torch.eye(mshape[-1], dtype=dtype, device=device) * 0.5
+        bmat = torch.rand(bshape, dtype=dtype, device=device)
+        emat = torch.rand(eshape, dtype=dtype, device=device)
+        mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+
+        amat = amat.requires_grad_()
+        mmat = mmat.requires_grad_()
+        bmat = bmat.requires_grad_()
+        emat = emat.requires_grad_()
+
+        def solvefcn(amat, mmat, bmat, emat):
+            mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+            alinop = LinearOperator.m(amat)
+            mlinop = LinearOperator.m(mmat)
+            x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
+                      **fwd_options,
+                      bck_options=bck_options)
+            return x
+
+        loss = (solvefcn(amat, mmat, bmat, emat) ** 2).sum()
+        # NOTE: create_graph=True will make memleak test fails for custom_solve
+        # but not for exactsolve
+        loss.backward(retain_graph=True)
+
+    assert_no_memleak(_test_solve)
