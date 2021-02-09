@@ -402,7 +402,7 @@ def _check_degen(evals: torch.Tensor, degen_atol: float, degen_rtol: float) -> \
     evals_diff = torch.abs(evals.unsqueeze(-2) - evals.unsqueeze(-1))  # (*BAM, neig, neig)
     degen_thrsh = degen_atol + degen_rtol * torch.abs(evals).unsqueeze(-1)
     idx_degen = (evals_diff < degen_thrsh).to(evals.dtype)
-    isdegenerate = torch.sum(idx_degen) > torch.numel(evals)
+    isdegenerate = bool(torch.sum(idx_degen) > torch.numel(evals))
     return idx_degen, isdegenerate
 
 def _ortho(A: torch.Tensor, B: torch.Tensor, *,
