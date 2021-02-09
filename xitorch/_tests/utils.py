@@ -63,7 +63,7 @@ def assert_no_memleak(fcn: Callable, strict: bool = True, gccollect: bool = Fals
             _show_memsize(fcn, ntries, gccollect=gccollect)
         assert size0 == size
     else:
-        raise NotImplemented("Option non-strict memory leak checking has not been implemented")
+        raise NotImplementedError("Option non-strict memory leak checking has not been implemented")
 
 def _show_memsize(fcn, ntries: int = 10, gccollect: bool = False):
     # show the memory growth
@@ -91,7 +91,7 @@ def _get_tensor_memory() -> float:
 
         # check if it has been visited
         storage = tensor.storage()
-        data_ptr = storage.data_ptr()
+        data_ptr = storage.data_ptr()  # type: ignore
         if data_ptr in visited_data:
             continue
         visited_data.add(data_ptr)
