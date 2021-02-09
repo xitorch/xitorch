@@ -679,9 +679,9 @@ def test_lsymeig_AM_mem(dtype, device, ashape, mshape, method):
 
         eival, eivec = lsymeig_fcn(mata, matm)
         loss = (eival * eival).sum() + (eivec * eivec).sum()
-        # NOTE: create_graph=True will make memleak test fails for custom_exacteig
-        # but not for exacteig
-        loss.backward(retain_graph=True)
+        # using autograd.grad instead of .backward because backward has a known
+        # memory leak problem
+        grads = torch.autograd.grad(loss, (mata, matm), create_graph=True)
 
     assert_no_memleak(_test_lsymeig)
 
@@ -729,8 +729,8 @@ def test_solve_AEM_mem(dtype, device, abeshape, mshape, method):
             return x
 
         loss = (solvefcn(amat, mmat, bmat, emat) ** 2).sum()
-        # NOTE: create_graph=True will make memleak test fails for custom_solve
-        # but not for exactsolve
-        loss.backward(retain_graph=True)
+        # using autograd.grad instead of .backward because backward has a known
+        # memory leak problem
+        grads = torch.autograd.grad(loss, (amat, mmat, bmat, emat), create_graph=True)
 
     assert_no_memleak(_test_solve)

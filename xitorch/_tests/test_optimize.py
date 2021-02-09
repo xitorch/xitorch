@@ -420,9 +420,9 @@ def test_rootfinder_mem(dtype, device):
             return y
 
         loss = (getloss(A, y0, diag, bias) ** 2).sum()
-        # NOTE: memory leak if create_graph=True, but no leak if no rootfinder
-        # function involved
-        loss.backward(retain_graph=True)
+        # using torch.autograd.grad instead of backward because backward
+        # has a memory leak problem
+        grads = torch.autograd.grad(loss, (A, diag, bias), create_graph=True)
 
     assert_no_memleak(_test_rf)
 
@@ -456,8 +456,7 @@ def test_equil_mem(dtype, device):
             return y
 
         loss = (getloss(A, y0, diag, bias) ** 2).sum()
-        # NOTE: create_graph=True will make memleak test fails
-        loss.backward(retain_graph=True)
+        grads = torch.autograd.grad(loss, (A, diag, bias), create_graph=True)
 
     assert_no_memleak(_test_equil)
 
@@ -491,7 +490,6 @@ def test_minimize_mem(dtype, device):
             return y
 
         loss = (getloss(A, y0, diag, bias) ** 2).sum()
-        # NOTE: create_graph=True will make memleak test fails
-        loss.backward(retain_graph=True)
+        grads = torch.autograd.grad(loss, (A, diag, bias), create_graph=True)
 
     assert_no_memleak(_test_min)
