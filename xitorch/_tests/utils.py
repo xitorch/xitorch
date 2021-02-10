@@ -67,13 +67,12 @@ def assert_no_memleak(fcn: Callable, strict: bool = True, gccollect: bool = Fals
 
 def _show_memsize(fcn, ntries: int = 10, gccollect: bool = False):
     # show the memory growth
-    size0 = _get_tensor_memory()
     for i in range(ntries):
         fcn()
         if gccollect:
             gc.collect()
         size = _get_tensor_memory()
-        print("%3d iteration: %.7f MiB of tensors" % (i + 1, size - size0))
+        print("%3d iteration: %.7f MiB of tensors" % (i + 1, size))
 
 def _get_tensor_memory() -> float:
     # obtain the total memory occupied by torch.Tensor in the garbage collector
