@@ -4,7 +4,7 @@ import torch
 import pytest
 from typing import Mapping, List, Callable, Optional, Tuple
 
-__all__ = ["device_dtype_float_test"]
+__all__ = ["device_dtype_float_test", "assert_no_memleak"]
 
 def device_dtype_float_test(only64: int = False, onlycpu: bool = False,
                             additional_kwargs: Mapping[str, List] = {},
