@@ -7,7 +7,7 @@ from xitorch.linalg.symeig import lsymeig, symeig, svd
 from xitorch.linalg.solve import solve
 from xitorch._utils.bcast import get_bcasted_dims
 from xitorch._utils.exceptions import MathWarning
-from xitorch._tests.utils import device_dtype_float_test, assert_no_memleak
+from xitorch._tests.utils import device_dtype_float_test
 
 seed = 12345
 

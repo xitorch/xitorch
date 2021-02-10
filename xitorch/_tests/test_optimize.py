@@ -5,7 +5,7 @@ from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
 from xitorch.grad.jachess import hess
 from xitorch.optimize import rootfinder, equilibrium, minimize
-from xitorch._tests.utils import device_dtype_float_test, assert_no_memleak
+from xitorch._tests.utils import device_dtype_float_test
 
 class DummyModule(xt.EditableModule):
     def __init__(self, A, addx=True, activation="sigmoid", sumoutput=False):
