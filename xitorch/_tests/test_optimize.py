@@ -490,6 +490,6 @@ def test_minimize_mem(dtype, device):
             return y
 
         loss = (getloss(A, y0, diag, bias) ** 2).sum()
-        grads = torch.autograd.grad(loss, (A, diag, bias), create_graph=True)
+        grads = torch.autograd.grad(loss, (A, diag), create_graph=True)
 
     assert_no_memleak(_test_min)
