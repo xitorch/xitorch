@@ -5,7 +5,7 @@ from xitorch.interpolate.interp1 import Interp1D
 from xitorch._tests.utils import device_dtype_float_test
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "bc_type": ["clamped", "natural", "not-a-knot", "periodic", None][3:4],
+    "bc_type": ["clamped", "natural", "not-a-knot", "periodic", None],
     "scramble": [False, True]
 })
 def test_interp1_cspline(dtype, device, bc_type, scramble):
@@ -272,7 +272,3 @@ def test_extrap(dtype, device):
         print("Extrap: %s" % extrap)
         yq = interp(x, y1, xq1, extrap=extrap)
         assert torch.allclose(yq, yq_true, equal_nan=True)
-
-
-if __name__ == "__main__":
-    test_interp1_cspline()
