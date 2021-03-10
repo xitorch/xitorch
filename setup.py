@@ -1,7 +1,22 @@
+import re
 import os
 from setuptools import setup, find_packages
 
 module_name = "xitorch"
+github_url = "https://github.com/xitorch/xitorch/tree/master/"
+raw_github_url = "https://raw.githubusercontent.com/xitorch/xitorch/master/"
+
+# open readme and convert all relative path to absolute path
+with open("README.md", "r") as f:
+    long_desc = f.read()
+
+link_pattern = re.compile(r"\(([\w\-/]+)\)")
+img_pattern  = re.compile(r"\(([\w\-/\.]+)\)")
+link_repl = r"(%s\1)" % github_url
+img_repl  = r"(%s\1)" % raw_github_url
+long_desc = re.sub(link_pattern, link_repl, long_desc)
+long_desc = re.sub(img_pattern, img_repl, long_desc)
+
 file_dir = os.path.dirname(os.path.realpath(__file__))
 absdir = lambda p: os.path.join(file_dir, p)
 
@@ -21,6 +36,8 @@ setup(
     name=module_name,
     version=version["get_version"](),
     description='Differentiable scientific computing library',
+    long_description=long_desc,
+    long_description_content_type="text/markdown",
     url='https://xitorch.readthedocs.io/',
     author='mfkasim1',
     author_email='firman.kasim@gmail.com',
