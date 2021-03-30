@@ -100,7 +100,7 @@ class LinearOperator(EditableModule):
                 is_hermitian = torch.allclose(mat, mat.transpose(-2, -1))
         elif is_hermitian:
             # check the hermitian
-            if not torch.allclose(mat, mat.transpose(-2, -1)):
+            if not torch.allclose(mat, mat.transpose(-2, -1).conj()):
                 raise RuntimeError("The linear operator is indicated to be hermitian, but the matrix is not")
 
         return MatrixLinearOperator(mat, is_hermitian)
