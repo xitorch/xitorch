@@ -32,7 +32,7 @@ def exacteig(A: LinearOperator, neig: int,
         # complex eigenvalues for (near-)degenerate case
         L = torch.cholesky(Mmatrix, upper=False)  # (*BM, q, q)
         Linv = torch.inverse(L)  # (*BM, q, q)
-        LinvT = Linv.transpose(-2, -1)  # (*BM, q, q)
+        LinvT = Linv.transpose(-2, -1).conj()  # (*BM, q, q)
         A2 = torch.matmul(Linv, torch.matmul(Amatrix, LinvT))  # (*BAM, q, q)
 
         # calculate the eigenvalues and eigenvectors
