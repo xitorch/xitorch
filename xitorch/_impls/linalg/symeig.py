@@ -57,21 +57,21 @@ class degen_symeig(torch.autograd.Function):
 
         eival, eivec = ctx.saved_tensors
         min_threshold = torch.finfo(eival.dtype).eps ** 0.6
-        eivect = eivec.transpose(-2, -1)
+        eivect = eivec.transpose(-2, -1).conj()
 
         # remove the degenerate part
         # see https://arxiv.org/pdf/2011.04366.pdf
         if grad_eivec is not None:
             # take the contribution from the eivec
             F = eival.unsqueeze(-2) - eival.unsqueeze(-1)
-            idx = torch.abs(F) < min_threshold
+            idx = torch.abs(F) <= min_threshold
             F[idx] = float("inf")
 
             # if in debug mode, check the degeneracy requirements
             if in_debug_mode:
                 degenerate = torch.any(idx)
                 xtg = eivect @ grad_eivec
-                diff_xtg = (xtg - xtg.transpose(-2, -1))[idx]
+                diff_xtg = (xtg - xtg.transpose(-2, -1).conj())[idx]
                 reqsat = torch.allclose(diff_xtg, torch.zeros_like(diff_xtg))
                 # if the requirement is not satisfied, mathematically the derivative
                 # should be `nan`, but here we just raise a warning
@@ -94,7 +94,7 @@ class degen_symeig(torch.autograd.Function):
             result += torch.matmul(eivec, grad_eival.unsqueeze(-1) * eivect)
 
         # symmetrize to reduce numerical instability
-        result = (result + result.transpose(-2, -1)) * 0.5
+        result = (result + result.transpose(-2, -1).conj()) * 0.5
         return result
 
 def davidson(A: LinearOperator, neig: int,

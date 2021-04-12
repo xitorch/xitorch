@@ -333,8 +333,8 @@ class symeig_torchfcn(torch.autograd.Function):
 
         # if degenerate, check the conditions for finite derivative
         if is_debug_enabled() and isdegenerate:
-            xtg = torch.matmul(evecs.transpose(-2, -1), grad_evecs)
-            req1 = idx_degen * (xtg - xtg.transpose(-2, -1))
+            xtg = torch.matmul(evecs.transpose(-2, -1).conj(), grad_evecs)
+            req1 = idx_degen * (xtg - xtg.transpose(-2, -1).conj())
             reqtol = xtg.abs().max() * grad_evecs.shape[-2] * torch.finfo(grad_evecs.dtype).eps
 
             if not torch.all(torch.abs(req1) <= reqtol):
@@ -417,26 +417,27 @@ def _ortho(A: torch.Tensor, B: torch.Tensor, *,
     # shapes:
     # A: (*BAM, na, neig)
     # B: (*BAM, na, neig)
-    Ar = A if (M is None or not mright) else M.mm(A)
     if D is None:
         # contracted using opt_einsum
         str1 = "...rc,...rc->...c"
+        Bconj = B.conj()
         if M is None:
-            return A - torch.einsum(str1, A, B).unsqueeze(-2) * B
+            return A - torch.einsum(str1, A, Bconj).unsqueeze(-2) * B
         elif mright:
-            return A - torch.einsum(str1, M.mm(A), B).unsqueeze(-2) * B
+            return A - torch.einsum(str1, M.mm(A), Bconj).unsqueeze(-2) * B
         else:
-            return A - M.mm(torch.einsum(str1, A, B).unsqueeze(-2) * B)
+            return A - M.mm(torch.einsum(str1, A, Bconj).unsqueeze(-2) * B)
     else:
+        BH = B.transpose(-2, -1).conj()
         if M is None:
-            DBTA = D * torch.matmul(B.transpose(-2, -1), A)
-            return A - torch.matmul(B, DBTA)
+            DBHA = D * torch.matmul(BH, A)
+            return A - torch.matmul(B, DBHA)
         elif mright:
-            DBTA = D * torch.matmul(B.transpose(-2, -1), M.mm(A))
-            return A - torch.matmul(B, DBTA)
+            DBHA = D * torch.matmul(BH, M.mm(A))
+            return A - torch.matmul(B, DBHA)
         else:
-            DBTA = D * torch.matmul(B.transpose(-2, -1), A)
-            return A - M.mm(torch.matmul(B, DBTA))
+            DBHA = D * torch.matmul(BH, A)
+            return A - M.mm(torch.matmul(B, DBHA))
 
 def custom_exacteig(A, neig, mode, M=None, **options):
     return exacteig(A, neig, mode, M)

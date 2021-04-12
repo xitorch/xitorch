@@ -48,20 +48,21 @@ def test_lsymeig_mismatch_err(dtype, device):
         pass
 
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "shape": [(4, 4), (2, 4, 4), (2, 3, 4, 4)],
     "method": ["exacteig", "custom_exacteig"],  # only 2 of methods, because both gradient implementations are covered
 })
 def test_lsymeig_A(dtype, device, shape, method):
     torch.manual_seed(seed)
     mat1 = torch.rand(shape, dtype=dtype, device=device)
-    mat1 = mat1 + mat1.transpose(-2, -1)
+    mat1 = mat1 + mat1.transpose(-2, -1).conj()
     mat1 = mat1.requires_grad_()
     linop1 = LinearOperator.m(mat1, True)
     fwd_options = {"method": method}
 
     for neig in [2, shape[-1]]:
         eigvals, eigvecs = lsymeig(linop1, neig=neig, **fwd_options)  # eigvals: (..., neig), eigvecs: (..., na, neig)
+        eigvals = eigvals.to(eigvecs.dtype)
         assert list(eigvecs.shape) == list([*linop1.shape[:-1], neig])
         assert list(eigvals.shape) == list([*linop1.shape[:-2], neig])
 
@@ -72,15 +73,15 @@ def test_lsymeig_A(dtype, device, shape, method):
         # only perform gradcheck if neig is full, to reduce the computational cost
         if neig == shape[-1]:
             def lsymeig_fcn(amat):
-                amat = (amat + amat.transpose(-2, -1)) * 0.5  # symmetrize
+                amat = (amat + amat.transpose(-2, -1).conj()) * 0.5  # symmetrize
                 alinop = LinearOperator.m(amat, is_hermitian=True)
                 eigvals_, eigvecs_ = lsymeig(alinop, neig=neig, **fwd_options)
-                return eigvals_, eigvecs_
+                return eigvals_, eigvecs_.abs()
 
             gradcheck(lsymeig_fcn, (mat1,))
             gradgradcheck(lsymeig_fcn, (mat1,))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "ashape": [(3, 3), (2, 3, 3), (2, 1, 3, 3)],
     "mshape": [(3, 3), (2, 3, 3), (2, 1, 3, 3)],
     "method": ["exacteig", "custom_exacteig"],  # only 2 of methods, because both gradient implementations are covered
@@ -90,8 +91,8 @@ def test_lsymeig_AM(dtype, device, ashape, mshape, method):
     mata = torch.rand(ashape, dtype=dtype, device=device)
     matm = torch.rand(mshape, dtype=dtype, device=device) + \
         torch.eye(mshape[-1], dtype=dtype, device=device)  # make sure it's not singular
-    mata = mata + mata.transpose(-2, -1)
-    matm = matm + matm.transpose(-2, -1)
+    mata = mata + mata.transpose(-2, -1).conj()
+    matm = matm + matm.transpose(-2, -1).conj()
     mata = mata.requires_grad_()
     matm = matm.requires_grad_()
     linopa = LinearOperator.m(mata, True)
@@ -102,6 +103,7 @@ def test_lsymeig_AM(dtype, device, ashape, mshape, method):
     bshape = get_bcasted_dims(ashape[:-2], mshape[:-2])
     for neig in [2, ashape[-1]]:
         eigvals, eigvecs = lsymeig(linopa, M=linopm, neig=neig, **fwd_options)  # eigvals: (..., neig)
+        eigvals = eigvals.to(eigvecs.dtype)
         assert list(eigvals.shape) == list([*bshape, neig])
         assert list(eigvecs.shape) == list([*bshape, na, neig])
 
@@ -113,12 +115,12 @@ def test_lsymeig_AM(dtype, device, ashape, mshape, method):
         if neig == ashape[-1]:
             def lsymeig_fcn(amat, mmat):
                 # symmetrize
-                amat = (amat + amat.transpose(-2, -1)) * 0.5
-                mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+                amat = (amat + amat.transpose(-2, -1).conj()) * 0.5
+                mmat = (mmat + mmat.transpose(-2, -1).conj()) * 0.5
                 alinop = LinearOperator.m(amat, is_hermitian=True)
                 mlinop = LinearOperator.m(mmat, is_hermitian=True)
                 eigvals_, eigvecs_ = lsymeig(alinop, M=mlinop, neig=neig, **fwd_options)
-                return eigvals_, eigvecs_
+                return eigvals_, eigvecs_.abs()
 
             gradcheck(lsymeig_fcn, (mata, matm))
             gradgradcheck(lsymeig_fcn, (mata, matm))
@@ -172,22 +174,24 @@ def test_symeig_A_large_methods(dtype, device, shape, method, mode):
     xe = torch.matmul(eigvecs, torch.diag_embed(eigvals, dim1=-2, dim2=-1))
     assert torch.allclose(ax, xe)
 
-@device_dtype_float_test(only64=True, additional_kwargs={
-    "eivaloffset": [0, -4]
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
+    "eivaloffset": [0, -4],
+    "method": ["exacteig", "custom_exacteig"]
 })
-def test_symeig_A_degenerate(dtype, device, eivaloffset):
+def test_symeig_A_degenerate(dtype, device, eivaloffset, method):
     # test if the gradient can be stably propagated if the loss function
     # does not depend on which degenerate eigenvectors are used
     # (note: the variable is changed in a certain way so that the degeneracy
     # is kept)
 
-    torch.manual_seed(126)
+    torch.manual_seed(127)
     n = 5
     neig = 3
     kwargs = {
         "dtype": dtype,
         "device": device,
     }
+    print(dtype)
     # random matrix to be orthogonalized for the eigenvectors
     mat = torch.randn((n, n), **kwargs).requires_grad_()
 
@@ -195,7 +199,11 @@ def test_symeig_A_degenerate(dtype, device, eivaloffset):
     P2 = torch.randn((n, n), **kwargs).requires_grad_()
 
     # the degenerate eigenvalues
-    a = (torch.tensor([1.0, 2.0, 3.0], **kwargs) + eivaloffset).requires_grad_()
+    a = (torch.tensor([1.0, 2.0, 3.0], **kwargs) + eivaloffset)
+    if torch.is_complex(a):
+        a = a.real
+    a = a.requires_grad_()
+
     bck_options = {
         "method": "exactsolve",
     }
@@ -205,27 +213,29 @@ def test_symeig_A_degenerate(dtype, device, eivaloffset):
         P, _ = torch.qr(mat)
 
         # line up the eigenvalues
-        b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
+        b = torch.cat((a[:2], a[1:2], a[2:], a[2:])).to(dtype)
 
         # construct the matrix
         diag = torch.diag_embed(b)
-        A = torch.matmul(torch.matmul(P.T, diag), P)
-        Alinop = LinearOperator.m(A)
+        A = torch.matmul(torch.matmul(P.transpose(-2, -1).conj(), diag), P)
+        Alinop = LinearOperator.m(A, is_hermitian=True)
 
         eivals, eivecs = symeig(
             Alinop, neig=neig,
-            method="custom_exacteig",
+            method=method,
             bck_options=bck_options)
         U = eivecs[:, 1:3]  # the degenerate eigenvectors
 
-        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U)
+        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U.conj())
         return loss
 
     gradcheck(get_loss, (a, mat, P2))
     gradgradcheck(get_loss, (a, mat, P2))
 
-@device_dtype_float_test(only64=True)
-def test_symeig_AM_degenerate(dtype, device):
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
+    "method": ["exacteig", "custom_exacteig"]
+})
+def test_symeig_AM_degenerate(dtype, device, method):
     # same as test_symeig_A_degenerate, but now with the overlap matrix
 
     torch.manual_seed(126)
@@ -243,7 +253,11 @@ def test_symeig_AM_degenerate(dtype, device):
     P2 = torch.randn((n, n), **kwargs).requires_grad_()
 
     # the degenerate eigenvalues
-    a = torch.tensor([1.0, 2.0, 3.0], **kwargs).requires_grad_()
+    a = torch.tensor([1.0, 2.0, 3.0], **kwargs)
+    if torch.is_complex(a):
+        a = a.real
+    a = a.requires_grad_()
+
     bck_options = {
         "method": "exactsolve",
     }
@@ -254,22 +268,22 @@ def test_symeig_AM_degenerate(dtype, device):
         PM, _ = torch.qr(matM)
 
         # line up the eigenvalues
-        b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
+        b = torch.cat((a[:2], a[1:2], a[2:], a[2:])).to(dtype)
 
         # construct the matrix
         diag = torch.diag_embed(b)
-        A = torch.matmul(torch.matmul(P.T, diag), P)
-        M = torch.matmul(PM.T, PM)
-        Alinop = LinearOperator.m(A)
-        Mlinop = LinearOperator.m(M)
+        A = torch.matmul(torch.matmul(P.transpose(-2, -1).conj(), diag), P)
+        M = torch.matmul(PM.transpose(-2, -1).conj(), PM)
+        Alinop = LinearOperator.m(A, is_hermitian=True)
+        Mlinop = LinearOperator.m(M, is_hermitian=True)
 
         eivals, eivecs = symeig(
             Alinop, M=Mlinop, neig=neig,
-            method="custom_exacteig",
+            method=method,
             bck_options=bck_options)
         U = eivecs[:, 1:3]  # the degenerate eigenvectors
 
-        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U)
+        loss = torch.einsum("rc,rc->", torch.matmul(P2, U), U.conj())
         return loss
 
     gradcheck(get_loss, (a, matA, matM, P2))
@@ -313,7 +327,7 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
             method="custom_exacteig",
             bck_options=bck_options)
         U = eivecs[:, :3]  # the degenerate eigenvectors are in 1,2
-        loss = torch.sum(U**4)
+        loss = torch.sum(U ** 4)
         return loss
 
     with warnings.catch_warnings(record=True) as w, enable_debug():

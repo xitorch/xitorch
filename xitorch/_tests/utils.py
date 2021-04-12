@@ -8,7 +8,8 @@ __all__ = ["device_dtype_float_test", "assert_no_memleak"]
 
 def device_dtype_float_test(only64: int = False, onlycpu: bool = False,
                             additional_kwargs: Mapping[str, List] = {},
-                            skip_fcn: Optional[Callable[..., Tuple[bool, str]]] = None) -> Callable:
+                            skip_fcn: Optional[Callable[..., Tuple[bool, str]]] = None,
+                            include_complex: bool = False) -> Callable:
 
     dtypes = [torch.float, torch.float64]
     devices = [torch.device("cpu"), torch.device("cuda")]
@@ -16,6 +17,9 @@ def device_dtype_float_test(only64: int = False, onlycpu: bool = False,
         dtypes = [torch.float64]
     if onlycpu or not torch.cuda.is_available():
         devices = [torch.device("cpu")]
+    if include_complex:
+        dtypes.extend([_get_complex_dtype(dt) for dt in dtypes])
+
     kwargs_vals = additional_kwargs.values()
     argnames = ",".join(["dtype", "device"] + list(additional_kwargs.keys()))
     iters = itertools.product(dtypes, devices, *kwargs_vals)
@@ -64,6 +68,27 @@ def assert_no_memleak(fcn: Callable, strict: bool = True, gccollect: bool = Fals
         assert size0 == size
     else:
         raise NotImplementedError("Option non-strict memory leak checking has not been implemented")
+
+def _get_complex_dtype(dtype: torch.dtype) -> torch.dtype:
+    """
+    Returns the complex data type that corresponds to the input data type.
+
+    Arguments
+    ---------
+    dtype: torch.dtype
+        Real number data type
+
+    Returns
+    -------
+    torch.dtype
+        The complex data type
+    """
+    if dtype == torch.float32:
+        return torch.complex64
+    elif dtype == torch.float64:
+        return torch.complex128
+    else:
+        raise RuntimeError("Datatype %s has no complex datatype" % dtype)
 
 def _show_memsize(fcn, ntries: int = 10, gccollect: bool = False):
     # show the memory growth
