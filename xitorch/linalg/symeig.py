@@ -380,7 +380,7 @@ class symeig_torchfcn(torch.autograd.Function):
             gevecsM = -gevecsA * evals.unsqueeze(-2)
 
             # the contribution from the parallel elements
-            gevecsM_par = (-0.5 * torch.einsum("...ae,...ae->...e", grad_evecs, evecs)
+            gevecsM_par = (-0.5 * torch.einsum("...ae,...ae->...e", grad_evecs, evecs.conj())
                            ).unsqueeze(-2) * evecs  # (*BAM, na, neig)
 
             gaccumM = gevalsM + gevecsM + gevecsM_par
