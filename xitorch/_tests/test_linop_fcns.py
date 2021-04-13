@@ -423,7 +423,7 @@ def test_solve_mismatch_err(dtype, device):
         except RuntimeError:
             pass
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "ashape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "bshape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "method": ["exactsolve", "custom_exactsolve"],
@@ -432,7 +432,7 @@ def test_solve_mismatch_err(dtype, device):
 def test_solve_A(dtype, device, ashape, bshape, method, hermit):
     torch.manual_seed(seed)
     na = ashape[-1]
-    checkgrad = method.endswith("exactsolve")
+    checkgrad = method.endswith("exactsolve") and len(ashape) == len(bshape) == 2
 
     ncols = bshape[-1] - 1
     bshape = [*bshape[:-1], ncols]
@@ -449,7 +449,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
 
     def prepare(amat):
         if hermit:
-            return (amat + amat.transpose(-2, -1)) * 0.5
+            return (amat + amat.transpose(-2, -1).conj()) * 0.5
         return amat
 
     def solvefcn(amat, bmat):
@@ -513,7 +513,7 @@ def test_solve_A_methods(dtype, device, method):
     ax = LinearOperator.m(amat).mm(x)
     assert torch.allclose(ax, bmat)
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "ashape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "bshape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "eshape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
@@ -522,7 +522,9 @@ def test_solve_A_methods(dtype, device, method):
 def test_solve_AE(dtype, device, ashape, bshape, eshape, method):
     torch.manual_seed(seed)
     na = ashape[-1]
-    checkgrad = method.endswith("exactsolve")
+
+    # save time by enabling gradchecker only on some cases
+    checkgrad = method.endswith("exactsolve") and len(ashape) == len(bshape) == len(eshape) == 2
 
     ncols = bshape[-1] - 1
     bshape = [*bshape[:-1], ncols]
@@ -554,12 +556,11 @@ def test_solve_AE(dtype, device, ashape, bshape, eshape, method):
     xe = torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2))
     assert torch.allclose(ax - xe, bmat)
 
-    # grad check only performed at AEM, to save time
-    # if checkgrad:
-    #     gradcheck(solvefcn, (amat, bmat, emat))
-    #     gradgradcheck(solvefcn, (amat, bmat, emat))
+    if checkgrad:
+        gradcheck(solvefcn, (amat, bmat, emat))
+        gradgradcheck(solvefcn, (amat, bmat, emat))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "abeshape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "mshape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
     "method": ["exactsolve", "custom_exactsolve"],
@@ -570,7 +571,9 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
     ashape = abeshape
     bshape = abeshape
     eshape = abeshape
-    checkgrad = method.endswith("exactsolve")
+
+    # save time by enabling gradchecker only on some cases
+    checkgrad = method.endswith("exactsolve") and len(abeshape) == len(mshape) == 2
 
     ncols = bshape[-1] - 1
     bshape = [*bshape[:-1], ncols]
@@ -585,7 +588,7 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
         torch.eye(mshape[-1], dtype=dtype, device=device) * 0.5
     bmat = torch.rand(bshape, dtype=dtype, device=device)
     emat = torch.rand(eshape, dtype=dtype, device=device)
-    mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+    mmat = (mmat + mmat.transpose(-2, -1).conj()) * 0.5
 
     amat = amat.requires_grad_()
     mmat = mmat.requires_grad_()
@@ -593,9 +596,9 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
     emat = emat.requires_grad_()
 
     def solvefcn(amat, mmat, bmat, emat):
-        mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+        mmat = (mmat + mmat.transpose(-2, -1).conj()) * 0.5
         alinop = LinearOperator.m(amat)
-        mlinop = LinearOperator.m(mmat)
+        mlinop = LinearOperator.m(mmat, is_hermitian=True)
         x = solve(A=alinop, B=bmat, E=emat, M=mlinop,
                   **fwd_options,
                   bck_options=bck_options)
@@ -605,7 +608,7 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
     assert list(x.shape) == xshape
 
     ax = LinearOperator.m(amat).mm(x)
-    mxe = LinearOperator.m(mmat).mm(torch.matmul(x, torch.diag_embed(emat, dim2=-1, dim1=-2)))
+    mxe = LinearOperator.m(mmat).mm(torch.matmul(x, torch.diag_embed(emat.to(x.dtype), dim2=-1, dim1=-2)))
     y = ax - mxe
     assert torch.allclose(y, bmat)
 

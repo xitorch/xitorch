@@ -176,7 +176,8 @@ class solve_torchfcn(torch.autograd.Function):
              ctx.M.uselinopparams(*mparams) if ctx.M is not None else dummy_context_manager():
             AT = ctx.A.H  # (*BA, nr, nr)
             MT = ctx.M.H if ctx.M is not None else None  # (*BM, nr, nr)
-            v = solve(AT, grad_x, E, MT,
+            Econj = E.conj() if E is not None else None
+            v = solve(AT, grad_x, Econj, MT,
                       bck_options=ctx.bck_config, **ctx.bck_config)  # (*BABEM, nr, ncols)
         grad_B = v
 
@@ -198,7 +199,7 @@ class solve_torchfcn(torch.autograd.Function):
             else:
                 with ctx.M.uselinopparams(*mparams):
                     Mx = ctx.M.mm(x)  # (*BABEM, nr, ncols)
-            grad_E = torch.einsum('...rc,...rc->...c', v, Mx)  # (*BABEM, ncols)
+            grad_E = torch.einsum('...rc,...rc->...c', v, Mx.conj())  # (*BABEM, ncols)
 
         # calculate the gradient to the biases matrices
         grad_mparams = []
