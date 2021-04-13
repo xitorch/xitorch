@@ -1,5 +1,6 @@
 import warnings
 import torch
+import pytest
 from torch.autograd import gradcheck, gradgradcheck
 from xitorch.debug.modes import enable_debug
 from xitorch import LinearOperator
@@ -470,10 +471,15 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
         gradcheck(solvefcn, (amat, bmat))
         gradgradcheck(solvefcn, (amat, bmat))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "method": ["scipy_gmres", "broyden1", "cg", "bicgstab"],
 })
 def test_solve_A_methods(dtype, device, method):
+
+    if dtype in [torch.complex128, torch.complex64]:
+        if method in ["scipy_gmres", "broyden1"]:
+            pytest.xfail("%s does not work for complex input" % method)
+
     torch.manual_seed(seed)
     na = 100
     ashape = (na, na)
@@ -497,7 +503,7 @@ def test_solve_A_methods(dtype, device, method):
     amat = torch.rand(ashape, dtype=dtype, device=device) * 0.1 + \
         torch.eye(ashape[-1], dtype=dtype, device=device)
     bmat = torch.rand(bshape, dtype=dtype, device=device) + 0.1
-    amat = (amat + amat.transpose(-2, -1)) * 0.5
+    amat = (amat + amat.transpose(-2, -1).conj()) * 0.5
 
     amat = amat.requires_grad_()
     bmat = bmat.requires_grad_()
@@ -617,10 +623,15 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
         gradcheck(solvefcn, (amat, mmat, bmat, emat))
         gradgradcheck(solvefcn, (amat, mmat, bmat, emat))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "method": ["broyden1", "cg", "bicgstab"],
 })
 def test_solve_AEM_methods(dtype, device, method):
+
+    if dtype in [torch.complex128, torch.complex64]:
+        if method in ["broyden1"]:
+            pytest.xfail("%s does not work for complex input" % method)
+
     torch.manual_seed(seed)
     na = 100
     nc = na // 2
@@ -641,11 +652,11 @@ def test_solve_AEM_methods(dtype, device, method):
     amat = torch.rand(amshape, dtype=dtype, device=device) * 0.1 + \
         torch.eye(amshape[-1], dtype=dtype, device=device)
     mmat = torch.rand(amshape, dtype=dtype, device=device) * 0.05 + \
-        torch.eye(amshape[-1], dtype=dtype, device=device)
+        torch.eye(amshape[-1], dtype=dtype, device=device) * 0.5
     bmat = torch.rand(bshape, dtype=dtype, device=device) + 0.1
     emat = torch.rand(eshape, dtype=dtype, device=device) * 0.1
-    amat = (amat + amat.transpose(-2, -1)) * 0.5
-    mmat = (mmat + mmat.transpose(-2, -1)) * 0.5
+    amat = (amat + amat.transpose(-2, -1).conj()) * 0.5
+    mmat = (mmat + mmat.transpose(-2, -1).conj()) * 0.5
 
     amat = amat.requires_grad_()
     bmat = bmat.requires_grad_()

@@ -330,7 +330,7 @@ def _dot(r: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     # r: (*BR, nr, nc)
     # z: (*BR, nr, nc)
     # return: (*BR, 1, nc)
-    return torch.einsum("...rc,...rc->...c", r, z).unsqueeze(-2)
+    return torch.einsum("...rc,...rc->...c", r.conj(), z).unsqueeze(-2)
 
 ############ rootfinder-based ############
 @functools.wraps(broyden1)
