@@ -8,6 +8,7 @@ from scipy.sparse.linalg import gmres
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from xitorch._utils.exceptions import ConvergenceWarning
+from xitorch._utils.types import get_np_dtype
 
 __all__ = ["wrap_gmres", "cg", "bicgstab", "broyden1_solve", "exactsolve"]
 
@@ -33,6 +34,7 @@ def wrap_gmres(A, B, E=None, M=None,
 
     # NOTE: currently only works for batched B (1 batch dim), but unbatched A
     assert len(A.shape) == 2 and len(B.shape) == 3, "Currently only works for batched B (1 batch dim), but unbatched A"
+    assert not torch.is_complex(B), "complex is not supported in gmres"
 
     # check the parameters
     msg = "GMRES can only do AX=B"
@@ -49,7 +51,7 @@ def wrap_gmres(A, B, E=None, M=None,
     # convert the numpy/scipy
     op = A.scipy_linalg_op()
     B_np = B.detach().cpu().numpy()
-    res_np = np.empty(B.shape, dtype=np.float64)
+    res_np = np.empty(B.shape, dtype=get_np_dtype(B.dtype))
     for i in range(nbatch):
         for j in range(ncols):
             x, info = gmres(op, B_np[i, j, :], tol=min_eps, atol=1e-12, maxiter=max_niter)
