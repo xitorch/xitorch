@@ -341,7 +341,7 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
         assert w[0].category == MathWarning
 
 ############## svd #############
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "shape": [(4, 3), (2, 1, 3, 4)],
     "method": ["exacteig", "custom_exacteig"],
 })
@@ -361,10 +361,10 @@ def test_svd_A(dtype, device, shape, method):
 
         keye = torch.zeros((*shape[:-2], k, k), dtype=dtype, device=device) + \
             torch.eye(k, dtype=dtype, device=device)
-        assert torch.allclose(u.transpose(-2, -1) @ u, keye)
-        assert torch.allclose(vh @ vh.transpose(-2, -1), keye)
+        assert torch.allclose(u.transpose(-2, -1).conj() @ u, keye)
+        assert torch.allclose(vh @ vh.transpose(-2, -1).conj(), keye)
         if k == min_mn:
-            assert torch.allclose(mat1, u @ torch.diag_embed(s) @ vh)
+            assert torch.allclose(mat1, u @ torch.diag_embed(s.to(u.dtype)) @ vh)
 
         def svd_fcn(amat, only_s=False):
             alinop = LinearOperator.m(amat, is_hermitian=False)
@@ -372,7 +372,7 @@ def test_svd_A(dtype, device, shape, method):
             if only_s:
                 return s_
             else:
-                return u_, s_, vh_
+                return u_.abs(), s_, vh_.abs()
 
         gradcheck(svd_fcn, (mat1,))
         gradgradcheck(svd_fcn, (mat1,))

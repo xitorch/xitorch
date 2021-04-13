@@ -246,7 +246,7 @@ def svd(A: LinearOperator, k: Optional[int] = None,
     else:
         v = eivecs  # (*BA, n, k)
         u = A.mm(v) / sdiv  # (*BA, m, k)
-    vh = v.transpose(-2, -1)
+    vh = v.transpose(-2, -1).conj()
     return u, s, vh
 
 class symeig_torchfcn(torch.autograd.Function):

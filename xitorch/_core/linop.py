@@ -97,7 +97,7 @@ class LinearOperator(EditableModule):
             if mat.shape[-2] != mat.shape[-1]:
                 is_hermitian = False
             else:
-                is_hermitian = torch.allclose(mat, mat.transpose(-2, -1))
+                is_hermitian = torch.allclose(mat, mat.transpose(-2, -1).conj())
         elif is_hermitian:
             # check the hermitian
             if not torch.allclose(mat, mat.transpose(-2, -1).conj()):
@@ -384,6 +384,10 @@ class LinearOperator(EditableModule):
         LinearOperator
             The Hermite / transposed LinearOperator
         """
+        if self._is_hermitian:
+            return self
+        elif isinstance(self, MatrixLinearOperator):
+            return LinearOperator.m(self.fullmatrix().transpose(-2, -1).conj())
         return AdjointLinearOperator(self)
 
     ############# special functions ################
@@ -406,6 +410,8 @@ class LinearOperator(EditableModule):
         # returns linear operator that represents self @ b
         if self.shape[-1] != b.shape[-2]:
             raise RuntimeError("Mismatch shape of matmul operation: %s and %s" % (self.shape, b.shape))
+        if isinstance(self, MatrixLinearOperator) and isinstance(b, MatrixLinearOperator):
+            return LinearOperator.m(self.fullmatrix() @ b.fullmatrix(), is_hermitian=is_hermitian)
         return MatmulLinearOperator(self, b, is_hermitian=is_hermitian)
 
     def __add__(self, b):
@@ -633,10 +639,10 @@ class MatrixLinearOperator(LinearOperator):
         return torch.matmul(self.mat, x)
 
     def _rmv(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.matmul(self.mat.transpose(-2, -1), x.unsqueeze(-1)).squeeze(-1)
+        return torch.matmul(self.mat.transpose(-2, -1).conj(), x.unsqueeze(-1)).squeeze(-1)
 
     def _rmm(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.matmul(self.mat.transpose(-2, -1), x)
+        return torch.matmul(self.mat.transpose(-2, -1).conj(), x)
 
     def _fullmatrix(self) -> torch.Tensor:
         return self.mat

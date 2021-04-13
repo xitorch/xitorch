@@ -172,10 +172,10 @@ class solve_torchfcn(torch.autograd.Function):
 
         # solve (A-biases*M)^T v = grad_x
         # this is the grad of B
-        AT = ctx.A.H  # (*BA, nr, nr)
-        MT = ctx.M.H if ctx.M is not None else None  # (*BM, nr, nr)
-        with AT.uselinopparams(*params), \
-             MT.uselinopparams(*mparams) if MT is not None else dummy_context_manager():
+        with ctx.A.uselinopparams(*params), \
+             ctx.M.uselinopparams(*mparams) if ctx.M is not None else dummy_context_manager():
+            AT = ctx.A.H  # (*BA, nr, nr)
+            MT = ctx.M.H if ctx.M is not None else None  # (*BM, nr, nr)
             v = solve(AT, grad_x, E, MT,
                       bck_options=ctx.bck_config, **ctx.bck_config)  # (*BABEM, nr, ncols)
         grad_B = v
