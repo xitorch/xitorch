@@ -68,6 +68,7 @@ def _nonlin_solver(fcn, x0, params, method,
     # solving complex rootfinder by concatenating real and imaginary part,
     # making the variable twice as long
     x_is_complex = torch.is_complex(x0)
+
     def _ravel(x: torch.Tensor) -> torch.Tensor:
         # represents x as a long real vector
         if x_is_complex:
