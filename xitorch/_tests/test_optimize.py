@@ -13,7 +13,7 @@ class DummyModule(xt.EditableModule):
         self.A = A  # (nr, nr)
         self.addx = addx
         self.activation = {
-            "sigmoid": torch.nn.Sigmoid(),
+            "sigmoid": lambda x: 1 / (1 + torch.exp(-x)),
             "cos": torch.cos,
             "square": lambda x: x * x
         }[activation]
@@ -50,7 +50,7 @@ class DummyNNModule(torch.nn.Module):
         self.A = A
         self.addx = addx
         self.activation = {
-            "sigmoid": torch.nn.Sigmoid(),
+            "sigmoid": lambda x: 1 / (1 + torch.exp(-x)),
             "cos": torch.cos,
             "square": lambda x: x * x
         }[activation]
@@ -98,7 +98,7 @@ class DummyModuleExplicit(xt.EditableModule):
     def __init__(self, addx=True):
         super(DummyModuleExplicit, self).__init__()
         self.addx = addx
-        self.activation = torch.nn.Sigmoid()
+        self.activation = lambda x: 1 / (1 + torch.exp(-x))
 
     def forward(self, x, A, diag, bias):
         nbatch, nr = x.shape
@@ -114,14 +114,14 @@ class DummyModuleExplicit(xt.EditableModule):
     def getparamnames(self, methodname, prefix=""):
         return []
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "clss": [DummyModule, DummyNNModule, DummyNNInEditableModule],
 })
 def test_rootfinder(dtype, device, clss):
     torch.manual_seed(100)
     random.seed(100)
 
-    nr = 3
+    nr = 2
     nbatch = 2
     fwd_options = {
         "method": "broyden1",
@@ -146,21 +146,24 @@ def test_rootfinder(dtype, device, clss):
         y = rootfinder(model.forward, y0, **fwd_options)
         return y
 
-    gradcheck(getloss, (A, y0, diag, bias))
-    gradgradcheck(getloss, (A, y0, diag, bias))
+    # only check for real numbers or complex with DummyModule to save time
+    checkgrad = not torch.is_complex(y0) or clss is DummyModule
+    if checkgrad:
+        gradcheck(getloss, (A, y0, diag, bias))
+        gradgradcheck(getloss, (A, y0, diag, bias))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "clss": [DummyModule, DummyNNModule],
 })
 def test_equil(dtype, device, clss):
     torch.manual_seed(100)
     random.seed(100)
 
-    nr = 3
+    nr = 2
     nbatch = 2
     fwd_options = {
         "method": "broyden1",
-        "f_tol": 1e-9,
+        "f_tol": 1e-12,
         "alpha": -0.5,
     }
     bck_options = {
@@ -184,17 +187,20 @@ def test_equil(dtype, device, clss):
         y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
         return y
 
-    gradcheck(getloss, (A, y0, diag, bias))
-    gradgradcheck(getloss, (A, y0, diag, bias))
+    # only check for real numbers or complex with DummyModule to save time
+    checkgrad = not torch.is_complex(y0) or clss is DummyModule
+    if checkgrad:
+        gradcheck(getloss, (A, y0, diag, bias))
+        gradgradcheck(getloss, (A, y0, diag, bias))
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "bias_is_tensor": [True, False]
 })
 def test_rootfinder_with_params(dtype, device, bias_is_tensor):
     torch.manual_seed(100)
     random.seed(100)
 
-    nr = 3
+    nr = 2
     nbatch = 2
     fwd_options = {
         "method": "broyden1",
@@ -221,8 +227,11 @@ def test_rootfinder_with_params(dtype, device, bias_is_tensor):
         y = rootfinder(model.forward, y0, (A, diag, bias), **fwd_options)
         return y
 
-    gradcheck(getloss, (y0, A, diag, bias))
-    gradgradcheck(getloss, (y0, A, diag, bias))
+    # only check for real numbers or complex with bias_is_tensor to save time
+    checkgrad = not torch.is_complex(y0) or bias_is_tensor
+    if checkgrad:
+        gradcheck(getloss, (y0, A, diag, bias))
+        gradgradcheck(getloss, (y0, A, diag, bias))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "clss": [DummyModule, DummyNNModule],
@@ -273,7 +282,7 @@ def test_minimize(dtype, device, clss):
     gradgradcheck(getloss, (A, y0, diag, bias))
 
 ############## forward methods test ##############
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "method": ["broyden1", "broyden2", "linearmixing"],
 })
 def test_rootfinder_methods(dtype, device, method):
@@ -306,7 +315,7 @@ def test_rootfinder_methods(dtype, device, method):
     f = model.forward(y)
     assert torch.allclose(f * 0, f)
 
-@device_dtype_float_test(only64=True, additional_kwargs={
+@device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "method": ["broyden1", "broyden2", "linearmixing"],
 })
 def test_equil_methods(dtype, device, method):

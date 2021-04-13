@@ -213,6 +213,10 @@ def minimize(
         tensor([[-0.0519],
                 [-0.2684]], grad_fn=<_RootFinderBackward>)
     """
+
+    assert not torch.is_complex(y0), \
+        "complex number is not supported on xitorch.optimize.rootfinder at the moment"
+
     # perform implementation check if debug mode is enabled
     if is_debug_enabled():
         assert_fcn_params(fcn, (y0, *params))
