@@ -53,7 +53,7 @@ def test_lsymeig_mismatch_err(dtype, device):
     "method": ["exacteig", "custom_exacteig"],  # only 2 of methods, because both gradient implementations are covered
 })
 def test_lsymeig_A(dtype, device, shape, method):
-    torch.manual_seed(135)  # TODO: stabilize lsymeig for many manual_seed
+    torch.manual_seed(seed)
     mat1 = torch.rand(shape, dtype=dtype, device=device)
     mat1 = mat1 + mat1.transpose(-2, -1).conj()
     mat1 = mat1.requires_grad_()
@@ -87,7 +87,7 @@ def test_lsymeig_A(dtype, device, shape, method):
     "method": ["exacteig", "custom_exacteig"],  # only 2 of methods, because both gradient implementations are covered
 })
 def test_lsymeig_AM(dtype, device, ashape, mshape, method):
-    torch.manual_seed(125)
+    torch.manual_seed(seed)
     mata = torch.rand(ashape, dtype=dtype, device=device)
     matm = torch.rand(mshape, dtype=dtype, device=device) + \
         torch.eye(mshape[-1], dtype=dtype, device=device)  # make sure it's not singular
@@ -184,7 +184,7 @@ def test_symeig_A_degenerate(dtype, device, eivaloffset, method):
     # (note: the variable is changed in a certain way so that the degeneracy
     # is kept)
 
-    torch.manual_seed(127)
+    torch.manual_seed(seed)
     n = 5
     neig = 3
     kwargs = {
@@ -238,7 +238,7 @@ def test_symeig_A_degenerate(dtype, device, eivaloffset, method):
 def test_symeig_AM_degenerate(dtype, device, method):
     # same as test_symeig_A_degenerate, but now with the overlap matrix
 
-    torch.manual_seed(126)
+    torch.manual_seed(seed)
     n = 5
     neig = 3
     kwargs = {
@@ -294,7 +294,7 @@ def test_symeig_AM_degenerate(dtype, device, method):
 def test_symeig_A_degenerate_req_not_sat(dtype, device):
     # test if the degenerate gradient returns nan if the requirments are not satisfied
 
-    torch.manual_seed(126)
+    torch.manual_seed(seed)
     n = 5
     neig = 3
     kwargs = {

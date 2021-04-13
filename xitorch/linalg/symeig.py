@@ -354,8 +354,16 @@ class symeig_torchfcn(torch.autograd.Function):
             # orthogonalize the grad_evecs with evecs
             B = _ortho(grad_evecs, evecs, D=idx_degen, M=M, mright=False)
 
+            # Based on test cases, complex datatype is more likely to suffer from
+            # singularity error when doing the inverse. Therefore, I add a small
+            # offset here to prevent that from happening
+            if torch.is_complex(B):
+                evals_offset = evals + 1e-14
+            else:
+                evals_offset = evals
+
             with A.uselinopparams(*params):
-                gevecs = solve(A, -B, evals, M, bck_options=ctx.bck_config,
+                gevecs = solve(A, -B, evals_offset, M, bck_options=ctx.bck_config,
                                **ctx.bck_config)  # (*BAM, na, neig)
 
             # orthogonalize gevecs w.r.t. evecs
