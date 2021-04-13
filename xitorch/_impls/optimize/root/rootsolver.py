@@ -65,10 +65,28 @@ def _nonlin_solver(fcn, x0, params, method,
     elif line_search is False:
         line_search = None
 
+    # solving complex rootfinder by concatenating real and imaginary part,
+    # making the variable twice as long
+    x_is_complex = torch.is_complex(x0)
+    def _ravel(x: torch.Tensor) -> torch.Tensor:
+        # represents x as a long real vector
+        if x_is_complex:
+            return torch.cat((x.real, x.imag), dim=0).reshape(-1)
+        else:
+            return x.reshape(-1)
+
+    def _pack(x: torch.Tensor) -> torch.Tensor:
+        # pack a long real vector into the shape accepted by fcn
+        if x_is_complex:
+            n = len(x) // 2
+            xreal, ximag = x[:n], x[n:]
+            x = xreal + 1j * ximag
+        return x.reshape(xshape)
+
     # shorthand for the function
     xshape = x0.shape
-    func = lambda x: fcn(x.reshape(xshape), *params).reshape(-1)
-    x = x0.reshape(-1)
+    func = lambda x: _ravel(fcn(_pack(x), *params))
+    x = _ravel(x0)
 
     y = func(x)
     y_norm = y.norm()
@@ -143,7 +161,7 @@ def _nonlin_solver(fcn, x0, params, method,
                "Best |dx|=%.3e, |f|=%.3e at iter %d") % (maxiter, best_dxnorm, best_ynorm, best_iter)
         warnings.warn(ConvergenceWarning(msg))
         x = best_x
-    return x.reshape(xshape)
+    return _pack(x)
 
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',))  # takes only the signature
 def broyden1(fcn, x0, params=(), **kwargs):

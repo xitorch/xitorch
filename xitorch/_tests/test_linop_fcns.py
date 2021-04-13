@@ -477,7 +477,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
 def test_solve_A_methods(dtype, device, method):
 
     if dtype in [torch.complex128, torch.complex64]:
-        if method in ["scipy_gmres", "broyden1"]:
+        if method in ["scipy_gmres"]:
             pytest.xfail("%s does not work for complex input" % method)
 
     torch.manual_seed(seed)
@@ -486,7 +486,9 @@ def test_solve_A_methods(dtype, device, method):
     bshape = (2, na, na)
     options = {
         "scipy_gmres": {},
-        "broyden1": {},
+        "broyden1": {
+            "alpha": -0.2,
+        },
         "cg": {
             "rtol": 1e-8  # stringent rtol required to meet the torch.allclose tols
         },
@@ -627,11 +629,6 @@ def test_solve_AEM(dtype, device, abeshape, mshape, method):
     "method": ["broyden1", "cg", "bicgstab"],
 })
 def test_solve_AEM_methods(dtype, device, method):
-
-    if dtype in [torch.complex128, torch.complex64]:
-        if method in ["broyden1"]:
-            pytest.xfail("%s does not work for complex input" % method)
-
     torch.manual_seed(seed)
     na = 100
     nc = na // 2
@@ -641,7 +638,9 @@ def test_solve_AEM_methods(dtype, device, method):
     bshape = (2, na, nc)
     options = {
         "scipy_gmres": {},
-        "broyden1": {},
+        "broyden1": {
+            "alpha": -0.2,
+        },
         "cg": {
             "rtol": 1e-8  # stringent rtol required to meet the torch.allclose tols
         },
