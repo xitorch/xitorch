@@ -297,6 +297,41 @@ def test_linop_add():
     m12 = m1 + m2
     assert torch.allclose(m12.fullmatrix(), 2 * mat + 1)
 
+def test_linop_sub():
+    # test the behaviour of subtraction of LinearOperators
+    mat = torch.randn((2, 3, 2))
+    linop1 = LinOp1(mat)
+    linop2 = LinOp2(-mat + 1)
+
+    # test using non-matrix linop
+    c = linop1 - linop2
+    assert torch.allclose(c.fullmatrix(), 2 * mat - 1)
+
+    # test using matrix linear operator
+    m1 = LinearOperator.m(mat)
+    m2 = LinearOperator.m(-mat + 1)
+    m12 = m1 - m2
+    assert torch.allclose(m12.fullmatrix(), 2 * mat - 1)
+
+def test_linop_mul():
+    # test the behaviour of multiplication of LinearOperator with a number
+    mat = torch.randn((2, 3, 2))
+    linop1 = LinOp1(mat)
+    linop2 = LinearOperator.m(mat)
+
+    for f1 in [2, 4.0]:
+        print(f1)
+        # test using non-matrix linop multiplier
+        c11l = linop1 * f1
+        c11r = f1 * linop1
+        # test using matrix linop multiplier
+        c12l = linop2 * f1
+        c12r = f1 * linop2
+        assert torch.allclose(c11l.fullmatrix(), f1 * mat)
+        assert torch.allclose(c11r.fullmatrix(), f1 * mat)
+        assert torch.allclose(c12l.fullmatrix(), f1 * mat)
+        assert torch.allclose(c12r.fullmatrix(), f1 * mat)
+
 def _assert_str_contains(s, slist):
     for c in slist:
         assert c in s
