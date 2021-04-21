@@ -43,7 +43,7 @@ setup(
     author_email='firman.kasim@gmail.com',
     license='MIT',
     packages=find_packages(),
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=get_requirements("requirements.txt"),
     classifiers=[
         "Intended Audience :: Science/Research",
