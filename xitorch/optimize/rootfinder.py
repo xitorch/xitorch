@@ -1,9 +1,10 @@
-from typing import Callable, Mapping, Any, Sequence, Union
+from typing import Callable, Mapping, Any, Sequence, Union, List
 import torch
 from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
     linearmixing
+from xitorch._impls.optimize.minimizer import gd
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
 from xitorch._core.pure_function import get_pure_function, make_sibling
@@ -11,6 +12,16 @@ from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 
 __all__ = ["equilibrium", "rootfinder", "minimize"]
+
+_RF_METHODS = {
+    "broyden1": broyden1,
+    "broyden2": broyden2,
+    "linearmixing": linearmixing,
+}
+
+_OPT_METHODS = {
+    "gd": gd,
+}
 
 def rootfinder(
         fcn: Callable[..., torch.Tensor],
@@ -78,7 +89,8 @@ def rootfinder(
 
     pfunc = get_pure_function(fcn)
     fwd_options["method"] = _get_rootfinder_default_method(method)
-    return _RootFinder.apply(pfunc, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
+    return _RootFinder.apply(pfunc, y0, pfunc, False, fwd_options, bck_options,
+                             len(params), *params, *pfunc.objparams())
 
 def equilibrium(
         fcn: Callable[..., torch.Tensor],
@@ -156,7 +168,8 @@ def equilibrium(
         return y - pfunc(y, *params)
 
     fwd_options["method"] = _get_rootfinder_default_method(method)
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
+    return _RootFinder.apply(new_fcn, y0, new_fcn, False, fwd_options, bck_options,
+                             len(params), *params, *pfunc.objparams())
 
 def minimize(
         fcn: Callable[..., torch.Tensor],
@@ -224,24 +237,53 @@ def minimize(
     pfunc = get_pure_function(fcn)
 
     fwd_options["method"] = _get_minimizer_default_method(method)
+    method = fwd_options["method"]
+
+    # minimization can use rootfinder algorithm, so check if it is actually
+    # using the optimization algorithm, not the rootfinder algorithm
+    opt_method = method not in _RF_METHODS.keys()
+
     # the rootfinder algorithms are designed to move to the opposite direction
     # of the output of the function, so the output of this function is just
     # the grad of z w.r.t. y
+    # if it is going to optimization method, then also returns the value
 
     @make_sibling(pfunc)
-    def new_fcn(y, *params):
+    def _min_fwd_fcn(y, *params):
         with torch.enable_grad():
             y1 = y.clone().requires_grad_()
             z = pfunc(y1, *params)
         grady, = torch.autograd.grad(z, (y1,), retain_graph=True,
                                      create_graph=torch.is_grad_enabled())
+        return z, grady
+
+    @make_sibling(_min_fwd_fcn)
+    def _rf_fcn(y, *params):
+        z, grady = _min_fwd_fcn(y, *params)
         return grady
 
-    return _RootFinder.apply(new_fcn, y0, fwd_options, bck_options, len(params), *params, *pfunc.objparams())
+    # if using the optimization algorithm, then the forward function is the one
+    # that returns f and grad
+    if opt_method:
+        _fwd_fcn = _min_fwd_fcn
+    # if it is just using the rootfinder algorithm, then the forward function
+    # is the one that returns only the grad
+    else:
+        _fwd_fcn = _rf_fcn
+
+    return _RootFinder.apply(_rf_fcn, y0, _fwd_fcn, opt_method, fwd_options, bck_options,
+                             len(params), *params, *pfunc.objparams())
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, fcn, y0, options, bck_options, nparams, *allparams):
+    def forward(ctx, fcn, y0, fwd_fcn, is_opt_method, options, bck_options, nparams, *allparams):
+        # fcn: a function that returns what has to be 0 (will be used in the
+        #      backward, not used in the forward). For minimization, it is
+        #      the gradient
+        # fwd_fcn: a function that will be executed in the forward method
+        #          (unused in the backward)
+        # This class is also used for minimization, where fcn and fwd_fcn might
+        # be slightly different
 
         # set default options
         config = options
@@ -250,18 +292,16 @@ class _RootFinder(torch.autograd.Function):
         params = allparams[:nparams]
         objparams = allparams[nparams:]
 
-        with fcn.useobjparams(objparams):
+        with fwd_fcn.useobjparams(objparams):
 
             method = config.pop("method")
-            methods = {
-                "broyden1": broyden1,
-                "broyden2": broyden2,
-                "linearmixing": linearmixing,
-            }
-            method_fcn = get_method("rootfinder", methods, method)
-            y = method_fcn(fcn, y0, params, **config)
+            methods = _RF_METHODS if not is_opt_method else _OPT_METHODS
+            name = "rootfinder" if not is_opt_method else "minimizer"
+            method_fcn = get_method(name, methods, method)
+            y = method_fcn(fwd_fcn, y0, params, **config)
 
         ctx.fcn = fcn
+        ctx.is_opt_method = is_opt_method
 
         # split tensors and non-tensors params
         ctx.nparams = nparams
@@ -285,9 +325,9 @@ class _RootFinder(torch.autograd.Function):
         objparams = allparams[nparams:]
 
         # dL/df
-        with fcn.useobjparams(objparams):
+        with ctx.fcn.useobjparams(objparams):
 
-            jac_dfdy = jac(ctx.fcn, params=(yout, *params), idxs=[0])[0]
+            jac_dfdy = jac(fcn, params=(yout, *params), idxs=[0])[0]
             gyfcn = solve(A=jac_dfdy.H, B=-grad_yout.reshape(-1, 1),
                           bck_options=ctx.bck_options, **ctx.bck_options)
             gyfcn = gyfcn.reshape(grad_yout.shape)
@@ -298,7 +338,7 @@ class _RootFinder(torch.autograd.Function):
                 allparams_copy = param_sep.reconstruct_params(tensor_params_copy)
                 params_copy = allparams_copy[:nparams]
                 objparams_copy = allparams_copy[nparams:]
-                with fcn.useobjparams(objparams_copy):
+                with ctx.fcn.useobjparams(objparams_copy):
                     yfcn = fcn(yout, *params_copy)
 
             grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
@@ -306,7 +346,7 @@ class _RootFinder(torch.autograd.Function):
             grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
             grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
 
-        return (None, None, None, None, None, *grad_params)
+        return (None, None, None, None, None, None, None, *grad_params)
 
 def _get_rootfinder_default_method(method):
     if method is None:
@@ -322,7 +362,8 @@ def _get_minimizer_default_method(method):
 
 
 # docstring completion
-rf_methods: Sequence[Callable] = [broyden1, broyden2, linearmixing]
+rf_methods: List[Callable] = [broyden1, broyden2, linearmixing]
+opt_methods: List[Callable] = [gd]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
 equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
-minimize.__doc__ = get_methods_docstr(minimize, rf_methods)
+minimize.__doc__ = get_methods_docstr(minimize, rf_methods + opt_methods)

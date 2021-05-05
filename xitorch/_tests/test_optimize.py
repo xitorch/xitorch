@@ -15,7 +15,7 @@ class DummyModule(xt.EditableModule):
         self.activation = {
             "sigmoid": lambda x: 1 / (1 + torch.exp(-x)),
             "cos": torch.cos,
-            "square": lambda x: x * x
+            "square": lambda x: (x - 0.1) ** 2,
         }[activation]
         self.sumoutput = sumoutput
         self.biasdiff = True
@@ -52,7 +52,7 @@ class DummyNNModule(torch.nn.Module):
         self.activation = {
             "sigmoid": lambda x: 1 / (1 + torch.exp(-x)),
             "cos": torch.cos,
-            "square": lambda x: x * x
+            "square": lambda x: (x - 0.1) ** 2,
         }[activation]
         self.sumoutput = sumoutput
         self.biasdiff = True
@@ -235,12 +235,27 @@ def test_rootfinder_with_params(dtype, device, bias_is_tensor):
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "clss": [DummyModule, DummyNNModule],
+    "method": ["broyden1", "gd"],
 })
-def test_minimize(dtype, device, clss):
+def test_minimize(dtype, device, clss, method):
     torch.manual_seed(400)
     random.seed(100)
 
-    nr = 3
+    method_fwd_options = {
+        "broyden1": {
+            "max_niter": 50,
+            "f_tol": 1e-9,
+            "alpha": -0.5,
+        },
+        "gd": {
+            "maxiter": 10000,
+            "f_rtol": 1e-14,
+            "x_rtol": 1e-14,
+            "step": 2e-2,
+        },
+    }
+
+    nr = 2
     nbatch = 2
 
     A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
@@ -248,19 +263,18 @@ def test_minimize(dtype, device, clss):
     # bias will be detached from the optimization line, so set it undifferentiable
     bias = torch.zeros((nbatch, nr)).to(dtype)
     y0 = torch.randn((nbatch, nr)).to(dtype)
-    fwd_options = {
-        "method": "broyden1",
-        "max_niter": 50,
-        "f_tol": 1e-9,
-        "alpha": -0.5,
+    fwd_options = method_fwd_options[method]
+    bck_options = {
+        "rtol": 1e-9,
+        "atol": 1e-9,
     }
     activation = "square"  # square activation makes it easy to optimize
 
     model = clss(A, addx=False, activation=activation, sumoutput=True)
     model.set_diag_bias(diag, bias)
-    y = minimize(model.forward, y0, **fwd_options)
+    y = minimize(model.forward, y0, method=method, **fwd_options)
 
-    # check the grad (must be close to 1)
+    # check the grad (must be close to 0)
     with torch.enable_grad():
         y1 = y.clone().requires_grad_()
         f = model.forward(y1)
@@ -275,7 +289,7 @@ def test_minimize(dtype, device, clss):
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=False, activation=activation, sumoutput=True)
         model.set_diag_bias(diag, bias)
-        y = minimize(model.forward, y0, **fwd_options)
+        y = minimize(model.forward, y0, method=method, bck_options=bck_options, **fwd_options)
         return y
 
     gradcheck(getloss, (A, y0, diag, bias))
@@ -348,7 +362,7 @@ def test_equil_methods(dtype, device, method):
     assert torch.allclose(y, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing"]
+    "method": ["broyden1", "broyden2", "linearmixing", "gd"]
 })
 def test_minimize_methods(dtype, device, method):
     torch.manual_seed(400)
@@ -366,11 +380,18 @@ def test_minimize_methods(dtype, device, method):
         "f_tol": 3e-6,
         "alpha": -0.3,
     }
+    gd_fwd_options = {
+        "maxiter": 5000,
+        "f_rtol": 1e-10,
+        "x_rtol": 1e-10,
+        "step": 1e-2,
+    }
     # list the methods and the options here
     options = {
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
         "linearmixing": linearmixing_fwd_options,
+        "gd": gd_fwd_options,
     }[method]
 
     # specify higher atol for non-ideal method
