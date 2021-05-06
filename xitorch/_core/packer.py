@@ -12,6 +12,11 @@ class Packer(object):
     This object preserves the structure of the object by performing the deepcopy
     of the object, except for the tensor.
 
+    Arguments
+    ---------
+    obj: Any
+        Any structure object that contains tensors.
+
     Example
     -------
     .. testsetup::
@@ -37,12 +42,6 @@ class Packer(object):
         {'a': tensor(2.), 'b': tensor(4.), 'c': tensor(2.)}
     """
     def __init__(self, obj: Any):
-        """
-        Arguments
-        ---------
-        obj: Any
-            Any structure object that contains tensors.
-        """
         # deep copy the object, except the tensors
         tensor_lists = _extract_tensors(obj)
         memo = {id(t): t for t in tensor_lists}
