@@ -42,35 +42,23 @@ def gd(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
     """
 
     x = x0.clone()
-    stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol)
+    stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol, verbose)
     fprev = torch.tensor(0.0, dtype=x0.dtype, device=x0.device)
     v = torch.zeros_like(x)
     for i in range(maxiter):
         f, dfdx = fcn(x, *params)
-        # f = dfdx.norm()
 
         # update the step
         v = (gamma * v - step * dfdx).detach()
         xprev = x.detach()
         x = (xprev + v).detach()
 
-        if verbose:
-            if i == 0 or (i + 1) % 10 == 0:
-                print("%4d: %.5e" % (i + 1, float(f.detach())))
-
         # check the stopping conditions
-        if i > 0:
-            xnorm = float(x.detach().norm())
-            dxnorm = float((xprev - x).detach().norm())
-            fnorm = float(f.detach())
-            dfnorm = float((fprev - f).detach().abs())
-            to_stop = stop_cond.to_stop(xnorm, dxnorm, fnorm, dfnorm)
+        to_stop = stop_cond.to_stop(i, x, xprev, f, fprev)
 
-            if to_stop:
-                if verbose:
-                    print("Finish with convergence")
-                    print("%4d: %.5e" % (i + 1, float(f.detach())))
-                break
+        if to_stop:
+            break
+
         fprev = f
     return x
 
@@ -125,7 +113,7 @@ def adam(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
     """
 
     x = x0.clone()
-    stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol)
+    stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol, verbose)
     fprev = torch.tensor(0.0, dtype=x0.dtype, device=x0.device)
     v = torch.zeros_like(x)
     m = torch.zeros_like(x)
@@ -146,36 +134,41 @@ def adam(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
         xprev = x.detach()
         x = (xprev - step * mhat / (vhat ** 0.5 + eps)).detach()
 
-        if verbose:
-            if i == 0 or (i + 1) % 10 == 0:
-                print("%4d: %.5e" % (i + 1, float(f.detach())))
-
         # check the stopping conditions
-        if i > 0:
-            xnorm = float(x.detach().norm())
-            dxnorm = float((xprev - x).detach().norm())
-            fnorm = float(f.detach())
-            dfnorm = float((fprev - f).detach().abs())
-            to_stop = stop_cond.to_stop(xnorm, dxnorm, fnorm, dfnorm)
+        to_stop = stop_cond.to_stop(i, x, xprev, f, fprev)
 
-            if to_stop:
-                if verbose:
-                    print("Finish with convergence")
-                    print("%4d: %.5e" % (i + 1, float(f.detach())))
-                break
+        if to_stop:
+            break
+
         fprev = f
     return x
 
 class TerminationCondition(object):
-    def __init__(self, f_tol: float, f_rtol: float, x_tol: float, x_rtol: float):
+    def __init__(self, f_tol: float, f_rtol: float, x_tol: float, x_rtol: float,
+                 verbose: bool):
         self.f_tol = f_tol
         self.f_rtol = f_rtol
         self.x_tol = x_tol
         self.x_rtol = x_rtol
+        self.verbose = verbose
 
-    def to_stop(self, xnorm: float, dxnorm: float, f: float, df: float) -> bool:
+    def to_stop(self, i: int, x: torch.Tensor, xprev: torch.Tensor,
+                f: torch.Tensor, fprev: torch.Tensor) -> bool:
+        xnorm = float(x.detach().norm())
+        dxnorm = float((xprev - x).detach().norm())
+        f = float(f.detach())
+        df = float((fprev - f).detach().abs())
+
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
         ytcheck = df < self.f_tol
         yrcheck = df < self.f_rtol * f
-        return xtcheck or xrcheck or ytcheck or yrcheck
+        converge = xtcheck or xrcheck or ytcheck or yrcheck
+        if self.verbose:
+            if i == 0:
+                print("   #:             f |        dx,        df")
+            if converge:
+                print("Finish with convergence")
+            if i == 0 or ((i + 1) % 10) == 0 or converge:
+                print("%4d: %.6e | %.3e, %.3e" % (i + 1, f, dxnorm, df))
+        return i > 0 and converge
