@@ -4,6 +4,7 @@ from typing import Callable, List
 def gd(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
        # gd parameters
        step: float = 1e-3,
+       gamma: float = 0.9,
        # stopping conditions
        maxiter: int = 1000,
        f_tol: float = 0.0,
@@ -13,13 +14,21 @@ def gd(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
        # misc parameters
        verbose=False,
        **unused):
-    """
-    Vanilla gradient descent. The stopping conditions use OR criteria.
+    r"""
+    Vanilla gradient descent with momentum. The stopping conditions use OR criteria.
+    The update step is following the equations below.
+
+    .. math::
+        \mathbf{v}_{t+1} &= \gamma \mathbf{v}_t - \eta \nabla_{\mathbf{x}} f(\mathbf{x}_t) \\
+        \mathbf{x}_{t+1} &= \mathbf{x}_t + \mathbf{v}_{t+1}
 
     Keyword arguments
     -----------------
     step: float
-        The step size towards the steepest descent direction.
+        The step size towards the steepest descent direction, i.e. :math:`\eta` in
+        the equations above.
+    gamma: float
+        The momentum factor, i.e. :math:`\gamma` in the equations above.
     maxiter: int
         Maximum number of iterations.
     f_tol: float or None
@@ -35,13 +44,15 @@ def gd(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
     x = x0.clone()
     stop_cond = TerminationCondition(f_tol, f_rtol, x_tol, x_rtol)
     fprev = torch.tensor(0.0, dtype=x0.dtype, device=x0.device)
+    v = torch.zeros_like(x)
     for i in range(maxiter):
         f, dfdx = fcn(x, *params)
         # f = dfdx.norm()
 
         # update the step
+        v = (gamma * v - step * dfdx).detach()
         xprev = x.detach()
-        x = (xprev - step * dfdx).detach()
+        x = (xprev + v).detach()
 
         if verbose:
             if i == 0 or (i + 1) % 10 == 0:
