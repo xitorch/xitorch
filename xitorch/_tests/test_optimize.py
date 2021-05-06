@@ -433,6 +433,6 @@ def test_min_not_stop_for_negative_value():
     # the method must be non-rootfinder method
     method = "gd"
     a = torch.tensor(1.0, dtype=torch.float64)
-    amin = minimize(fcn, a, method=method, step=0.2)
+    amin = minimize(fcn, a, method=method, step=0.2, f_rtol=0, x_rtol=1e-10, verbose=True)
     amin_true = torch.zeros_like(amin)
     assert torch.allclose(amin, amin_true)
