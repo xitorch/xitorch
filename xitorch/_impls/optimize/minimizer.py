@@ -154,10 +154,10 @@ class TerminationCondition(object):
 
     def to_stop(self, i: int, x: torch.Tensor, xprev: torch.Tensor,
                 f: torch.Tensor, fprev: torch.Tensor) -> bool:
-        xnorm = float(x.detach().norm())
-        dxnorm = float((xprev - x).detach().norm())
-        fabs = float(f.detach().abs())
-        df = float((fprev - f).detach().abs())
+        xnorm: float = float(x.detach().norm().item())
+        dxnorm: float = float((xprev - x).detach().norm().item())
+        fabs: float = float(f.detach().abs().item())
+        df: float = float((fprev - f).detach().abs().item())
 
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
@@ -171,4 +171,4 @@ class TerminationCondition(object):
                 print("Finish with convergence")
             if i == 0 or ((i + 1) % 10) == 0 or converge:
                 print("%4d: %.6e | %.3e, %.3e" % (i + 1, f, dxnorm, df))
-        return i > 0 and converge
+        return (i > 0 and converge)
