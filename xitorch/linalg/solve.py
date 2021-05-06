@@ -97,6 +97,8 @@ def solve(A: LinearOperator, B: torch.Tensor, E: Union[torch.Tensor, None] = Non
         if isinstance(A, MatrixLinearOperator) and \
            (M is None or isinstance(M, MatrixLinearOperator)):
             method = "exactsolve"
+        elif A.shape[-1] <= 5:  # for small matrix
+            method = "exactsolve"
         else:
             is_hermit = A.is_hermitian and (M is None or M.is_hermitian)
             method = "cg" if is_hermit else "bicgstab"
