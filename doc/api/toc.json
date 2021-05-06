@@ -4,7 +4,8 @@
     "api": {
       "EditableModule": "",
       "LinearOperator": "",
-      "make_sibling": ""
+      "make_sibling": "",
+      "Packer": ""
     }
   },
   "xitorch.optimize": {
