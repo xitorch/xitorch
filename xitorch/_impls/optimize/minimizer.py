@@ -156,13 +156,13 @@ class TerminationCondition(object):
                 f: torch.Tensor, fprev: torch.Tensor) -> bool:
         xnorm = float(x.detach().norm())
         dxnorm = float((xprev - x).detach().norm())
-        f = float(f.detach())
+        fabs = float(f.detach().abs())
         df = float((fprev - f).detach().abs())
 
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
         ytcheck = df < self.f_tol
-        yrcheck = df < self.f_rtol * f
+        yrcheck = df < self.f_rtol * fabs
         converge = xtcheck or xrcheck or ytcheck or yrcheck
         if self.verbose:
             if i == 0:
