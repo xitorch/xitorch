@@ -421,3 +421,17 @@ def test_minimize_methods(dtype, device, method):
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()
     eigval, _ = torch.symeig(h)
     assert torch.all(eigval >= 0)
+
+############## additional tests ##############
+def test_min_not_stop_for_negative_value():
+    # there was a bug where the minimizer stops right away if the value is negative
+    # this test is written to make sure it does not happen again
+    def fcn(a):
+        return (a * a).sum() - 100.
+
+    # the method must be non-rootfinder method
+    method = "gd"
+    a = torch.tensor(1.0, dtype=torch.float64)
+    amin = minimize(fcn, a, method=method, step=0.2)
+    amin_true = torch.zeros_like(amin)
+    assert torch.allclose(amin, amin_true)

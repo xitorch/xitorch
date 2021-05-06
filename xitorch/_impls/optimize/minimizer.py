@@ -58,6 +58,7 @@ def gd(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: List,
             if to_stop:
                 if verbose:
                     print("Finish with convergence")
+                    print("%4d: %.5e" % (i + 1, float(f.detach())))
                 break
         fprev = f
     return x
@@ -72,6 +73,6 @@ class TerminationCondition(object):
     def to_stop(self, xnorm: float, dxnorm: float, f: float, df: float) -> bool:
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
-        ytcheck = f < self.f_tol
+        ytcheck = df < self.f_tol
         yrcheck = df < self.f_rtol * f
         return xtcheck or xrcheck or ytcheck or yrcheck
