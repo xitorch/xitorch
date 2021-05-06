@@ -362,7 +362,7 @@ def test_equil_methods(dtype, device, method):
     assert torch.allclose(y, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing", "gd"]
+    "method": ["broyden1", "broyden2", "linearmixing", "gd", "adam"]
 })
 def test_minimize_methods(dtype, device, method):
     torch.manual_seed(400)
@@ -392,6 +392,7 @@ def test_minimize_methods(dtype, device, method):
         "broyden2": default_fwd_options,
         "linearmixing": linearmixing_fwd_options,
         "gd": gd_fwd_options,
+        "adam": gd_fwd_options,
     }[method]
 
     # specify higher atol for non-ideal method

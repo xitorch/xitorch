@@ -4,7 +4,7 @@ from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
     linearmixing
-from xitorch._impls.optimize.minimizer import gd
+from xitorch._impls.optimize.minimizer import gd, adam
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
 from xitorch._core.pure_function import get_pure_function, make_sibling
@@ -21,6 +21,7 @@ _RF_METHODS = {
 
 _OPT_METHODS = {
     "gd": gd,
+    "adam": adam,
 }
 
 def rootfinder(
@@ -363,7 +364,7 @@ def _get_minimizer_default_method(method):
 
 # docstring completion
 rf_methods: List[Callable] = [broyden1, broyden2, linearmixing]
-opt_methods: List[Callable] = [gd]
+opt_methods: List[Callable] = [gd, adam]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
 equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
 minimize.__doc__ = get_methods_docstr(minimize, rf_methods + opt_methods)
