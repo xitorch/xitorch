@@ -30,7 +30,7 @@ def exacteig(A: LinearOperator, neig: int,
         # M decomposition to make A symmetric
         # it is done this way to make it numerically stable in avoiding
         # complex eigenvalues for (near-)degenerate case
-        L = torch.cholesky(Mmatrix, upper=False)  # (*BM, q, q)
+        L = torch.linalg.cholesky(Mmatrix)  # (*BM, q, q)
         Linv = torch.inverse(L)  # (*BM, q, q)
         LinvT = Linv.transpose(-2, -1).conj()  # (*BM, q, q)
         A2 = torch.matmul(Linv, torch.matmul(Amatrix, LinvT))  # (*BAM, q, q)
@@ -47,7 +47,7 @@ def exacteig(A: LinearOperator, neig: int,
 class degen_symeig(torch.autograd.Function):
     @staticmethod
     def forward(ctx, A):
-        eival, eivec = torch.symeig(A, eigenvectors=True)
+        eival, eivec = torch.linalg.eigh(A)
         ctx.save_for_backward(eival, eivec)
         return eival, eivec
 
