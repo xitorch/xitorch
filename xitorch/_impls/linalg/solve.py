@@ -385,7 +385,7 @@ def exactsolve(A: LinearOperator, B: torch.Tensor,
     # M: (*BM, na, na)
     if E is None:
         Amatrix = A.fullmatrix()  # (*BA, na, na)
-        x, _ = torch.solve(B, Amatrix)  # (*BAB, na, ncols)
+        x = torch.linalg.solve(Amatrix, B)  # (*BAB, na, ncols)
     elif M is None:
         Amatrix = A.fullmatrix()
         x = _solve_ABE(Amatrix, B, E)
