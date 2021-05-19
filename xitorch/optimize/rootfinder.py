@@ -343,7 +343,8 @@ class _RootFinder(torch.autograd.Function):
                     yfcn = fcn(yout, *params_copy)
 
             grad_tensor_params = torch.autograd.grad(yfcn, tensor_params_copy, grad_outputs=gyfcn,
-                                                     create_graph=torch.is_grad_enabled())
+                                                     create_graph=torch.is_grad_enabled(),
+                                                     allow_unused=True)
             grad_nontensor_params = [None for _ in range(param_sep.nnontensors())]
             grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_nontensor_params)
 

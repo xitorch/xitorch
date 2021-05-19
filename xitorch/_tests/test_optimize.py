@@ -260,8 +260,7 @@ def test_minimize(dtype, device, clss, method):
 
     A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
     diag = torch.nn.Parameter(torch.randn((nbatch, nr)).to(dtype).requires_grad_())
-    # bias will be detached from the optimization line, so set it undifferentiable
-    bias = torch.zeros((nbatch, nr)).to(dtype)
+    bias = torch.nn.Parameter(torch.zeros((nbatch, nr)).to(dtype).requires_grad_())
     y0 = torch.randn((nbatch, nr)).to(dtype)
     fwd_options = method_fwd_options[method]
     bck_options = {
