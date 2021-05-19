@@ -292,7 +292,9 @@ def test_minimize(dtype, device, clss, method):
         return y
 
     gradcheck(getloss, (A, y0, diag, bias))
-    gradgradcheck(getloss, (A, y0, diag, bias))
+    # pytorch 1.8's gradgradcheck fails if there are unrelated variables
+    # I have made a PR to solve this and will be in 1.9
+    gradgradcheck(getloss, (A, y0, diag, bias.detach()))
 
 ############## forward methods test ##############
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
