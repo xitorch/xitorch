@@ -3,6 +3,7 @@ from collections import defaultdict
 import torch
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
+import pytest
 from xitorch.grad.jachess import hess
 from xitorch.optimize import rootfinder, equilibrium, minimize
 from xitorch._tests.utils import device_dtype_float_test
@@ -437,3 +438,13 @@ def test_min_not_stop_for_negative_value():
     amin = minimize(fcn, a, method=method, step=0.2, f_rtol=0, x_rtol=1e-10, verbose=True)
     amin_true = torch.zeros_like(amin)
     assert torch.allclose(amin, amin_true)
+
+def test_minimizer_warnings():
+    # test to see if it produces warnings
+    def fcn(a):
+        return (a * a).sum()
+
+    with pytest.warns(UserWarning, match="converge"):
+        # set it so that it will never converge
+        a = torch.tensor(1.0, dtype=torch.float64)
+        amin = minimize(fcn, a, method="gd", step=0.1, f_rtol=0, x_rtol=0, maxiter=10, verbose=True)
