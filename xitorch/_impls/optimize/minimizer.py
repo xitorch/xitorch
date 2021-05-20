@@ -162,10 +162,10 @@ class TerminationCondition(object):
         self._best_f = float("inf")
         self._best_x: Optional[torch.Tensor] = None
 
-    def to_stop(self, i: int, x: torch.Tensor, xprev: torch.Tensor,
+    def to_stop(self, i: int, xnext: torch.Tensor, x: torch.Tensor,
                 f: torch.Tensor, fprev: torch.Tensor) -> bool:
         xnorm: float = float(x.detach().norm().item())
-        dxnorm: float = float((xprev - x).detach().norm().item())
+        dxnorm: float = float((x - xnext).detach().norm().item())
         fabs: float = float(f.detach().abs().item())
         df: float = float((fprev - f).detach().abs().item())
         fval: float = float(f.detach().item())
@@ -192,7 +192,7 @@ class TerminationCondition(object):
             self._max_i = i
         if fval < self._best_f:
             self._best_f = fval
-            self._best_x = xprev  # xprev is the one used to calculate f
+            self._best_x = x
             self._best_dxnorm = dxnorm
             self._best_df = df
         return res
