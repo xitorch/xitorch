@@ -192,7 +192,7 @@ class TerminationCondition(object):
             self._max_i = i
         if fval < self._best_f:
             self._best_f = fval
-            self._best_x = x
+            self._best_x = xprev  # xprev is the one used to calculate f
             self._best_dxnorm = dxnorm
             self._best_df = df
         return res
