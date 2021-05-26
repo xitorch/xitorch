@@ -48,7 +48,7 @@ def _get_git_version():
     os.chdir(cwd)
     return res
 
-def get_version(build_version = False):
+def get_version(build_version=False):
     if ISRELEASED:
         return VERSION
 
@@ -56,7 +56,7 @@ def get_version(build_version = False):
     GIT_REVISION = _get_git_version()
     if build_version:
         import datetime as dt
-        date = dt.date.strftime(dt.date.today(), "%Y%m%d")
+        date = dt.date.strftime(dt.datetime.now(), "%Y%m%d%H%M%S")
         return VERSION + ".dev" + date
     else:
         return VERSION + ".dev0+" + GIT_REVISION[:7]

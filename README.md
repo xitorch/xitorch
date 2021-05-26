@@ -41,8 +41,8 @@ grad2A, = torch.autograd.grad(dydA.sum(), (A,), create_graph=True)
 
 ## Requirements
 
-* python 3.6 or higher
-* pytorch 1.6 or higher (install [here](https://pytorch.org/))
+* python 3.7 or higher
+* pytorch 1.8 or higher (install [here](https://pytorch.org/))
 
 ## Getting started
 
