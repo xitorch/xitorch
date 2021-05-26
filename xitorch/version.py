@@ -54,4 +54,4 @@ def get_version():
 
     # unreleased version
     GIT_REVISION = _get_git_version()
-    return VERSION + ".dev0+" + GIT_REVISION[:7]
+    return VERSION + ".dev0" + GIT_REVISION[:7]
