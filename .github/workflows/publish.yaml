@@ -9,6 +9,8 @@ jobs:
 
     name: Build and publish Python distributions to PyPI and TestPyPI
     runs-on: ubuntu-latest
+    env:
+      XITORCH_BUILD: 1
 
     steps:
       - uses: actions/checkout@master

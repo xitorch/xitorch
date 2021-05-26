@@ -32,9 +32,11 @@ def get_requirements(fname):
     with open(absdir(fname), "r") as f:
         return [line.strip() for line in f.read().split("\n") if line.strip() != ""]
 
+build_version = "XITORCH_BUILD" in os.environ
+
 setup(
     name=module_name,
-    version=version["get_version"](),
+    version=version["get_version"](build_version),
     description='Differentiable scientific computing library',
     long_description=long_desc,
     long_description_content_type="text/markdown",
