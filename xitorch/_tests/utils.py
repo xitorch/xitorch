@@ -11,6 +11,12 @@ def device_dtype_float_test(only64: int = False, onlycpu: bool = False,
                             skip_fcn: Optional[Callable[..., Tuple[bool, str]]] = None,
                             include_complex: bool = False) -> Callable:
 
+    # test function decorator that will setup the dtype, device, and some additional
+    # kwargs values to the arguments.
+    # the skip_fcn is a function that receives the same argument as the decorated
+    # function and should return a tuple of bool and string.
+    # the first returned value (i.e. a bool) is whether to skip that parameters
+    # and the second one is the reason
     dtypes = [torch.float, torch.float64]
     devices = [torch.device("cpu"), torch.device("cuda")]
     if only64:
