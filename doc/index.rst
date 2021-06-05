@@ -21,6 +21,12 @@ Example operations available in xitorch:
 * :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
   known as ordinary differential equations (ODE) solver.
 
+Why use xitorch:
+
+* contains differentiable functionals;
+* provides 1st, 2nd, and higher order gradients of functionals;
+* enables the use of functionals in the object-oriented way.
+
 Source code: https://github.com/xitorch/xitorch/
 
 .. toctree::
