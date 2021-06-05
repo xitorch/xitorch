@@ -15,17 +15,17 @@ It is inspired by SciPy, a popular Python library for scientific computing.
 
 Example operations available in xitorch:
 
-* :obj:`xitorch.linalg.symeig`: symetric eigendecomposition for large sparse
-  matrix or implicit linear operator,
-* :obj:`xitorch.optimize.rootfinder`: multivariate root finder, and
-* :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
-  known as ordinary differential equations (ODE) solver.
+  * :obj:`xitorch.linalg.symeig`: symetric eigendecomposition for large sparse
+    matrix or implicit linear operator,
+  * :obj:`xitorch.optimize.rootfinder`: multivariate root finder, and
+  * :obj:`xitorch.integrate.solve_ivp`: initial value problem solver or commonly
+    known as ordinary differential equations (ODE) solver.
 
 Why use xitorch:
 
-* contains differentiable functionals;
-* provides 1st, 2nd, and higher order gradients of functionals;
-* enables the use of functionals in the object-oriented way.
+  * contains differentiable functionals;
+  * provides 1st, 2nd, and higher order gradients of functionals;
+  * enables the use of functionals in the object-oriented way.
 
 Source code: https://github.com/xitorch/xitorch/
 
