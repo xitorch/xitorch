@@ -21,6 +21,9 @@ class Interp1D(EditableModule):
         If ``None``, it must be supplied during ``__call__``
     method: str or callable or None
         Interpolation method. If None, it will choose ``"cspline"``.
+    assume_sorted: bool
+        Assume x is sorted monotonically increasing. If False, then it sorts the
+        input x and y first before doing the interpolation.
     **fwd_options
         Method-specific options (see method section below)
     """
@@ -29,6 +32,7 @@ class Interp1D(EditableModule):
                  x: torch.Tensor,
                  y: Optional[torch.Tensor] = None,
                  method: Union[str, Callable, None] = None,
+                 assume_sorted: bool = False,
                  **fwd_options):
         if method is None:
             method = "cspline"
@@ -37,6 +41,16 @@ class Interp1D(EditableModule):
             "linear": LinearInterp1D,
         }
         method_cls = get_method("Interp1D", methods, method)
+
+        # sort x
+        self.idx: Optional[torch.Tensor] = None
+        if not assume_sorted:
+            x, idx = torch.sort(x)
+            if y is not None:
+                y = y[..., idx]
+            else:
+                self.idx = idx
+
         self.obj = method_cls(x, y, **fwd_options)
 
     def __call__(self, xq: torch.Tensor, y: Optional[torch.Tensor] = None) -> torch.Tensor:
@@ -56,6 +70,8 @@ class Interp1D(EditableModule):
         torch.Tensor
             The interpolated values with shape ``(*BY, nrq)``.
         """
+        if self.idx is not None:
+            y = y[..., self.idx]
         return self.obj(xq, y)
 
     def getparamnames(self, methodname: str, prefix: str = "") -> List[str]:

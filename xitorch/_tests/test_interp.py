@@ -213,6 +213,55 @@ def test_interp1_linear(dtype, device, scramble):
     gradgradcheck(interp, (x, y2, xq1))
     gradgradcheck(interp, (x, y2, xq2))
 
+@device_dtype_float_test(only64=True)
+def test_interp1_unsorted(dtype, device):
+    dtype_device_kwargs = {"dtype": dtype, "device": device}
+    x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
+    y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
+    y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
+                       [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
+
+    # points are well inside to avoid extrapolation in numerical gradient calculations
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
+
+    def interp(x, y, xq):
+        return Interp1D(x, y, method="linear")(xq)
+
+    def interp2(x, y, xq):
+        return Interp1D(x, method="linear")(xq, y)
+
+    # calculate the interpolated value with sorted x
+    yq11 = interp(x, y1, xq1)
+    yq12 = interp(x, y1, xq2)
+    yq21 = interp(x, y2, xq1)
+    yq22 = interp(x, y2, xq2)
+
+    # scramble x and y1 and y2
+    idx1 = torch.randperm(len(x))
+    x = x[..., idx1]
+    y1 = y1[..., idx1]
+    y2 = y2[..., idx1]
+
+    # calculate the interpolated value with unsorted x
+    yq11_u = interp(x, y1, xq1)
+    yq12_u = interp(x, y1, xq2)
+    yq21_u = interp(x, y2, xq1)
+    yq22_u = interp(x, y2, xq2)
+    yq11_u2 = interp2(x, y1, xq1)
+    yq12_u2 = interp2(x, y1, xq2)
+    yq21_u2 = interp2(x, y2, xq1)
+    yq22_u2 = interp2(x, y2, xq2)
+
+    assert torch.allclose(yq11, yq11_u)
+    assert torch.allclose(yq12, yq12_u)
+    assert torch.allclose(yq21, yq21_u)
+    assert torch.allclose(yq22, yq22_u)
+    assert torch.allclose(yq11, yq11_u2)
+    assert torch.allclose(yq12, yq12_u2)
+    assert torch.allclose(yq21, yq21_u2)
+    assert torch.allclose(yq22, yq22_u2)
+
 @device_dtype_float_test(only64=True, additional_kwargs={
     "method": ["cspline", "linear"]
 })
