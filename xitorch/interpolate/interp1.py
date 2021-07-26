@@ -70,7 +70,7 @@ class Interp1D(EditableModule):
         torch.Tensor
             The interpolated values with shape ``(*BY, nrq)``.
         """
-        if self.idx is not None:
+        if self.idx is not None and y is not None:
             y = y[..., self.idx]
         return self.obj(xq, y)
 
