@@ -55,6 +55,10 @@ Or if you want to install from source:
     git clone https://github.com/xitorch/xitorch/
     cd xitorch
     python -m pip install -e .
+    
+## Used in
+
+* Differentiable Quantum Chemistry (DQC): https://dqc.readthedocs.io/
 
 ## Gallery
 
