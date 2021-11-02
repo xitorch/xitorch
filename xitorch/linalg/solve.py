@@ -8,7 +8,7 @@ from xitorch._utils.misc import set_default_option, dummy_context_manager, get_m
 from xitorch._docstr.api_docstr import get_methods_docstr
 from xitorch.debug.modes import is_debug_enabled
 from xitorch._impls.linalg.solve import exactsolve, wrap_gmres, \
-    cg, bicgstab, broyden1_solve, _get_batchdims
+    cg, bicgstab, broyden1_solve, _get_batchdims, gmres
 
 def solve(A: LinearOperator, B: torch.Tensor, E: Union[torch.Tensor, None] = None,
           M: Optional[LinearOperator] = None,
@@ -147,6 +147,7 @@ class solve_torchfcn(torch.autograd.Function):
                     "broyden1": broyden1_solve,
                     "cg": cg,
                     "bicgstab": bicgstab,
+                    "gmres": gmres,
                 }
                 method_fcn = get_method("solve", methods, method)
                 x = method_fcn(A, B, E, M, **config)
@@ -236,6 +237,7 @@ _solve_methods = {
     "exactsolve": exactsolve,
     "broyden1": broyden1_solve,
     "scipy_gmres": wrap_gmres,
+    "gmres": gmres,
 }
 ignore_kwargs = ["E", "M", "mparams"]
 solve.__doc__ = get_methods_docstr(solve, _solve_methods, ignore_kwargs)
