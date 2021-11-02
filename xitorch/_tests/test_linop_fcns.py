@@ -477,7 +477,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
 def test_solve_A_methods(dtype, device, method):
 
     if dtype in [torch.complex128, torch.complex64]:
-        if method in ["scipy_gmres"]:
+        if method in ["scipy_gmres", "gmres"]:
             pytest.xfail("%s does not work for complex input" % method)
 
     torch.manual_seed(seed)
@@ -495,7 +495,7 @@ def test_solve_A_methods(dtype, device, method):
         "bicgstab": {
             "rtol": 1e-8,
         },
-        "gmres": {}
+        "gmres": {"rtol": 1, "atol":1}
     }[method]
     fwd_options = {"method": method, **options}
 
