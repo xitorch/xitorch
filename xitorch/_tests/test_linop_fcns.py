@@ -495,7 +495,7 @@ def test_solve_A_methods(dtype, device, method):
         "bicgstab": {
             "rtol": 1e-8,
         },
-        "gmres": {"rtol": 1, "atol":1}
+        "gmres": {}
     }[method]
     fwd_options = {"method": method, **options}
 
