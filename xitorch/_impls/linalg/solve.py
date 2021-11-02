@@ -381,8 +381,6 @@ def gmres(A: LinearOperator, B: torch.Tensor,
     h = torch.zeros((*batchdims, max_niter + 1, max_niter), device=A.device)
     h = h.reshape((-1, max_niter + 1, max_niter))
 
-    t = 0
-
     for k in range(max_niter):
         y = A_fcn(q[k])  # torch.Size([*batch_dims, nr, ncols])
         for j in range(k):
