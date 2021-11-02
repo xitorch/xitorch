@@ -350,10 +350,8 @@ def gmres(A: LinearOperator, B: torch.Tensor,
     eps: float
         Substitute the absolute zero in the algorithm's denominator with this
         value to avoid nan.
-    """
-    nr = A.shape[-1]
-    ncols = B.shape[-1]
-    # nr, ncols = B.shape[-2:]
+    """ 
+    nr, ncols = A.shape[-1], B.shape[-1]
     if max_niter is None:
         max_niter = int(1.5 * nr)
 
@@ -378,32 +376,31 @@ def gmres(A: LinearOperator, B: torch.Tensor,
     r = B2 - A_fcn(x0)  # torch.Size([*batch_dims, nr, ncols])
     q = [0] * max_niter
     q[0] = r / _safedenom(_dot(r, r) ** .5, eps)  # torch.Size([*batch_dims, nr, ncols])
-    h = torch.zeros((*batchdims, max_niter + 1, max_niter), device=A.device)
-    h = h.reshape((-1, max_niter + 1, max_niter))
+    h = torch.zeros((*batchdims, ncols, max_niter + 1, max_niter), device=A.device)
+    h = h.reshape((-1, ncols, max_niter + 1, max_niter))
 
     for k in range(max_niter):
         y = A_fcn(q[k])  # torch.Size([*batch_dims, nr, ncols])
         for j in range(k):
-            h[:, j, k] = _dot(q[j], y).reshape(-1)
-            y = y - h[:, j, k].reshape(*batchdims, 1, 1) * q[j]
-        
-        h[:, k + 1, k] = torch.linalg.matrix_norm(y).reshape(-1)
-        if torch.any(h[:, k + 1, k]) != 0 and k != max_niter - 1:
-            q[k + 1] = y.reshape(-1, nr, ncols) / h[:, k + 1, k].reshape(-1, 1, 1)
+            h[..., j, k] = _dot(q[j], y).reshape(-1, ncols)
+            y = y - h[..., j, k].reshape(*batchdims, 1, ncols) * q[j]
+
+        h[..., k + 1, k] = torch.linalg.norm(y,  dim=-2)
+        if torch.any(h[..., k + 1, k]) != 0 and k != max_niter - 1:
+            q[k + 1] = y.reshape(-1, nr, ncols) / h[..., k + 1, k].reshape(-1, 1, ncols)
             q[k + 1] = q[k + 1].reshape(*batchdims, nr, ncols)
         
-        b = torch.zeros(*batchdims, k + 1, device=A.device)
-        b = b.reshape(-1, k + 1)
-       
-        b[:, 0] = torch.linalg.matrix_norm(r).reshape(-1)
-        result = torch.linalg.lstsq(h[:, :k+1, :k], b)[0]  # torch.Size([*batch_dims, max_niter])
+        b = torch.zeros((*batchdims, ncols, k + 1), device=A.device)
+        b = b.reshape(-1, ncols, k + 1)
+        b[..., 0] = torch.linalg.norm(r, dim=-2)
+        result = torch.linalg.lstsq(h[..., :k+1, :k], b)[0]  # torch.Size([*batch_dims, max_niter])
         # Q, R = torch.linalg.qr(h[:, :k+1, :k], mode='complete')
         # result = torch.triangular_solve(torch.matmul(Q.permute(0, 2, 1), b[:, :, None])[:, :-1], R[:, :-1, :])[0]
 
         res = torch.empty([])
         for i in range(k):
-            res = res + q[i] * result[:, i].reshape(*batchdims, 1, 1) + x0 if res.size() \
-                else q[i] * result[:, i].reshape(*batchdims, 1, 1) + x0
+            res = res + q[i] * result[..., i].reshape(*batchdims, 1, ncols) + x0 if res.size() \
+                else q[i] * result[..., i].reshape(*batchdims, 1, ncols) + x0
         
         # if torch.all(b[:, 0] < rtol):
         #     return res
