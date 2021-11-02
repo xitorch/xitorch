@@ -472,7 +472,7 @@ def test_solve_A(dtype, device, ashape, bshape, method, hermit):
         gradgradcheck(solvefcn, (amat, bmat))
 
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
-    "method": ["scipy_gmres", "broyden1", "cg", "bicgstab"],
+    "method": ["scipy_gmres", "broyden1", "cg", "bicgstab", "gmres"],
 })
 def test_solve_A_methods(dtype, device, method):
 
@@ -495,6 +495,7 @@ def test_solve_A_methods(dtype, device, method):
         "bicgstab": {
             "rtol": 1e-8,
         },
+        "gmres": {}
     }[method]
     fwd_options = {"method": method, **options}
 
