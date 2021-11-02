@@ -4,7 +4,7 @@ from typing import Union, Optional, Callable, Tuple, Sequence
 import torch
 import numpy as np
 from xitorch import LinearOperator
-from scipy.sparse.linalg import gmres
+from scipy.sparse.linalg import gmres as scipy_gmres
 from xitorch._impls.optimize.root.rootsolver import broyden1
 from xitorch._utils.bcast import normalize_bcast_dims, get_bcasted_dims
 from xitorch._utils.exceptions import ConvergenceWarning
@@ -54,7 +54,7 @@ def wrap_gmres(A, B, E=None, M=None,
     res_np = np.empty(B.shape, dtype=get_np_dtype(B.dtype))
     for i in range(nbatch):
         for j in range(ncols):
-            x, info = gmres(op, B_np[i, j, :], tol=min_eps, atol=1e-12, maxiter=max_niter)
+            x, info = scipy_gmres(op, B_np[i, j, :], tol=min_eps, atol=1e-12, maxiter=max_niter)
             if info > 0:
                 msg = "The GMRES iteration does not converge to the desired value "\
                       "(%.3e) after %d iterations" % \
