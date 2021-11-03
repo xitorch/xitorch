@@ -376,7 +376,7 @@ def gmres(A: LinearOperator, B: torch.Tensor,
     r = B2 - A_fcn(x0)  # torch.Size([*batch_dims, nr, ncols])
     q = [0] * max_niter
     q[0] = r / _safedenom(_dot(r, r) ** .5, eps)  # torch.Size([*batch_dims, nr, ncols])
-    h = torch.zeros((*batchdims, ncols, max_niter + 1, max_niter), device=A.device)
+    h = torch.zeros((*batchdims, ncols, max_niter + 1, max_niter), dtype=A.dtype, device=A.device)
     h = h.reshape((-1, ncols, max_niter + 1, max_niter))
 
     for k in range(max_niter):
@@ -389,8 +389,8 @@ def gmres(A: LinearOperator, B: torch.Tensor,
         if torch.any(h[..., k + 1, k]) != 0 and k != max_niter - 1:
             q[k + 1] = y.reshape(-1, nr, ncols) / h[..., k + 1, k].reshape(-1, 1, ncols)
             q[k + 1] = q[k + 1].reshape(*batchdims, nr, ncols)
-        
-        b = torch.zeros((*batchdims, ncols, k + 1), device=A.device)
+
+        b = torch.zeros((*batchdims, ncols, k + 1), dtype=A.dtype, device=A.device)
         b = b.reshape(-1, ncols, k + 1)
         b[..., 0] = torch.linalg.norm(r, dim=-2)
         result = torch.linalg.lstsq(h[..., :k+1, :k], b)[0]  # torch.Size([*batch_dims, max_niter])
