@@ -391,7 +391,7 @@ def exactsolve(A: LinearOperator, B: torch.Tensor,
         x = _solve_ABE(Amatrix, B, E)
     else:
         Mmatrix = M.fullmatrix()  # (*BM, na, na)
-        L = torch.cholesky(Mmatrix, upper=False)  # (*BM, na, na)
+        L = torch.linalg.cholesky(Mmatrix)  # (*BM, na, na)
         Linv = torch.inverse(L)  # (*BM, na, na)
         LinvT = Linv.transpose(-2, -1).conj()  # (*BM, na, na)
         A2 = torch.matmul(Linv, A.mm(LinvT))  # (*BAM, na, na)

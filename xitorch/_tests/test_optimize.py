@@ -283,7 +283,7 @@ def test_minimize(dtype, device, clss, method):
 
     # check the hessian (must be posdef)
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()
-    eigval, _ = torch.symeig(h)
+    eigval = torch.linalg.eigvalsh(h)
     assert torch.all(eigval >= 0)
 
     def getloss(A, y0, diag, bias):
@@ -422,7 +422,7 @@ def test_minimize_methods(dtype, device, method):
 
     # check the hessian (must be posdef)
     h = hess(model.forward, (y1,), idxs=0).fullmatrix()
-    eigval, _ = torch.symeig(h)
+    eigval = torch.linalg.eigvalsh(h)
     assert torch.all(eigval >= 0)
 
 ############## additional tests ##############

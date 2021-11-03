@@ -13,7 +13,7 @@ def tallqr(V, MV=None):
     if MV is None:
         MV = V
     VTV = torch.matmul(V.transpose(-2, -1), MV)  # (*BMV, nguess, nguess)
-    R = torch.cholesky(VTV, upper=True)  # (*BMV, nguess, nguess)
+    R = torch.linalg.cholesky(VTV.transpose(-2, -1).conj()).transpose(-2, -1).conj()  # (*BMV, nguess, nguess)
     Rinv = torch.inverse(R)  # (*BMV, nguess, nguess)
     Q = torch.matmul(V, Rinv)
     return Q, R
@@ -72,5 +72,5 @@ def create_random_ortho_matrix(n, seed=-1):
     if seed > 0:
         torch.manual_seed(seed)
     a = torch.randn((n, n), dtype=dtype)
-    q, r = torch.qr(a)
+    q, r = torch.linalg.qr(a)
     return q

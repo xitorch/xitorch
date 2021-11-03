@@ -21,7 +21,7 @@ def exacteig(A: LinearOperator, neig: int,
     """
     Amatrix = A.fullmatrix()  # (*BA, q, q)
     if M is None:
-        # evals, evecs = torch.symeig(Amatrix, eigenvectors=True)  # (*BA, q), (*BA, q, q)
+        # evals, evecs = torch.linalg.eigh(Amatrix, eigenvectors=True)  # (*BA, q), (*BA, q, q)
         evals, evecs = degen_symeig.apply(Amatrix)  # (*BA, q, q)
         return _take_eigpairs(evals, evecs, neig, mode)
     else:
@@ -37,7 +37,7 @@ def exacteig(A: LinearOperator, neig: int,
 
         # calculate the eigenvalues and eigenvectors
         # (the eigvecs are normalized in M-space)
-        # evals, evecs = torch.symeig(A2, eigenvectors=True)  # (*BAM, q, q)
+        # evals, evecs = torch.linalg.eigh(A2, eigenvectors=True)  # (*BAM, q, q)
         evals, evecs = degen_symeig.apply(A2)  # (*BAM, q, q)
         evals, evecs = _take_eigpairs(evals, evecs, neig, mode)  # (*BAM, neig) and (*BAM, q, neig)
         evecs = torch.matmul(LinvT, evecs)
@@ -171,7 +171,7 @@ def davidson(A: LinearOperator, neig: int,
 
         # eigvals are sorted from the lowest
         # eval: (*BAM, nguess), evec: (*BAM, nguess, nguess)
-        eigvalT, eigvecT = torch.symeig(T, eigenvectors=True)
+        eigvalT, eigvecT = torch.linalg.eigh(T)
         eigvalT, eigvecT = _take_eigpairs(eigvalT, eigvecT, neig, mode)  # (*BAM, neig) and (*BAM, nguess, neig)
 
         # calculate the eigenvectors of A

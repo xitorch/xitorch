@@ -211,7 +211,7 @@ def test_symeig_A_degenerate(dtype, device, eivaloffset, method):
 
     def get_loss(a, mat, P2):
         # get the orthogonal vector for the eigenvectors
-        P, _ = torch.qr(mat)
+        P, _ = torch.linalg.qr(mat)
 
         # line up the eigenvalues
         b = torch.cat((a[:2], a[1:2], a[2:], a[2:])).to(dtype)
@@ -265,8 +265,8 @@ def test_symeig_AM_degenerate(dtype, device, method):
 
     def get_loss(a, matA, matM, P2):
         # get the orthogonal vector for the eigenvectors
-        P, _ = torch.qr(matA)
-        PM, _ = torch.qr(matM)
+        P, _ = torch.linalg.qr(matA)
+        PM, _ = torch.linalg.qr(matM)
 
         # line up the eigenvalues
         b = torch.cat((a[:2], a[1:2], a[2:], a[2:])).to(dtype)
@@ -313,7 +313,7 @@ def test_symeig_A_degenerate_req_not_sat(dtype, device):
 
     def get_loss(a, mat):
         # get the orthogonal vector for the eigenvectors
-        P, _ = torch.qr(mat)
+        P, _ = torch.linalg.qr(mat)
 
         # line up the eigenvalues
         b = torch.cat((a[:2], a[1:2], a[2:], a[2:]))
