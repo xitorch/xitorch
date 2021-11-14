@@ -520,11 +520,8 @@ def test_solve_A_methods(dtype, device, method):
     assert list(x.shape) == xshape
 
     ax = LinearOperator.m(amat).mm(x)
-    if method == 'gmres':
-        # temporary solution until better convergence of gmres is obtained
-        assert torch.allclose(ax, bmat, atol=1e-1)
-    else:
-        assert torch.allclose(ax, bmat)
+
+    assert torch.allclose(ax, bmat)
 
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "ashape": [(2, 2), (2, 2, 2), (2, 1, 2, 2)],
