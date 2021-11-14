@@ -388,7 +388,7 @@ def gmres(A: LinearOperator, B: torch.Tensor,
 
     for k in range(min(nr, max_niter)):
         y = A_fcn(q[k])  # torch.Size([*batch_dims, nr, ncols])
-        for j in range(k):
+        for j in range(k + 1):
             h[..., j, k] = _dot(q[j], y).reshape(-1, ncols)
             y = y - h[..., j, k].reshape(*batchdims, 1, ncols) * q[j]
 
