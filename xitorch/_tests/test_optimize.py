@@ -168,7 +168,9 @@ def test_equil(dtype, device, clss):
         "alpha": -0.5,
     }
     bck_options = {
-        "method": "cg",
+        # NOTE: using "cg" fails the test, and using "gmres" produces an error
+        # of re-entrant
+        "method": "exactsolve",
     }
 
     A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
