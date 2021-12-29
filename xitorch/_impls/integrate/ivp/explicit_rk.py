@@ -57,41 +57,50 @@ fwd_euler_tableau = _Tableau(
 def explicit_rk(tableau: _Tableau,
                 fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
                 params: Sequence[torch.Tensor]):
+    # t: (nt, ...)
+    # y0: (..., *ny)
+    # yt: (nt, ..., *ny)
+    # where (...,) is the batch dimensions
     c = tableau.c
     a = tableau.a
     b = tableau.b
     s = len(c)
-    nt = len(t)
+    nt = t.size(0)
     dtype = t.dtype
     device = t.device
 
+    # set up the slices to extend the time into y0
+    ylast_slices = (Ellipsis,) + ((None,) * (y0.ndim - t.ndim + 1))
+
     # set up the results list
-    yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
+    # yt: (nt, ..., *ny)
+    yt = torch.empty((nt,) + y0.shape, dtype=dtype, device=device)
 
     yt[0] = y0
     y = y0
     # see https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Explicit_Runge.E2.80.93Kutta_methods
     # for the implementation
     for i in range(nt - 1):
-        t0 = t[i]
+        t0 = t[i]  # (...,)
         t1 = t[i + 1]
-        h = t1 - t0
+        h = (t1 - t0)  # (...,)
+        hy = h[ylast_slices]  # (..., *1)
         ks: List[torch.Tensor] = []
         ksum = torch.tensor(0.0, dtype=dtype, device=device)
         for j in range(s):
             if j == 0:
-                k = fcn(t0, y, *params)
+                k = fcn(t0, y, *params)  # (..., *ny)
             else:
                 ak = torch.tensor(0.0, dtype=dtype, device=device)
                 aj = a[j]
                 for m in range(j):
                     ak = aj[m] * ks[m] + ak
-                k = fcn(t0 + c[j] * h, h * ak + y, *params)
+                k = fcn(t0 + c[j] * h, hy * ak + y, *params)
             ks.append(k)
             ksum = ksum + b[j] * k
-        y = h * ksum + y
+        y = hy * ksum + y  # (..., *ny)
         yt[i + 1] = y
-    return yt
+    return yt  # (nt, ..., *ny)
 
 ############################# list of methods #############################
 def rk38_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
@@ -108,12 +117,17 @@ def rk4_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
     """
     Perform the Runge-Kutta steps of order 4 with a fixed step size.
     """
+    # t: (nt, ...)
+    # y: (..., *ny)
     dtype = t.dtype
     device = t.device
-    nt = torch.numel(t)
+    nt = t.size(0)
 
     # set up the results
     yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
+
+    # set up the slices to extend the time into y0
+    ylast_slices = (Ellipsis,) + ((None,) * (y0.ndim - t.ndim + 1))
 
     yt[0] = y0
     y = y0
@@ -122,10 +136,12 @@ def rk4_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
         t1 = t[i + 1]
         h = t1 - t0
         h2 = h * 0.5
+        hy = h[ylast_slices]
+        hy2 = h2[ylast_slices]
         k1 = fcn(t0, y, *params)
-        k2 = fcn(t0 + h2, h2 * k1 + y, *params)
-        k3 = fcn(t0 + h2, h2 * k2 + y, *params)
-        k4 = fcn(t0 + h, h  * k3 + y, *params)
-        y = h / 6. * (k1 + 2 * k2 + 2 * k3 + k4) + y
+        k2 = fcn(t0 + h2, hy2 * k1 + y, *params)
+        k3 = fcn(t0 + h2, hy2 * k2 + y, *params)
+        k4 = fcn(t0 + h, hy  * k3 + y, *params)
+        y = hy / 6. * (k1 + 2 * k2 + 2 * k3 + k4) + y
         yt[i + 1] = y
     return yt
