@@ -1,3 +1,4 @@
+from typing import List, Dict, Callable, Sequence, NamedTuple
 import torch
 
 # All functions in this file should have the following inputs and outputs
@@ -25,10 +26,35 @@ import torch
 
 __all__ = ["rk4_ivp", "rk38_ivp"]
 
-def explicit_rk(tableau, fcn, t, y0, params):
-    c = tableau["c"]
-    a = tableau["a"]
-    b = tableau["b"]
+############################# list of tableaus #############################
+class _Tableau(NamedTuple):
+    c: List[float]
+    b: List[float]
+    a: List[List[float]]
+
+rk4_tableau = _Tableau(
+    c = [0.0, 0.5, 0.5, 1.0],
+    b = [1 / 6., 1 / 3., 1 / 3., 1 / 6.],
+    a = [[0.0, 0.0, 0.0, 0.0],
+         [0.5, 0.0, 0.0, 0.0],
+         [0.0, 0.5, 0.0, 0.0],
+         [0.0, 0.0, 1.0, 0.0]]
+)
+rk38_tableau = _Tableau(
+    c = [0.0, 1 / 3, 2 / 3, 1.0],
+    b = [1 / 8, 3 / 8, 3 / 8, 1 / 8],
+    a = [[0.0, 0.0, 0.0, 0.0],
+         [1 / 3, 0.0, 0.0, 0.0],
+         [-1 / 3, 1.0, 0.0, 0.0],
+         [1.0, -1.0, 1.0, 0.0]]
+)
+
+def explicit_rk(tableau: _Tableau,
+                fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
+                params: Sequence[torch.Tensor]):
+    c = tableau.c
+    a = tableau.a
+    b = tableau.b
     s = len(c)
     nt = len(t)
     dtype = t.dtype
@@ -45,13 +71,13 @@ def explicit_rk(tableau, fcn, t, y0, params):
         t0 = t[i]
         t1 = t[i + 1]
         h = t1 - t0
-        ks = []
-        ksum = 0.0
+        ks: List[torch.Tensor] = []
+        ksum = torch.tensor(0.0, dtype=dtype, device=device)
         for j in range(s):
             if j == 0:
                 k = fcn(t0, y, *params)
             else:
-                ak = 0.0
+                ak = torch.tensor(0.0, dtype=dtype, device=device)
                 for m in range(j):
                     ak = a[j][m] * ks[m] + ak
                 k = fcn(t0 + c[j] * h, h * ak + y, *params)
@@ -61,31 +87,14 @@ def explicit_rk(tableau, fcn, t, y0, params):
         yt[i + 1] = y
     return yt
 
-
-############################# list of tableaus #############################
-rk4_tableau = {
-    "c": [0.0, 0.5, 0.5, 1.0],
-    "b": [1 / 6., 1 / 3., 1 / 3., 1 / 6.],
-    "a": [[0.0, 0.0, 0.0, 0.0],
-          [0.5, 0.0, 0.0, 0.0],
-          [0.0, 0.5, 0.0, 0.0],
-          [0.0, 0.0, 1.0, 0.0]]
-}
-rk38_tableau = {
-    "c": [0.0, 1 / 3, 2 / 3, 1.0],
-    "b": [1 / 8, 3 / 8, 3 / 8, 1 / 8],
-    "a": [[0.0, 0.0, 0.0, 0.0],
-          [1 / 3, 0.0, 0.0, 0.0],
-          [-1 / 3, 1.0, 0.0, 0.0],
-          [1.0, -1.0, 1.0, 0.0]]
-}
-
 ############################# list of methods #############################
-def rk38_ivp(fcn, t, y0, params, **kwargs):
+def rk38_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
+             params: Sequence[torch.Tensor], **kwargs):
     return explicit_rk(rk38_tableau, fcn, t, y0, params)
 
 # explicit rk4 implementation to speed up
-def rk4_ivp(fcn, t, y0, params, **kwargs):
+def rk4_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
+            params: Sequence[torch.Tensor], **kwargs):
     """
     Perform the Runge-Kutta steps of order 4 with a fixed step size.
     """
