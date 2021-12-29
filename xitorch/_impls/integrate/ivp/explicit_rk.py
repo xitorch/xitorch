@@ -48,6 +48,11 @@ rk38_tableau = _Tableau(
          [-1 / 3, 1.0, 0.0, 0.0],
          [1.0, -1.0, 1.0, 0.0]]
 )
+fwd_euler_tableau = _Tableau(
+    c = [0.0],
+    b = [1.0],
+    a = [[0.0]]
+)
 
 def explicit_rk(tableau: _Tableau,
                 fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
@@ -78,11 +83,12 @@ def explicit_rk(tableau: _Tableau,
                 k = fcn(t0, y, *params)
             else:
                 ak = torch.tensor(0.0, dtype=dtype, device=device)
+                aj = a[j]
                 for m in range(j):
-                    ak = a[j][m] * ks[m] + ak
+                    ak = aj[m] * ks[m] + ak
                 k = fcn(t0 + c[j] * h, h * ak + y, *params)
             ks.append(k)
-            ksum += b[j] * k
+            ksum = ksum + b[j] * k
         y = h * ksum + y
         yt[i + 1] = y
     return yt
@@ -92,7 +98,11 @@ def rk38_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor
              params: Sequence[torch.Tensor], **kwargs):
     return explicit_rk(rk38_tableau, fcn, t, y0, params)
 
-# explicit rk4 implementation to speed up
+def fwd_euler_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
+                  params: Sequence[torch.Tensor], **kwargs):
+    return explicit_rk(fwd_euler_tableau, fcn, t, y0, params)
+
+# explicit implementations for simple algorithms to speed up
 def rk4_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
             params: Sequence[torch.Tensor], **kwargs):
     """

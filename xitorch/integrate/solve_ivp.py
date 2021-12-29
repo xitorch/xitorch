@@ -2,7 +2,7 @@ import torch
 from typing import Callable, Union, Mapping, Any, Sequence, Dict
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
-from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp
+from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp, fwd_euler_ivp
 from xitorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
 from xitorch._utils.misc import set_default_option, TensorNonTensorSeparator, \
     TensorPacker, get_method
@@ -107,6 +107,7 @@ class _SolveIVP(torch.autograd.Function):
             "rk38": rk38_ivp,
             "rk23": rk23_adaptive,
             "rk45": rk45_adaptive,
+            "euler": fwd_euler_ivp,
         }
         solver = get_method("solve_ivp", methods, method)
         yt = solver(pfcn, ts, y0, params, **config)
@@ -237,5 +238,7 @@ ivp_methods: Dict[str, Callable] = {
     "rk45": rk45_adaptive,
     "rk23": rk23_adaptive,
     "rk4": rk4_ivp,
+    "rk38": rk38_ivp,
+    "euler": fwd_euler_ivp,
 }
 solve_ivp.__doc__ = get_methods_docstr(solve_ivp, ivp_methods)

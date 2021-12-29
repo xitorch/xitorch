@@ -212,6 +212,7 @@ def test_ivp(dtype, device, clss):
         ("rk38", (1e-8, 1e-5)),
         ("rk45", (1e-8, 1e-5)),
         ("rk23", (1e-6, 1e-4)),
+        ("euler", (2e-2, 1e-4)),  # yes, don't use euler method
     ],
     "clss": [IVPModule, IVPNNModule],
 })
