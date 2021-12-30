@@ -1,6 +1,6 @@
 import torch
 import functools
-from typing import Sequence, Callable, Tuple
+from typing import Optional, Sequence, Callable, Tuple
 
 __all__ = ["rk23_adaptive", "rk45_adaptive"]
 
@@ -36,12 +36,12 @@ def rk_step(func: Callable[..., torch.Tensor], t: torch.Tensor, y: torch.Tensor,
     return ynew, fnew
 
 class RKAdaptiveStepSolver(object):
-    A: torch.Tensor = torch.tensor([])
-    B: torch.Tensor = torch.tensor([])
-    C: torch.Tensor = torch.tensor([])
-    E: torch.Tensor = torch.tensor([])
-    n_stages: int = 0
-    error_estimator_order: int = 0
+    A: Optional[torch.Tensor] = None
+    B: Optional[torch.Tensor] = None
+    C: Optional[torch.Tensor] = None
+    E: Optional[torch.Tensor] = None
+    n_stages: Optional[int] = None
+    error_estimator_order: Optional[int] = None
 
     def __init__(self, atol: float, rtol: float):
         self.atol = atol
@@ -115,7 +115,7 @@ class RKAdaptiveStepSolver(object):
         res = err.norm(dim=self.ydims)
         return res
 
-    def _step(self, rk_state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+    def _step(self, rk_state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor ,torch.Tensor],
               t1: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         t1_achieved = False
         while not t1_achieved:
