@@ -70,7 +70,7 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
 
 def _solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[torch.Tensor]]],
                ts: torch.Tensor,
-               y0: torch.Tensor,
+               y0: Union[torch.Tensor, Sequence[torch.Tensor]],
                params: Sequence[Any] = [],
                params_batched: Union[bool, Sequence[bool]] = True,
                objparams_batched: bool = False,
@@ -87,9 +87,9 @@ def _solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[to
     fwd_options["method"] = method
 
     # run once to see if the outputs is a tuple or a single tensor
-    is_y0_list = isinstance(y0, list) or isinstance(y0, tuple)
+    is_y0_list = isinstance(y0, collections.abc.Sequence) and not isinstance(y0, str)
     dydt = fcn(ts[0], y0, *params)
-    is_dydt_list = isinstance(dydt, list) or isinstance(dydt, tuple)
+    is_dydt_list = isinstance(dydt, collections.abc.Sequence) and not isinstance(dydt, str)
     if is_y0_list != is_dydt_list:
         raise RuntimeError("The y0 and output of fcn must both be tuple or a tensor")
 
@@ -99,10 +99,11 @@ def _solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[to
 
     pfcn = get_pure_function(fcn)
     objparams = pfcn.objparams()
-    params_batched_lst = params_batched + [objparams_batched for _ in objparams]
+    params_batched_lst = list(params_batched) + [objparams_batched for _ in objparams]
     if is_y0_list:
         nt = len(ts)
         batch_dims = ts.shape[1:]
+        assert isinstance(y0, collections.abc.Sequence)
         roller = TensorPacker(y0, batch_dims)
 
         @make_sibling(pfcn)

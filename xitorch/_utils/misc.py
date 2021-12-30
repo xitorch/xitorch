@@ -105,7 +105,7 @@ class TensorPacker(object):
         assert batch_dims is not None
         self.batch_dims = batch_dims
         nbatch_dims = len(batch_dims)
-        self.idx_shapes: Tuple[int, int, Tuple[int, ...]] = []
+        self.idx_shapes: List[Tuple[int, int, Tuple[int, ...]]] = []
         istart = 0
         for i, p in enumerate(tensors):
             pshapes = p.shape[nbatch_dims:]

@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import collections
 import torch
 from typing import Callable, Union, Mapping, Any, Sequence
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
@@ -16,6 +17,7 @@ def quad(
         xl: Union[float, int, torch.Tensor],
         xu: Union[float, int, torch.Tensor],
         params: Sequence[Any] = [],
+        *,
         bck_options: Mapping[str, Any] = {},
         method: Union[str, Callable, None] = None,
         **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
@@ -37,6 +39,9 @@ def quad(
         The upper bound of the integration.
     params: list
         Sequence of any other parameters for the function ``fcn``.
+
+    Keyword arguments
+    -----------------
     bck_options: dict
         Options for the backward quadrature method.
     method: str or callable or None
@@ -65,7 +70,7 @@ def quad(
         dtype = out.dtype
         device = out.device
         is_tuple_out = False
-    elif len(out) > 0:
+    elif isinstance(out, collections.abc.Sequence) and not isinstance(out, str) and len(out) > 0:
         dtype = out[0].dtype
         device = out[0].device
         is_tuple_out = True
@@ -75,6 +80,7 @@ def quad(
     pfunc = get_pure_function(fcn)
     nparams = len(params)
     if is_tuple_out:
+        assert isinstance(out, collections.abc.Sequence)
         packer = TensorPacker(out)
 
         @make_sibling(pfunc)

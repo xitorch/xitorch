@@ -1,4 +1,4 @@
-from typing import List, Dict, Callable, Sequence, NamedTuple
+from typing import List, Callable, Sequence, NamedTuple
 import torch
 
 # All functions in this file should have the following inputs and outputs
@@ -33,25 +33,25 @@ class _Tableau(NamedTuple):
     a: List[List[float]]
 
 rk4_tableau = _Tableau(
-    c = [0.0, 0.5, 0.5, 1.0],
-    b = [1 / 6., 1 / 3., 1 / 3., 1 / 6.],
-    a = [[0.0, 0.0, 0.0, 0.0],
-         [0.5, 0.0, 0.0, 0.0],
-         [0.0, 0.5, 0.0, 0.0],
-         [0.0, 0.0, 1.0, 0.0]]
+    c=[0.0, 0.5, 0.5, 1.0],
+    b=[1 / 6., 1 / 3., 1 / 3., 1 / 6.],
+    a=[[0.0, 0.0, 0.0, 0.0],
+       [0.5, 0.0, 0.0, 0.0],
+       [0.0, 0.5, 0.0, 0.0],
+       [0.0, 0.0, 1.0, 0.0]]
 )
 rk38_tableau = _Tableau(
-    c = [0.0, 1 / 3, 2 / 3, 1.0],
-    b = [1 / 8, 3 / 8, 3 / 8, 1 / 8],
-    a = [[0.0, 0.0, 0.0, 0.0],
-         [1 / 3, 0.0, 0.0, 0.0],
-         [-1 / 3, 1.0, 0.0, 0.0],
-         [1.0, -1.0, 1.0, 0.0]]
+    c=[0.0, 1 / 3, 2 / 3, 1.0],
+    b=[1 / 8, 3 / 8, 3 / 8, 1 / 8],
+    a=[[0.0, 0.0, 0.0, 0.0],
+       [1 / 3, 0.0, 0.0, 0.0],
+       [-1 / 3, 1.0, 0.0, 0.0],
+       [1.0, -1.0, 1.0, 0.0]]
 )
 fwd_euler_tableau = _Tableau(
-    c = [0.0],
-    b = [1.0],
-    a = [[0.0]]
+    c=[0.0],
+    b=[1.0],
+    a=[[0.0]]
 )
 
 def explicit_rk(tableau: _Tableau,
