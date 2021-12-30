@@ -1,6 +1,6 @@
 import torch
 import collections
-from typing import Callable, Union, Mapping, Any, Sequence, Dict, Tuple
+from typing import Callable, Union, Mapping, Any, Sequence, Dict
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp, fwd_euler_ivp
@@ -78,8 +78,7 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
     pfcn = get_pure_function(fcn)
     if is_y0_list:
         nt = len(ts)
-        batch_dims = ts.shape[1:]
-        roller = TensorPacker(y0, batch_dims)
+        roller = TensorPacker(y0)
 
         @make_sibling(pfcn)
         def pfcn2(t, ytensor, *params):
@@ -121,29 +120,24 @@ class _SolveIVP(torch.autograd.Function):
         ctx.pfcn = pfcn
         ctx.nparams = nparams
         ctx.yt = yt
-        ctx.batch_dims = ts.shape[1:]
         ctx.ts_requires_grad = ts.requires_grad
 
         return yt
 
     @staticmethod
     def backward(ctx, grad_yt):
-        # grad_yt: (nt, ..., *ny)
+        # grad_yt: (nt, *ny)
         nparams = ctx.nparams
         pfcn = ctx.pfcn
         param_sep = ctx.param_sep
         yt = ctx.yt
         ts_requires_grad = ctx.ts_requires_grad
-        batch_dims = ctx.batch_dims
 
         # restore the parameters
         saved_tensors = ctx.saved_tensors
         ts = saved_tensors[0]
         y0 = saved_tensors[1]
         tensor_params = list(saved_tensors[2:])
-        # TODO: this wouldn't work for all functions because it alters the parameters
-        # TODO: this assumes all the parameters are not batched
-        tensor_params = [give_batch_dims(batch_dims, prm) for prm in tensor_params]
         allparams = param_sep.reconstruct_params(tensor_params)
         ntensor_params = len(tensor_params)
         params = allparams[:nparams]
@@ -158,8 +152,7 @@ class _SolveIVP(torch.autograd.Function):
                 # if graph is not constructed, then use the default tensor_params
                 ycopy = y.detach().requires_grad_()  # [yi.detach().requires_grad_() for yi in y]
                 tcopy = t.detach().requires_grad_()
-                with pfcn.useobjparams(objparams):
-                    f = pfcn(tcopy, ycopy, *params)
+                f = pfcn(tcopy, ycopy, *params)
                 return f, tcopy, ycopy, tensor_params
             else:
                 # if graph is constructed, then use the clone of the tensor params
@@ -179,8 +172,8 @@ class _SolveIVP(torch.autograd.Function):
         dLdy_index = 1
         dLdt_index = 2
         dLdt_slice = slice(dLdt_index, dLdt_index + 1, None)  # [2:3]
-        dLdp_slice = (slice(-ntensor_params, None, None) if ntensor_params > 0
-                      else slice(0, 0, None))  # [-ntensor_params:]
+        dLdp_slice = slice(-ntensor_params, None, None) if ntensor_params > 0 else slice(0,
+                                                                                         0, None)  # [-ntensor_params:]
         state_size = 3 + ntensor_params
         states = [None for _ in range(state_size)]
 
@@ -234,11 +227,10 @@ class _SolveIVP(torch.autograd.Function):
 
         grad_y0 = states[dLdy_index]  # dL/dy0, (*ny)
         if ts_requires_grad:
-            grad_ts = torch.cat(grad_ts).reshape(ts.shape)
+            grad_ts = torch.cat(grad_ts).reshape(*ts.shape)
         grad_tensor_params = states[dLdp_slice]
         grad_ntensor_params = [None for _ in range(len(allparams) - ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
-        grad_params = [sum_batch_dims(batch_dims, gp) if gp is not None else gp for gp in grad_params]
         return (None, grad_ts, None, None, None, grad_y0, *grad_params)
 
 def assert_ts_y0_shape(ts: torch.Tensor, y0: Union[torch.Tensor, Sequence[torch.Tensor]]):
@@ -252,18 +244,6 @@ def assert_ts_y0_shape(ts: torch.Tensor, y0: Union[torch.Tensor, Sequence[torch.
     elif isinstance(y0, collections.abc.Sequence) and not isinstance(y0, str):
         for y in y0:
             assert_ts_y0_shape(ts, y)
-
-def give_batch_dims(batch_dims: Tuple[int, ...], tensor: torch.Tensor) -> torch.Tensor:
-    # give the leading batch dimension to the tensor
-    res = tensor.expand(batch_dims + tensor.shape).clone()
-    if tensor.requires_grad:
-        res = res.requires_grad_()
-    return res
-
-def sum_batch_dims(batch_dims: Tuple[int, ...], tensor: torch.Tensor) -> torch.Tensor:
-    # sum the batch dimensions of the tensors
-    res = torch.sum(tensor, dim=tuple(range(len(batch_dims))))
-    return res
 
 # docstring completion
 ivp_methods: Dict[str, Callable] = {

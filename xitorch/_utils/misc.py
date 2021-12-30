@@ -1,8 +1,7 @@
 import contextlib
 import torch
 import copy
-from typing import Mapping, Callable, Union, Dict, List, Sequence, Tuple, Optional
-import numpy as np
+from typing import Mapping, Callable, Union, Dict, List
 
 def set_default_option(defopt: Dict, opt: Dict) -> Dict:
     # return a dictionary based on the options and if no item from option,
@@ -68,9 +67,6 @@ class TensorNonTensorSeparator(object):
                 self.nontensor_params.append(p)
         self.alltensors = len(self.tensor_idxs) == self.nparams
 
-    def get_tensor_idxs(self):
-        return self.tensor_idxs
-
     def get_tensor_params(self):
         return self.tensor_params
 
@@ -99,27 +95,20 @@ class TensorNonTensorSeparator(object):
         return params
 
 class TensorPacker(object):
-    def __init__(self, tensors: Sequence[torch.Tensor], batch_dims: Optional[Tuple[int, ...]] = None):
-        if batch_dims is None:
-            batch_dims = ()
-        assert batch_dims is not None
-        self.batch_dims = batch_dims
-        nbatch_dims = len(batch_dims)
-        self.idx_shapes: Tuple[int, int, Tuple[int, ...]] = []
+    def __init__(self, tensors):
+        self.idx_shapes = []
         istart = 0
         for i, p in enumerate(tensors):
-            pshapes = p.shape[nbatch_dims:]
-            ifinish = istart + int(np.prod(pshapes))
-            self.idx_shapes.append((istart, ifinish, pshapes))
+            ifinish = istart + torch.numel(p)
+            self.idx_shapes.append((istart, ifinish, p.shape))
             istart = ifinish
 
-    def flatten(self, y_list: Sequence[torch.Tensor]) -> torch.Tensor:
-        return torch.cat([y.reshape(self.batch_dims + (-1,)) for y in y_list], dim=-1)
+    def flatten(self, y_list):
+        return torch.cat([y.reshape(-1) for y in y_list], dim=-1)
 
-    def pack(self, y: torch.Tensor) -> Tuple[torch.Tensor, ...]:
-        # y: (*batch_dims, nytot)
-        yshapem1 = y.shape[:-1]  # batch dims
-        res: List[torch.Tensor] = []
-        for (istart, ifinish, shape) in self.idx_shapes:
-            res.append(y[..., istart:ifinish].reshape(yshapem1 + shape))
-        return tuple(res)
+    def pack(self, y):
+        yshapem1 = y.shape[:-1]
+        return tuple([
+            y[..., istart:ifinish].reshape((*yshapem1, *shape))
+            for (istart, ifinish, shape) in self.idx_shapes
+        ])
