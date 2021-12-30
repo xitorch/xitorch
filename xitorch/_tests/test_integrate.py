@@ -202,11 +202,12 @@ class IVPModuleBatch(xt.EditableModule):
         return [prefix + "a", prefix + "b"]
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "clss": [IVPModule, IVPNNModule],
+    "clss": [IVPModuleBatch, IVPNNModuleBatch],
 })
 def test_ivp(dtype, device, clss):
     torch.manual_seed(100)
     random.seed(100)
+    nbatch = 2
     nr = 2
     nt = 5
     t0 = 0.0
@@ -218,8 +219,10 @@ def test_ivp(dtype, device, clss):
     a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
     c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
-    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device).requires_grad_()
-    y0 = torch.rand((nr,), dtype=dtype, device=device).requires_grad_()
+    # ts will be: (nt, nbatch)
+    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device)[..., None]
+    ts = (ts * torch.tensor([1.0, 0.5, 0.1], dtype=dtype, device=device)[:nbatch])  # .requires_grad_()
+    y0 = torch.rand((nbatch, nr), dtype=dtype, device=device).requires_grad_()
     ts1 = ts.unsqueeze(-1)
 
     def getoutput(a, b, c, ts, y0):
@@ -228,11 +231,12 @@ def test_ivp(dtype, device, clss):
         return yt
 
     yt = getoutput(a, b, c, ts, y0)
+    assert yt.shape == (nt, nbatch, nr)
     yt_true = y0 * torch.exp(-(0.5 * a * (ts1 + t0) + b + c) * (ts1 - t0))
     assert torch.allclose(yt, yt_true)
 
-    gradcheck(getoutput, (a, b, c, ts, y0))
-    gradgradcheck(getoutput, (a, b, c, ts, y0))
+    assert gradcheck(getoutput, (a, b, c, ts, y0))
+    assert gradgradcheck(getoutput, (a, b, c, ts, y0))
 
 @device_dtype_float_test(only64=True, additional_kwargs={
     "method_tol": [
@@ -277,8 +281,8 @@ def test_ivp_methods(dtype, device, method_tol, clss):
     "method_tol": [
         ("rk4", (1e-8, 1e-5)),
         ("rk38", (1e-8, 1e-5)),
-        # ("rk45", (1e-8, 1e-5)),
-        # ("rk23", (1e-6, 1e-4)),
+        ("rk45", (1e-8, 1e-5)),
+        ("rk23", (1e-6, 1e-4)),
         ("euler", (2e-2, 1e-4)),  # yes, don't use euler method
     ],
     "clss": [IVPModuleBatch, IVPNNModuleBatch],
@@ -295,7 +299,8 @@ def test_ivp_methods_batch(dtype, device, method_tol, clss):
     a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
     c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
-    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device)[..., None].expand(-1, nbatch)
+    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device)[..., None]
+    ts = ts * torch.tensor([1.0, 0.1, 0.03, 0.01], dtype=dtype, device=device)
     ts = ts.requires_grad_()  # (nt, nbatch)
     y0 = torch.rand((nbatch, nb, nr), dtype=dtype, device=device).requires_grad_()
     ts1 = ts[..., None, None]  # (nt, nbatch, 1, 1)
