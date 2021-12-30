@@ -522,7 +522,7 @@ def _solve_ABE(A: torch.Tensor, B: torch.Tensor, E: torch.Tensor):
 
     # NOTE: The line below is very inefficient for large na and ncols
     AE = A - torch.diag_embed(E.repeat_interleave(repeats=na, dim=-1), dim1=-2, dim2=-1)  # (ncols, *BAE, na, na)
-    r, _ = torch.solve(B, AE)  # (ncols, *BAEM, na, 1)
+    r = torch.linalg.solve(AE, B)  # (ncols, *BAEM, na, 1)
     r = r.transpose(0, -1).squeeze(0)  # (*BAEM, na, ncols)
     return r
 

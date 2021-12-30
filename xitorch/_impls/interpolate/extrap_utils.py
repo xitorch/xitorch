@@ -8,7 +8,8 @@ def get_extrap_pos(xqextrap, extrap, xmin=0.0, xmax=1.0):
     elif extrap == "mirror":
         xqnorm = xqnorm.abs()
         xqnorm_ceil = xqnorm.long() + 1
-        xqinside = (2 * (xqnorm_ceil // 2) - xqnorm) * (1 - (xqnorm_ceil % 2.0) * 2)
+        xqhalf = torch.div(xqnorm_ceil, 2, rounding_mode="trunc")
+        xqinside = (2 * xqhalf - xqnorm) * (1 - (xqnorm_ceil % 2.0) * 2)
     elif extrap == "bound":
         xqinside = torch.clamp(xqnorm, 0.0, 1.0)
     else:

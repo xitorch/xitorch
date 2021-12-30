@@ -386,7 +386,7 @@ def _get_spline_mat_inv(x: torch.Tensor, bc_type: str):
         raise RuntimeError("Unknown boundary condition: %s" % bc_type)
 
     # solve the matrix inverse
-    spline_mat_inv, _ = torch.solve(matr, spline_mat)
+    spline_mat_inv = torch.linalg.solve(spline_mat, matr)
 
     # return to the shape of x
     return spline_mat_inv
