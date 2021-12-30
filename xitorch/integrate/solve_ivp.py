@@ -17,8 +17,10 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
               ts: torch.Tensor,
               y0: torch.Tensor,
               params: Sequence[Any] = [],
+              *,
               bck_options: Mapping[str, Any] = {},
               method: Union[str, Callable, None] = None,
+              params_batched: Union[Sequence[bool], bool] = True,
               **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
     r"""
     Solve the initial value problem (IVP) or also commonly known as ordinary
@@ -51,6 +53,10 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
         take the same options as fwd_options.
     method: str or callable or None
         Initial value problem solver. If None, it will choose ``"rk45"``.
+    params_batched: bool or sequence of bools
+        To indicate whether the parameters in ``params`` are batched (i.e. have
+        the ``batch_dims`` in their shapes). If given as a sequence of bools,
+        it must have the same lengths as ``params``.
     **fwd_options
         Method-specific option (see method section below).
 
@@ -60,6 +66,18 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
         The values of ``y`` for each time step in ``ts``.
         It is a tensor with shape ``(nt,*ny)`` or a list of tensors
     """
+    return _solve_ivp(fcn, ts, y0, params, params_batched, False, bck_options, method, **fwd_options)
+
+def _solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[torch.Tensor]]],
+               ts: torch.Tensor,
+               y0: torch.Tensor,
+               params: Sequence[Any] = [],
+               params_batched: Union[bool, Sequence[bool]] = True,
+               objparams_batched: bool = False,
+               bck_options: Mapping[str, Any] = {},
+               method: Union[str, Callable, None] = None,
+               **fwd_options) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
+
     if is_debug_enabled():
         assert_fcn_params(fcn, (ts[0], y0, *params))
     assert_ts_y0_shape(ts, y0)
@@ -75,7 +93,13 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
     if is_y0_list != is_dydt_list:
         raise RuntimeError("The y0 and output of fcn must both be tuple or a tensor")
 
+    # set up the params_batched list
+    if isinstance(params_batched, bool):
+        params_batched = [params_batched for _ in params]
+
     pfcn = get_pure_function(fcn)
+    objparams = pfcn.objparams()
+    params_batched_lst = params_batched + [objparams_batched for _ in objparams]
     if is_y0_list:
         nt = len(ts)
         batch_dims = ts.shape[1:]
@@ -89,14 +113,17 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
             return res
 
         y0 = roller.flatten(y0)
-        res = _SolveIVP.apply(pfcn2, ts, fwd_options, bck_options, len(params), y0, *params, *pfcn.objparams())
+        res = _SolveIVP.apply(pfcn2, ts, fwd_options, bck_options, len(params), y0,
+                              params_batched_lst, *params, *objparams)
         return roller.pack(res)
     else:
-        return _SolveIVP.apply(pfcn, ts, fwd_options, bck_options, len(params), y0, *params, *pfcn.objparams())
+        return _SolveIVP.apply(pfcn, ts, fwd_options, bck_options, len(params), y0,
+                               params_batched_lst, *params, *objparams)
 
 class _SolveIVP(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, pfcn, ts, fwd_options, bck_options, nparams, y0, *allparams):
+    def forward(ctx, pfcn, ts, fwd_options, bck_options, nparams, y0, params_batched,
+                *allparams):
         config = fwd_options
         ctx.bck_config = set_default_option(config, bck_options)
 
@@ -115,9 +142,12 @@ class _SolveIVP(torch.autograd.Function):
         yt = solver(pfcn, ts, y0, params, **config)
 
         # save the parameters for backward
-        ctx.param_sep = TensorNonTensorSeparator(allparams, varonly=True)
-        tensor_params = ctx.param_sep.get_tensor_params()
+        param_sep = TensorNonTensorSeparator(allparams, varonly=True)
+        ctx.param_sep = param_sep
+        tensor_params = param_sep.get_tensor_params()
         ctx.save_for_backward(ts, y0, *tensor_params)
+        ctx.tensor_params_batched = [params_batched[ii] for ii in param_sep.get_tensor_idxs()]
+        ctx.params_batched = params_batched
         ctx.pfcn = pfcn
         ctx.nparams = nparams
         ctx.yt = yt
@@ -135,6 +165,7 @@ class _SolveIVP(torch.autograd.Function):
         yt = ctx.yt
         ts_requires_grad = ctx.ts_requires_grad
         batch_dims = ctx.batch_dims
+        tensor_params_batched = ctx.tensor_params_batched
 
         # restore the parameters
         saved_tensors = ctx.saved_tensors
@@ -142,8 +173,8 @@ class _SolveIVP(torch.autograd.Function):
         y0 = saved_tensors[1]
         tensor_params = list(saved_tensors[2:])
         # TODO: this wouldn't work for all functions because it alters the parameters
-        # TODO: this assumes all the parameters are not batched
-        tensor_params = [give_batch_dims(batch_dims, prm) for prm in tensor_params]
+        tensor_params = [give_batch_dims(batch_dims, prm) if not tensor_params_batched[i]
+                         else prm for i, prm in enumerate(tensor_params)]
         allparams = param_sep.reconstruct_params(tensor_params)
         ntensor_params = len(tensor_params)
         params = allparams[:nparams]
@@ -220,8 +251,9 @@ class _SolveIVP(torch.autograd.Function):
                 grad_ts[t_flip_idx] = dLdt1.reshape(-1)
 
             t_flip_idx -= 1
-            outs = solve_ivp(new_pfunc, ts_flip[i:i + 2], states, tensor_params,
-                             bck_options=ctx.bck_config, **ctx.bck_config)
+            outs = _solve_ivp(new_pfunc, ts_flip[i:i + 2], states, tensor_params,
+                              params_batched=True, objparams_batched=True,
+                              bck_options=ctx.bck_config, **ctx.bck_config)
             # only take the output for the earliest time
             states = [out[-1] for out in outs]
             states[y_index] = yt[t_flip_idx]
@@ -236,10 +268,11 @@ class _SolveIVP(torch.autograd.Function):
         if ts_requires_grad:
             grad_ts = torch.cat(grad_ts).reshape(ts.shape)
         grad_tensor_params = states[dLdp_slice]
+        grad_tensor_params = [sum_batch_dims(batch_dims, gp) if not tensor_params_batched[i]
+                              else gp for i, gp in enumerate(grad_tensor_params)]
         grad_ntensor_params = [None for _ in range(len(allparams) - ntensor_params)]
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
-        grad_params = [sum_batch_dims(batch_dims, gp) if gp is not None else gp for gp in grad_params]
-        return (None, grad_ts, None, None, None, grad_y0, *grad_params)
+        return (None, grad_ts, None, None, None, grad_y0, None, *grad_params)
 
 def assert_ts_y0_shape(ts: torch.Tensor, y0: Union[torch.Tensor, Sequence[torch.Tensor]]):
     # check the shape of ts and y0 inputs

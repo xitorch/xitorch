@@ -218,7 +218,7 @@ def test_ivp(dtype, device, clss):
 
     a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
     b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
-    c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
+    c = torch.randn((nbatch, nr), dtype=dtype, device=device).requires_grad_()
     # ts will be: (nt, nbatch)
     ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device)[..., None]
     ts = (ts * torch.tensor([1.0, 0.5, 0.1], dtype=dtype, device=device)[:nbatch])  # .requires_grad_()
