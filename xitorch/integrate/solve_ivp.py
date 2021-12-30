@@ -28,6 +28,11 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
 
         \mathbf{y}(t) = \mathbf{y_0} + \int_{t_0}^{t} \mathbf{f}(t', \mathbf{y}, \theta)\ \mathrm{d}t'
 
+    Although the original ``solve_ivp`` does not accept batched ``ts``, it can
+    be batched using functorch's ``vmap`` (only for explicit solver, though,
+    e.g. ``rk38``, ``rk4``, and ``euler``). Adaptive steps cannot be vmapped
+    at the moment.
+
     Arguments
     ---------
     fcn: callable

@@ -24,7 +24,7 @@ import torch
 # The operations are done in grad-disabled environment and **not** expected to
 # be able to propagate gradients.
 
-__all__ = ["rk4_ivp", "rk38_ivp"]
+__all__ = ["rk4_ivp", "rk38_ivp", "fwd_euler_ivp"]
 
 ############################# list of tableaus #############################
 class _Tableau(NamedTuple):
@@ -33,25 +33,25 @@ class _Tableau(NamedTuple):
     a: List[List[float]]
 
 rk4_tableau = _Tableau(
-    c = [0.0, 0.5, 0.5, 1.0],
-    b = [1 / 6., 1 / 3., 1 / 3., 1 / 6.],
-    a = [[0.0, 0.0, 0.0, 0.0],
-         [0.5, 0.0, 0.0, 0.0],
-         [0.0, 0.5, 0.0, 0.0],
-         [0.0, 0.0, 1.0, 0.0]]
+    c=[0.0, 0.5, 0.5, 1.0],
+    b=[1 / 6., 1 / 3., 1 / 3., 1 / 6.],
+    a=[[0.0, 0.0, 0.0, 0.0],
+       [0.5, 0.0, 0.0, 0.0],
+       [0.0, 0.5, 0.0, 0.0],
+       [0.0, 0.0, 1.0, 0.0]]
 )
 rk38_tableau = _Tableau(
-    c = [0.0, 1 / 3, 2 / 3, 1.0],
-    b = [1 / 8, 3 / 8, 3 / 8, 1 / 8],
-    a = [[0.0, 0.0, 0.0, 0.0],
-         [1 / 3, 0.0, 0.0, 0.0],
-         [-1 / 3, 1.0, 0.0, 0.0],
-         [1.0, -1.0, 1.0, 0.0]]
+    c=[0.0, 1 / 3, 2 / 3, 1.0],
+    b=[1 / 8, 3 / 8, 3 / 8, 1 / 8],
+    a=[[0.0, 0.0, 0.0, 0.0],
+       [1 / 3, 0.0, 0.0, 0.0],
+       [-1 / 3, 1.0, 0.0, 0.0],
+       [1.0, -1.0, 1.0, 0.0]]
 )
 fwd_euler_tableau = _Tableau(
-    c = [0.0],
-    b = [1.0],
-    a = [[0.0]]
+    c=[0.0],
+    b=[1.0],
+    a=[[0.0]]
 )
 
 def explicit_rk(tableau: _Tableau,
@@ -66,9 +66,8 @@ def explicit_rk(tableau: _Tableau,
     device = t.device
 
     # set up the results list
-    yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
-
-    yt[0] = y0
+    yt_lst: List[torch.Tensor] = []
+    yt_lst.append(y0)
     y = y0
     # see https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Explicit_Runge.E2.80.93Kutta_methods
     # for the implementation
@@ -90,7 +89,8 @@ def explicit_rk(tableau: _Tableau,
             ks.append(k)
             ksum = ksum + b[j] * k
         y = h * ksum + y
-        yt[i + 1] = y
+        yt_lst.append(y)
+    yt = torch.stack(yt_lst, dim=0)
     return yt
 
 ############################# list of methods #############################
@@ -102,30 +102,9 @@ def fwd_euler_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.T
                   params: Sequence[torch.Tensor], **kwargs):
     return explicit_rk(fwd_euler_tableau, fcn, t, y0, params)
 
-# explicit implementations for simple algorithms to speed up
 def rk4_ivp(fcn: Callable[..., torch.Tensor], t: torch.Tensor, y0: torch.Tensor,
             params: Sequence[torch.Tensor], **kwargs):
     """
     Perform the Runge-Kutta steps of order 4 with a fixed step size.
     """
-    dtype = t.dtype
-    device = t.device
-    nt = torch.numel(t)
-
-    # set up the results
-    yt = torch.empty((nt, *y0.shape), dtype=dtype, device=device)
-
-    yt[0] = y0
-    y = y0
-    for i in range(nt - 1):
-        t0 = t[i]
-        t1 = t[i + 1]
-        h = t1 - t0
-        h2 = h * 0.5
-        k1 = fcn(t0, y, *params)
-        k2 = fcn(t0 + h2, h2 * k1 + y, *params)
-        k3 = fcn(t0 + h2, h2 * k2 + y, *params)
-        k4 = fcn(t0 + h, h  * k3 + y, *params)
-        y = h / 6. * (k1 + 2 * k2 + 2 * k3 + k4) + y
-        yt[i + 1] = y
-    return yt
+    return explicit_rk(rk4_tableau, fcn, t, y0, params)

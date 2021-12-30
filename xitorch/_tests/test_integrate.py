@@ -1,6 +1,8 @@
 import random
 import torch
 import numpy as np
+import pytest
+from functorch import vmap
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
 from xitorch.integrate import quad, solve_ivp, mcquad, SQuad
@@ -242,6 +244,50 @@ def test_ivp_methods(dtype, device, method_tol, clss):
         return yt
 
     yt = getoutput(a, b, c, ts, y0)
+    yt_true = y0 * torch.exp(-(0.5 * a * (ts1 + t0) + b + c) * (ts1 - t0))
+    assert torch.allclose(yt, yt_true, rtol=rtol, atol=atol)
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "method_tol": [
+        ("rk4", (1e-8, 1e-5)),
+        ("rk38", (1e-8, 1e-5)),
+        # ("rk45", (1e-8, 1e-5)),
+        # ("rk23", (1e-6, 1e-4)),
+        ("euler", (2e-2, 1e-4)),  # yes, don't use euler method
+    ],
+    "clss": [IVPModule, IVPNNModule],
+})
+def test_ivp_methods_batch(dtype, device, method_tol, clss):
+    # test batched using vmap
+    torch.manual_seed(100)
+    random.seed(100)
+    nr = 2
+    nb = 3  # batch, only for y
+    nbatch = 4  # batch, for both t and y
+    nt = 5
+    t0 = 0.0
+    t1 = 0.2
+    a = torch.nn.Parameter(torch.rand((nr,), dtype=dtype, device=device).requires_grad_())
+    b = torch.nn.Parameter(torch.randn((nr,), dtype=dtype, device=device).requires_grad_())
+    c = torch.randn((nr,), dtype=dtype, device=device).requires_grad_()
+    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device)[..., None].expand(-1, nbatch)
+    ts = ts.requires_grad_()  # (nt, nbatch)
+    y0 = torch.rand((nbatch, nb, nr), dtype=dtype, device=device).requires_grad_()
+    ts1 = ts[..., None, None]  # (nt, nbatch, 1, 1)
+
+    method, (rtol, atol) = method_tol
+    fwd_options = {
+        "method": method,
+    }
+    solve_ivp_batch = vmap(solve_ivp, in_dims=(None, 1, 0, (None,)), out_dims=1)
+
+    def getoutput(a, b, c, ts, y0):
+        module = clss(a, b)
+        yt = solve_ivp_batch(module.forward, ts, y0, (c,), **fwd_options)
+        return yt
+
+    yt = getoutput(a, b, c, ts, y0)
+    assert yt.shape == (nt, nbatch, nb, nr)
     yt_true = y0 * torch.exp(-(0.5 * a * (ts1 + t0) + b + c) * (ts1 - t0))
     assert torch.allclose(yt, yt_true, rtol=rtol, atol=atol)
 
