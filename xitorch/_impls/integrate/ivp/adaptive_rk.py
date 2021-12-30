@@ -41,9 +41,12 @@ class RKAdaptiveStepSolver(object):
         self.y0 = y0.reshape(-1)
 
         direction = ts[1] - ts[0]
-        sgn = torch.sign(direction)
-        self.ts = sgn * ts
-        self.func = lambda t, y: sgn * fcn(sgn * t, y.reshape(self.yshape), *params).reshape(-1)
+        if direction < 0:
+            self.ts = -ts
+            self.func = lambda t, y: -fcn(-t, y.reshape(self.yshape), *params).reshape(-1)
+        else:
+            self.ts = ts
+            self.func = lambda t, y: fcn(t, y.reshape(self.yshape), *params).reshape(-1)
         self.dtype = y0.dtype
         self.device = y0.device
         n = torch.numel(y0)

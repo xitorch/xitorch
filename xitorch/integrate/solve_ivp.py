@@ -1,7 +1,6 @@
 import torch
-import collections
 from typing import Callable, Union, Mapping, Any, Sequence, Dict
-from xitorch._utils.assertfuncs import assert_fcn_params
+from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
 from xitorch._impls.integrate.ivp.explicit_rk import rk4_ivp, rk38_ivp, fwd_euler_ivp
 from xitorch._impls.integrate.ivp.adaptive_rk import rk23_adaptive, rk45_adaptive
@@ -62,7 +61,7 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
     """
     if is_debug_enabled():
         assert_fcn_params(fcn, (ts[0], y0, *params))
-    assert_ts_y0_shape(ts, y0)
+    assert_runtime(len(ts.shape) == 1, "Argument ts must be a 1D tensor")
 
     if method is None:  # set the default method
         method = "rk45"
@@ -233,17 +232,6 @@ class _SolveIVP(torch.autograd.Function):
         grad_params = param_sep.reconstruct_params(grad_tensor_params, grad_ntensor_params)
         return (None, grad_ts, None, None, None, grad_y0, *grad_params)
 
-def assert_ts_y0_shape(ts: torch.Tensor, y0: Union[torch.Tensor, Sequence[torch.Tensor]]):
-    # check the shape of ts and y0 inputs
-    if isinstance(y0, torch.Tensor):
-        batch_ndim = ts.ndim - 1
-        if ts.shape[1:] != y0.shape[:batch_ndim]:
-            msg = (f"The last {batch_ndim} dimensions of ts must match with the first {batch_ndim} "
-                   f"dimensions of y0. ts shape: {ts.shape}, y0.shape: {y0.shape}")
-            raise RuntimeError(msg)
-    elif isinstance(y0, collections.abc.Sequence) and not isinstance(y0, str):
-        for y in y0:
-            assert_ts_y0_shape(ts, y)
 
 # docstring completion
 ivp_methods: Dict[str, Callable] = {
