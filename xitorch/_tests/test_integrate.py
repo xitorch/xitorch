@@ -1,7 +1,6 @@
 import random
 import torch
 import numpy as np
-import pytest
 from functorch import vmap
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
