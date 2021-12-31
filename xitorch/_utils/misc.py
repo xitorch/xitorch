@@ -108,7 +108,7 @@ class TensorPacker(object):
 
     def pack(self, y):
         yshapem1 = y.shape[:-1]
-        return tuple([
-            y[..., istart:ifinish].reshape((*yshapem1, *shape))
+        return tuple(
+            y[..., istart:ifinish].reshape(yshapem1 + shape)
             for (istart, ifinish, shape) in self.idx_shapes
-        ])
+        )

@@ -1,4 +1,5 @@
 import torch
+import copy
 from typing import Callable, Union, Mapping, Any, Sequence, Dict
 from xitorch._utils.assertfuncs import assert_fcn_params, assert_runtime
 from xitorch._core.pure_function import get_pure_function, make_sibling
@@ -209,6 +210,16 @@ class _SolveIVP(torch.autograd.Function):
         states[dLdp_slice] = [torch.zeros_like(tp) for tp in tensor_params]
         grad_ts = [None for _ in range(len(ts))] if ts_requires_grad else None
 
+        # define a new function for the augmented dynamics
+        bkw_roller = TensorPacker(states)
+
+        @make_sibling(new_pfunc)
+        def pfcn_back(t, ytensor, *params):
+            ylist = bkw_roller.pack(ytensor)
+            res_list = new_pfunc(t, ylist, *params)
+            res = bkw_roller.flatten(res_list)
+            return res
+
         for i in range(len(ts_flip) - 1):
             if ts_requires_grad:
                 feval = pfunc2(ts_flip[i], states[y_index], tensor_params)[0]
@@ -217,8 +228,14 @@ class _SolveIVP(torch.autograd.Function):
                 grad_ts[t_flip_idx] = dLdt1.reshape(-1)
 
             t_flip_idx -= 1
-            outs = solve_ivp(new_pfunc, ts_flip[i:i + 2], states, tensor_params,
-                             bck_options=ctx.bck_config, **ctx.bck_config)
+            states_flatten = bkw_roller.flatten(states)
+            fwd_config = copy.copy(ctx.bck_config)
+            bck_config = copy.copy(ctx.bck_config)
+            outs_flatten = _SolveIVP.apply(
+                pfcn_back, ts_flip[i:i + 2], fwd_config, bck_config, len(tensor_params),
+                states_flatten, *tensor_params)
+            outs = bkw_roller.pack(outs_flatten)
+
             # only take the output for the earliest time
             states = [out[-1] for out in outs]
             states[y_index] = yt[t_flip_idx]
