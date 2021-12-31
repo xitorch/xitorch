@@ -1,3 +1,4 @@
+from typing import List
 import time
 import torch
 from xitorch.integrate import solve_ivp

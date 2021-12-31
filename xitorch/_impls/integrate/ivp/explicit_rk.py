@@ -1,4 +1,4 @@
-from typing import List, Callable, Sequence, NamedTuple
+from typing import List, Callable, Sequence, NamedTuple, Union
 import torch
 
 # All functions in this file should have the following inputs and outputs
