@@ -76,12 +76,12 @@ def explicit_rk(tableau: _Tableau,
         t1 = t[i + 1]
         h = t1 - t0
         ks: List[torch.Tensor] = []
-        ksum = torch.tensor(0.0, dtype=dtype, device=device)
+        ksum: Union[float, torch.Tensor] = 0.0
         for j in range(s):
             if j == 0:
                 k = fcn(t0, y, *params)
             else:
-                ak = torch.tensor(0.0, dtype=dtype, device=device)
+                ak: Union[float, torch.Tensor] = 0.0
                 aj = a[j]
                 for m in range(j):
                     ak = aj[m] * ks[m] + ak
