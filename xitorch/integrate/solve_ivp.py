@@ -73,13 +73,7 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
         method = "rk45"
     fwd_options["method"] = method
 
-    # run once to see if the outputs is a tuple or a single tensor
-    is_y0_list = isinstance(y0, list) or isinstance(y0, tuple)
-    dydt = fcn(ts[0], y0, *params)
-    is_dydt_list = isinstance(dydt, list) or isinstance(dydt, tuple)
-    if is_y0_list != is_dydt_list:
-        raise RuntimeError("The y0 and output of fcn must both be tuple or a tensor")
-
+    is_y0_list = isinstance(y0, (list, tuple))
     pfcn = get_pure_function(fcn)
     if is_y0_list:
         nt = len(ts)
@@ -89,6 +83,8 @@ def solve_ivp(fcn: Union[Callable[..., torch.Tensor], Callable[..., Sequence[tor
         def pfcn2(t, ytensor, *params):
             ylist = roller.pack(ytensor)
             res_list = pfcn(t, ylist, *params)
+            if not isinstance(res_list, (list, tuple)):
+                raise RuntimeError("The y0 and output of fcn must both be tuple or a tensor")
             res = roller.flatten(res_list)
             return res
 
