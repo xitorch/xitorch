@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 import torch
 import warnings
 from abc import abstractmethod
@@ -7,7 +7,7 @@ from xitorch._impls.interpolate.extrap_utils import get_extrap_pos, get_extrap_v
 from xitorch._utils.bcast import match_dim
 
 class BaseInterp1D(BaseInterp):
-    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor]=None, extrap: Optional[str]=None, 
+    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor] = None, extrap: Optional[str] = None,
                  **unused):
         # x: (*BX, nr)
         # y: (*BY, nr), BX and BY are broadcastable
@@ -16,6 +16,7 @@ class BaseInterp1D(BaseInterp):
         self._xmin = torch.min(x, dim=-1, keepdim=True)[0]
         self._xmax = torch.max(x, dim=-1, keepdim=True)[0]
         self._is_periodic_required = False
+        self._y = y
 
     def set_periodic_required(self, val):
         self._is_periodic_required = val
@@ -23,7 +24,7 @@ class BaseInterp1D(BaseInterp):
     def is_periodic_required(self):
         return self._is_periodic_required
 
-    def __call__(self, xq: torch.Tensor, y: Optional[torch.Tensor]=None) -> torch.Tensor:
+    def __call__(self, xq: torch.Tensor, y: Optional[torch.Tensor] = None) -> torch.Tensor:
         # xq: (*BX, nrq)
         # y: (*BY, nr)
         if self._y_is_given and y is not None:
@@ -33,7 +34,7 @@ class BaseInterp1D(BaseInterp):
 
         extrap = self._extrap
         if self._y_is_given:
-            y = self.y
+            y = self._y
         elif y is None:
             raise RuntimeError("y must be given")
         elif self.is_periodic_required():
@@ -45,7 +46,7 @@ class BaseInterp1D(BaseInterp):
         allinterp = torch.all(xqinterp_mask)
 
         if not allinterp and xqextrap_mask.ndim > 1:
-            raise NotImplemented("Batched interpolation + extrapolation has not been implemented yet")
+            raise NotImplementedError("Batched interpolation + extrapolation has not been implemented yet")
 
         if allinterp:
             return self._interp(xq, y=y)
@@ -65,12 +66,12 @@ class BaseInterp1D(BaseInterp):
             return yq
 
     @abstractmethod
-    def _interp(self, xq, y):
+    def _interp(self, xq: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         pass
 
 class CubicSpline1D(BaseInterp1D):
-    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor]=None, 
-                 bc_type: Optional[str]=None, extrap: Optional[str]=None, **unused):
+    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor] = None,
+                 bc_type: Optional[str] = None, extrap: Optional[str] = None, **unused):
         # x: (*BX, nr)
         # y: (*BY, nr), BX and BY are broadcastable
 
@@ -97,6 +98,7 @@ class CubicSpline1D(BaseInterp1D):
             if self.is_periodic_required():
                 check_periodic_value(y)
             self.y = y
+            assert y is not None
             self.ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)
 
     def _interp(self, xq, y):

@@ -27,7 +27,7 @@ class Interp1D(EditableModule):
         input x and y first before doing the interpolation.
     **fwd_options
         Method-specific options (see method section below)
-    
+
     Note
     ----
     Batched ``x`` and ``xq`` is only implemented if there is no extrapolation involved.
