@@ -10,7 +10,8 @@ from xitorch._tests.utils import device_dtype_float_test
 })
 def test_interp1_cspline(dtype, device, bc_type, scramble):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
-    x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
+    x = torch.tensor([[0.0, 0.2, 0.3, 0.5, 0.8, 1.0],
+                      [0.0, 0.1, 0.2, 0.6, 0.7, 1.0]], **dtype_device_kwargs).requires_grad_()
     if bc_type != "periodic":
         y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
         y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
@@ -21,13 +22,13 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
                            [0.8, 1.2, 2.2, 0.4, 3.2, 0.8]], **dtype_device_kwargs).requires_grad_()
 
     # points are well inside to avoid extrapolation in numerical gradient calculations
-    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
-    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs).expand((2, -1)).contiguous()
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs).expand((1, -1)).contiguous()
 
     scramble = scramble and bc_type != "periodic"
     if scramble:
-        idx1 = torch.randperm(len(xq1))
-        idx2 = torch.randperm(len(xq2))
+        idx1 = torch.randperm(xq1.shape[-1])
+        idx2 = torch.randperm(xq2.shape[-1])
         xq1 = xq1[..., idx1]
         xq2 = xq2[..., idx2]
     xq1 = xq1.requires_grad_()
@@ -35,63 +36,79 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
 
     # true results (obtained from scipy.interpolate.CubicSpline)
     # from scipy.interpolate import CubicSpline
-    # print("yq11:", CubicSpline(x.detach(), y1.detach(), bc_type=bc_type)(xq1.detach()))
-    # print("yq12:", CubicSpline(x.detach(), y1.detach(), bc_type=bc_type)(xq2.detach()))
-    # print("yq21:", CubicSpline(x.detach(), y2[1].detach(), bc_type=bc_type)(xq1.detach()))
-    # print("yq22:", CubicSpline(x.detach(), y2[1].detach(), bc_type=bc_type)(xq2.detach()))
+    # print("yq11:", CubicSpline(x[0].detach(), y1.detach(), bc_type=bc_type)(xq1[0].detach()))
+    # print("yq11:", CubicSpline(x[1].detach(), y1.detach(), bc_type=bc_type)(xq1[1].detach()))
+    # print("yq12:", CubicSpline(x[0].detach(), y1.detach(), bc_type=bc_type)(xq2[0].detach()))
+    # print("yq12:", CubicSpline(x[1].detach(), y1.detach(), bc_type=bc_type)(xq2[0].detach()))
+    # print("yq21:", CubicSpline(x[0].detach(), y2[0].detach(), bc_type=bc_type)(xq1[0].detach()))
+    # print("yq21:", CubicSpline(x[1].detach(), y2[1].detach(), bc_type=bc_type)(xq1[1].detach()))
+    # print("yq22:", CubicSpline(x[0].detach(), y2[0].detach(), bc_type=bc_type)(xq2[0].detach()))
+    # print("yq22:", CubicSpline(x[1].detach(), y2[1].detach(), bc_type=bc_type)(xq2[0].detach()))
 
     # get the y_trues from scipy
     if bc_type == "clamped":
-        yq11_true = torch.tensor([1.01599131, 1.23547394, 1.85950467, 2.02868906, 1.37102567, 1.04108172,
-                                  1.42061722, 2.04849297, 2.4435166, 2.5061722],
+        yq11_true = torch.tensor([[1.01599131, 1.23547394, 1.85950467, 2.02868906, 1.37102567, 1.04108172,
+                                   1.42061722, 2.04849297, 2.4435166, 2.5061722],
+                                  [1.15458402, 1.86457988, 2.10061827, 1.60125466, 0.9583273, 0.80051997,
+                                   1.6879346, 2.67117749, 2.78487169, 2.55645772]],
                                  **dtype_device_kwargs)
-        yq12_true = torch.tensor([1.01599131, 2.02868906, 1.42061722, 2.5061722], **dtype_device_kwargs)
+        yq12_true = torch.tensor([[1.01599131, 2.02868906, 1.42061722, 2.5061722],
+                                  [1.15458402, 1.60125466, 1.6879346, 2.55645772]], **dtype_device_kwargs)
         yq21_true = torch.tensor([[1.01599131, 1.23547394, 1.85950467, 2.02868906, 1.37102567, 1.04108172,
                                    1.42061722, 2.04849297, 2.4435166, 2.5061722],
-                                  [0.76740145, 0.85220436, 1.79469225, 2.01628631, 0.78122407, 0.53357346,
-                                   1.80606846, 3.07316928, 2.80705394, 1.48568465]],
+                                  [0.88289528, 1.76052359, 2.16598976, 1.0603244, -0.26361496, -0.40752535,
+                                   1.84590232, 3.7494006, 2.95335265, 1.4876579]],
                                  **dtype_device_kwargs)
         yq22_true = torch.tensor([[1.01599131, 2.02868906, 1.42061722, 2.5061722],
-                                  [0.76740145, 2.01628631, 1.80606846, 1.48568465]],
+                                  [0.88289528, 1.0603244, 1.84590232, 1.4876579]],
                                  **dtype_device_kwargs)
     elif bc_type == "not-a-knot" or bc_type is None:  # default choice
-        yq11_true = torch.tensor([0.66219741, 1.06231845, 1.8959342, 2.01058952, 1.36963168, 1.02084725,
-                                  1.33918614, 1.97824847, 2.56027129, 2.70749165],
+        yq11_true = torch.tensor([[0.66219741, 1.06231845, 1.8959342, 2.01058952, 1.36963168, 1.02084725,
+                                   1.33918614, 1.97824847, 2.56027129, 2.70749165],
+                                  [1.16715909, 1.85784091, 2.12116477, 1.68053977, 1.07286932, 0.87042614,
+                                   1.61068182, 3.03068182, 4.06704545, 3.62159091]],
                                  **dtype_device_kwargs)
-        yq12_true = torch.tensor([0.66219741, 2.01058952, 1.33918614, 2.70749165], **dtype_device_kwargs)
+        yq12_true = torch.tensor([[0.66219741, 2.01058952, 1.33918614, 2.70749165],
+                                  [1.16715909, 1.68053977, 1.61068182, 3.62159091]], **dtype_device_kwargs)
         yq21_true = torch.tensor([[0.66219741, 1.06231845, 1.8959342, 2.01058952, 1.36963168, 1.02084725,
                                    1.33918614, 1.97824847, 2.56027129, 2.70749165],
-                                  [-0.01262521, 0.47242487, 1.87087507, 1.99610601, 0.81846828, 0.39785058,
-                                   1.33699082, 2.68769477, 3.43433639, 2.56128965]],
+                                  [0.76045455, 1.78954545, 2.18206676, 1.22034801, 0.02198153, -0.21564631,
+                                   1.62377841, 4.79190341, 6.67571023, 4.58110795]],
                                  **dtype_device_kwargs)
         yq22_true = torch.tensor([[0.66219741, 2.01058952, 1.33918614, 2.70749165],
-                                  [-0.01262521, 1.99610601, 1.33699082, 2.56128965]],
+                                  [0.76045455, 1.22034801, 1.62377841, 4.58110795]],
                                  **dtype_device_kwargs)
     elif bc_type == "natural":
-        yq11_true = torch.tensor([1.03045416, 1.24263582, 1.85784168, 2.03025785, 1.37277695, 1.03808008,
-                                  1.41177844, 2.04167374, 2.45428693, 2.52449066],
+        yq11_true = torch.tensor([[1.03045416, 1.24263582, 1.85784168, 2.03025785, 1.37277695, 1.03808008,
+                                   1.41177844, 2.04167374, 2.45428693, 2.52449066],
+                                  [1.22309994, 1.84320018, 2.12197718, 1.64260534, 0.99525959, 0.81569312,
+                                   1.67539169, 2.72584853, 2.97806783, 2.71644906]],
                                  **dtype_device_kwargs)
-        yq12_true = torch.tensor([1.03045416, 2.03025785, 1.41177844, 2.52449066], **dtype_device_kwargs)
+        yq12_true = torch.tensor([[1.03045416, 2.03025785, 1.41177844, 2.52449066],
+                                  [1.22309994, 1.64260534, 1.67539169, 2.71644906]], **dtype_device_kwargs)
         yq21_true = torch.tensor([[1.03045416, 1.24263582, 1.85784168, 2.03025785, 1.37277695, 1.03808008,
                                    1.41177844, 2.04167374, 2.45428693, 2.52449066],
-                                  [0.70073217, 0.82102504, 1.79853565, 2.02728778, 0.8104202, 0.46318855,
-                                   1.57916384, 2.89143794, 3.09930603, 1.98521859]],
+                                  [0.9080941, 1.75071769, 2.18532016, 1.1250146, -0.17565687, -0.35561989,
+                                   1.78956063, 4.01070104, 3.88485062, 2.26135521]],
                                  **dtype_device_kwargs)
         yq22_true = torch.tensor([[1.03045416, 2.03025785, 1.41177844, 2.52449066],
-                                  [0.70073217, 2.02728778, 1.57916384, 1.98521859]],
+                                  [0.9080941, 1.1250146, 1.78956063, 2.26135521]],
                                  **dtype_device_kwargs)
     elif bc_type == "periodic":
-        yq11_true = torch.tensor([0.88184647, 1.16754002, 1.87806756, 1.99916778, 1.3241823, 1.13211374,
-                                  1.69017244, 2.25696675, 2.09041608, 1.31247223],
+        yq11_true = torch.tensor([[0.88184647, 1.16754002, 1.87806756, 1.99916778, 1.3241823, 1.13211374,
+                                   1.69017244, 2.25696675, 2.09041608, 1.31247223],
+                                  [1.15648189, 1.86547041, 2.09245252, 1.5646367, 0.90258944, 0.76558635,
+                                   1.72706493, 2.48167575, 1.94605786, 1.14727743]],
                                  **dtype_device_kwargs)
-        yq12_true = torch.tensor([0.88184647, 1.99916778, 1.69017244, 1.31247223], **dtype_device_kwargs)
+        yq12_true = torch.tensor([[0.88184647, 1.99916778, 1.69017244, 1.31247223],
+                                  [1.15648189, 1.5646367, 1.72706493, 1.14727743]], **dtype_device_kwargs)
         yq21_true = torch.tensor([[0.88184647, 1.16754002, 1.87806756, 1.99916778, 1.3241823, 1.13211374,
                                    1.69017244, 2.25696675, 2.09041608, 1.31247223],
-                                  [0.46559344, 0.70408188, 1.82662341, 1.99677022, 0.77170332, 0.52939286,
-                                   1.76540093, 3.03216372, 2.8731096, 1.44347038]],
+                                  [0.80193242, 1.78517005, 2.14439598, 1.02718087, -0.28362964, -0.41073874,
+                                   1.84429108, 3.7595664, 2.94839885, 1.2942101]],
                                  **dtype_device_kwargs)
         yq22_true = torch.tensor([[0.88184647, 1.99916778, 1.69017244, 1.31247223],
-                                  [0.46559344, 1.99677022, 1.76540093, 1.44347038]],
+                                  [0.80193242, 1.02718087, 1.84429108, 1.2942101]],
                                  **dtype_device_kwargs)
 
     if scramble:
@@ -143,18 +160,19 @@ def test_interp1_cspline(dtype, device, bc_type, scramble):
 })
 def test_interp1_linear(dtype, device, scramble):
     dtype_device_kwargs = {"dtype": dtype, "device": device}
-    x = torch.tensor([0.0, 0.2, 0.3, 0.5, 0.8, 1.0], **dtype_device_kwargs).requires_grad_()
+    x = torch.tensor([[0.0, 0.2, 0.3, 0.5, 0.8, 1.0],
+                      [0.0, 0.1, 0.2, 0.6, 0.7, 1.0]], **dtype_device_kwargs).requires_grad_()
     y1 = torch.tensor([1.0, 1.5, 2.1, 1.1, 2.3, 2.5], **dtype_device_kwargs).requires_grad_()
     y2 = torch.tensor([[1.0, 1.5, 2.1, 1.1, 2.3, 2.5],
                        [0.8, 1.2, 2.2, 0.4, 3.2, 1.2]], **dtype_device_kwargs).requires_grad_()
 
     # points are well inside to avoid extrapolation in numerical gradient calculations
-    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs)
-    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs)
+    xq1 = torch.linspace(0.05, 0.95, 10, **dtype_device_kwargs).expand((2, -1)).contiguous()
+    xq2 = torch.linspace(0.05, 0.95, 4, **dtype_device_kwargs).expand((1, -1)).contiguous()
 
     if scramble:
-        idx1 = torch.randperm(len(xq1))
-        idx2 = torch.randperm(len(xq2))
+        idx1 = torch.randperm(xq1.shape[-1])
+        idx2 = torch.randperm(xq2.shape[-1])
         xq1 = xq1[..., idx1]
         xq2 = xq2[..., idx2]
     xq1 = xq1.requires_grad_()
@@ -162,19 +180,25 @@ def test_interp1_linear(dtype, device, scramble):
 
     # # true results (obtained from scipy.interpolate.interp1d)
     # from scipy.interpolate import interp1d
-    # print("yq11:", interp1d(x.detach(), y1.detach())(xq1.detach()))
-    # print("yq12:", interp1d(x.detach(), y1.detach())(xq2.detach()))
-    # print("yq21:", interp1d(x.detach(), y2[1].detach())(xq1.detach()))
-    # print("yq22:", interp1d(x.detach(), y2[1].detach())(xq2.detach()))
+    # print("yq11:", interp1d(x[0].detach(), y1.detach())(xq1[0].detach()))
+    # print("yq11:", interp1d(x[1].detach(), y1.detach())(xq1[1].detach()))
+    # print("yq12:", interp1d(x[0].detach(), y1.detach())(xq2[0].detach()))
+    # print("yq12:", interp1d(x[1].detach(), y1.detach())(xq2[0].detach()))
+    # print("yq21:", interp1d(x[0].detach(), y2[0].detach())(xq1[0].detach()))
+    # print("yq21:", interp1d(x[1].detach(), y2[1].detach())(xq1[1].detach()))
+    # print("yq22:", interp1d(x[0].detach(), y2[0].detach())(xq2[0].detach()))
+    # print("yq22:", interp1d(x[1].detach(), y2[1].detach())(xq2[0].detach()))
 
-    yq11_true = torch.tensor([1.125, 1.375, 1.8, 1.85, 1.35, 1.3, 1.7, 2.1, 2.35, 2.45],
+    yq11_true = torch.tensor([[1.125, 1.375, 1.8, 1.85, 1.35, 1.3, 1.7, 2.1, 2.35, 2.45],
+                              [1.25, 1.8, 1.975, 1.725, 1.475, 1.225, 1.7, 2.33333333, 2.4, 2.46666667]],
                              **dtype_device_kwargs)
-    yq12_true = torch.tensor([1.125, 1.85, 1.7, 2.45], **dtype_device_kwargs)
+    yq12_true = torch.tensor([[1.125, 1.85, 1.7, 2.45],
+                              [1.25, 1.725, 1.7, 2.46666667]], **dtype_device_kwargs)
     yq21_true = torch.tensor([[1.125, 1.375, 1.8, 1.85, 1.35, 1.3, 1.7, 2.1, 2.35, 2.45],
-                              [0.9, 1.1, 1.7, 1.75, 0.85, 0.86666667, 1.8, 2.73333333, 2.7, 1.7]],
+                              [1., 1.7, 1.975, 1.525, 1.075, 0.625, 1.8, 2.86666667, 2.2, 1.53333333]],
                              **dtype_device_kwargs)
     yq22_true = torch.tensor([[1.125, 1.85, 1.7, 2.45],
-                              [0.9, 1.75, 1.8, 1.7]],
+                              [1., 1.525, 1.8, 1.53333333]],
                              **dtype_device_kwargs)
 
     if scramble:

@@ -213,7 +213,7 @@ def test_ivp(dtype, device, clss):
         ("rk38", (1e-8, 1e-5)),
         ("rk45", (1e-8, 1e-5)),
         ("rk23", (1e-6, 1e-4)),
-        ("euler", (2e-2, 1e-4)),  # yes, don't use euler method
+        ("euler", (5e-2, 1e-4)),  # yes, don't use euler method
     ],
     "clss": [IVPModule, IVPNNModule],
 })
@@ -252,7 +252,7 @@ def test_ivp_methods(dtype, device, method_tol, clss):
         ("rk38", (1e-8, 1e-5)),
         # ("rk45", (1e-8, 1e-5)),
         # ("rk23", (1e-6, 1e-4)),
-        ("euler", (2e-2, 1e-4)),  # yes, don't use euler method
+        ("euler", (5e-2, 1e-4)),  # yes, don't use euler method
     ],
     "clss": [IVPModule, IVPNNModule],
 })
@@ -430,9 +430,9 @@ def test_squad(dtype, device, imethod):
     assert torch.allclose(yintegrate, ytrue[..., -1])
 
     gradcheck(getval, (x, y, "cumsum"))
-    gradgradcheck(getval, (x, y, "cumsum"))
+    gradgradcheck(getval, (x, y, "cumsum"), nondet_tol=1e-6)
     gradcheck(getval, (x, y, "integrate"))
-    gradgradcheck(getval, (x, y, "integrate"))
+    gradgradcheck(getval, (x, y, "integrate"), nondet_tol=1e-6)
 
 
 if __name__ == "__main__":

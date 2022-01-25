@@ -1,16 +1,22 @@
+from typing import Optional
 import torch
 import warnings
 from abc import abstractmethod
 from xitorch._impls.interpolate.base_interp import BaseInterp
 from xitorch._impls.interpolate.extrap_utils import get_extrap_pos, get_extrap_val
+from xitorch._utils.bcast import match_dim
 
 class BaseInterp1D(BaseInterp):
-    def __init__(self, x, y=None, extrap=None, **unused):
+    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor] = None, extrap: Optional[str] = None,
+                 **unused):
+        # x: (*BX, nr)
+        # y: (*BY, nr), BX and BY are broadcastable
         self._y_is_given = y is not None
         self._extrap = extrap
         self._xmin = torch.min(x, dim=-1, keepdim=True)[0]
         self._xmax = torch.max(x, dim=-1, keepdim=True)[0]
         self._is_periodic_required = False
+        self._y = y
 
     def set_periodic_required(self, val):
         self._is_periodic_required = val
@@ -18,8 +24,8 @@ class BaseInterp1D(BaseInterp):
     def is_periodic_required(self):
         return self._is_periodic_required
 
-    def __call__(self, xq, y=None):
-        # xq: (nrq)
+    def __call__(self, xq: torch.Tensor, y: Optional[torch.Tensor] = None) -> torch.Tensor:
+        # xq: (*BX, nrq)
         # y: (*BY, nr)
         if self._y_is_given and y is not None:
             msg = "y has been supplied when initiating this instance. This value of y will be ignored"
@@ -28,15 +34,19 @@ class BaseInterp1D(BaseInterp):
 
         extrap = self._extrap
         if self._y_is_given:
-            y = self.y
+            y = self._y
         elif y is None:
             raise RuntimeError("y must be given")
         elif self.is_periodic_required():
             check_periodic_value(y)
+        assert y is not None
 
-        xqinterp_mask = torch.logical_and(xq >= self._xmin, xq <= self._xmax)  # (nrq)
+        xqinterp_mask = torch.logical_and(xq >= self._xmin, xq <= self._xmax)  # (*BX, nrq)
         xqextrap_mask = ~xqinterp_mask
         allinterp = torch.all(xqinterp_mask)
+
+        if not allinterp and xqextrap_mask.ndim > 1:
+            raise NotImplementedError("Batched interpolation + extrapolation has not been implemented yet")
 
         if allinterp:
             return self._interp(xq, y=y)
@@ -56,13 +66,14 @@ class BaseInterp1D(BaseInterp):
             return yq
 
     @abstractmethod
-    def _interp(self, xq, y):
+    def _interp(self, xq: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         pass
 
 class CubicSpline1D(BaseInterp1D):
-    def __init__(self, x, y=None, bc_type=None, extrap=None, **unused):
-        # x: (nr,)
-        # y: (*BY, nr)
+    def __init__(self, x: torch.Tensor, y: Optional[torch.Tensor] = None,
+                 bc_type: Optional[str] = None, extrap: Optional[str] = None, **unused):
+        # x: (*BX, nr)
+        # y: (*BY, nr), BX and BY are broadcastable
 
         # get the default extrapolation method and boundary condition
         if bc_type is None:
@@ -71,8 +82,8 @@ class CubicSpline1D(BaseInterp1D):
         super(CubicSpline1D, self).__init__(x, y, extrap=extrap)
 
         self.x = x
-        if x.ndim != 1:
-            raise RuntimeError("The input x must be a 1D tensor")
+        # if x.ndim != 1:
+        #     raise RuntimeError("The input x must be a 1D tensor")
 
         bc_types = ["natural", "clamped", "not-a-knot", "periodic"]
         if bc_type not in bc_types:
@@ -81,12 +92,13 @@ class CubicSpline1D(BaseInterp1D):
         self.set_periodic_required(extrap == "periodic")  # or self.bc_type == "periodic"
 
         # precompute the inverse of spline matrix
-        self.spline_mat_inv = _get_spline_mat_inv(x, bc_type)  # (nr, nr)
+        self.spline_mat_inv = _get_spline_mat_inv(x, bc_type)  # (*BX, nr, nr)
         self.y_is_given = y is not None
         if self.y_is_given:
             if self.is_periodic_required():
                 check_periodic_value(y)
             self.y = y
+            assert y is not None
             self.ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)
 
     def _interp(self, xq, y):
@@ -97,14 +109,14 @@ class CubicSpline1D(BaseInterp1D):
         else:
             ks = torch.matmul(self.spline_mat_inv, y.unsqueeze(-1)).squeeze(-1)  # (*BY, nr)
 
-        x = self.x  # (nr)
+        x, xq = match_dim(self.x, xq, contiguous=True)  # (*BX, nr)
 
         # find the index location of xq
         nr = x.shape[-1]
         # detaching due to PyTorch's issue #42328
-        idxr = torch.searchsorted(x.detach(), xq.detach(), right=False)  # (nrq)
+        idxr = torch.searchsorted(x.detach(), xq.detach(), right=False)  # (*BX, nrq)
         idxr = torch.clamp(idxr, 1, nr - 1)
-        idxl = idxr - 1  # (nrq) from (0 to nr-2)
+        idxl = idxr - 1  # (*BX, nrq) from (0 to nr-2)
 
         if torch.numel(xq) > torch.numel(x):
             # get the variables needed
@@ -121,27 +133,28 @@ class CubicSpline1D(BaseInterp1D):
             p2 = (b - 2 * a)  # (*BY, nr-1)
             p3 = a - b  # (*BY, nr-1)
 
-            t = (xq - torch.gather(xl, -1, idxl)) / torch.gather(dx, -1, idxl)  # (nrq)
+            t = (xq - torch.gather(xl, -1, idxl)) / torch.gather(dx, -1, idxl)  # (*BX, nrq)
             # yq = p0[:,idxl] + t * (p1[:,idxl] + t * (p2[:,idxl] + t * p3[:,idxl])) # (nbatch, nrq)
-            # NOTE: lines below do not work if xq and x have batch dimensions
-            yq = p3[..., idxl] * t
-            yq += p2[..., idxl]
+            p0, p1, p2, p3, idxl = match_dim(p0, p1, p2, p3, idxl)
+            yq = torch.gather(p3, dim=-1, index=idxl) * t
+            yq += torch.gather(p2, dim=-1, index=idxl)
             yq *= t
-            yq += p1[..., idxl]
+            yq += torch.gather(p1, dim=-1, index=idxl)
             yq *= t
-            yq += p0[..., idxl]
+            yq += torch.gather(p0, dim=-1, index=idxl)
             return yq
 
         else:
-            xl = torch.gather(x, -1, idxl)
-            xr = torch.gather(x, -1, idxr)
-            yl = y[..., idxl].contiguous()
-            yr = y[..., idxr].contiguous()
-            kl = ks[..., idxl].contiguous()
-            kr = ks[..., idxr].contiguous()
+            x, y, ks, idxl, idxr = match_dim(x, y, ks, idxl, idxr)
+            xl = torch.gather(x, dim=-1, index=idxl)
+            xr = torch.gather(x, dim=-1, index=idxr)
+            yl = torch.gather(y, dim=-1, index=idxl).contiguous()
+            yr = torch.gather(y, dim=-1, index=idxr).contiguous()
+            kl = torch.gather(ks, dim=-1, index=idxl).contiguous()
+            kr = torch.gather(ks, dim=-1, index=idxr).contiguous()
 
             dxrl = xr - xl  # (nrq,)
-            dyrl = yr - yl  # (nbatch, nrq)
+            # dyrl = yr - yl  # (nbatch, nrq)
 
             # calculate the coefficients of the large matrices
             t = (xq - xl) / dxrl  # (nrq,)
@@ -167,16 +180,14 @@ class LinearInterp1D(BaseInterp1D):
     def __init__(self, x, y=None, extrap=None, **unused):
         super(LinearInterp1D, self).__init__(x, y, extrap=extrap)
         self.x = x
-        if x.ndim != 1:
-            raise RuntimeError("The input x must be a 1D tensor")
         self.y_is_given = y is not None
         self.y = y
 
-    def _interp(self, xq, y):
+    def _interp(self, xq: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         if self.y_is_given:
             y = self.y
 
-        x = self.x
+        x, xq = match_dim(self.x, xq, contiguous=True)
 
         nr = x.shape[-1]
         idxr = torch.searchsorted(x.detach(), xq.detach(), right=False)  # (nrq)
@@ -184,23 +195,25 @@ class LinearInterp1D(BaseInterp1D):
         idxl = idxr - 1  # (nrq) from (0 to nr-2)
 
         if torch.numel(xq) > torch.numel(x):
-            yl = y[..., :-1]  # (*BY, nr-1)
-            xl = x[..., :-1]  # (nr-1)
-            dy = y[..., 1:] - yl  # (*BY, nr-1)
-            dx = x[..., 1:] - xl  # (nr-1)
-            t = (xq - torch.gather(xl, -1, idxl)) / torch.gather(dx, -1, idxl)  # (nrq)
-            yq = dy[..., idxl] * t
-            yq += yl[..., idxl]
+            x, y, idxl = match_dim(x, y, idxl)
+            yl = y[..., :-1]  # (..., nr-1)
+            xl = x[..., :-1]  # (..., nr-1)
+            dy = y[..., 1:] - yl  # (..., nr-1)
+            dx = x[..., 1:] - xl  # (..., nr-1)
+            t = (xq - torch.gather(xl, -1, idxl)) / torch.gather(dx, -1, idxl)  # (..., nrq)
+            yq = torch.gather(dy, dim=-1, index=idxl) * t
+            yq += torch.gather(yl, dim=-1, index=idxl)
             return yq
         else:
+            x, y, idxl, idxr = match_dim(x, y, idxl, idxr)
             xl = torch.gather(x, -1, idxl)
             xr = torch.gather(x, -1, idxr)
-            yl = y[..., idxl].contiguous()
-            yr = y[..., idxr].contiguous()
+            yl = torch.gather(y, dim=-1, index=idxl).contiguous()
+            yr = torch.gather(y, dim=-1, index=idxr).contiguous()
 
-            dxrl = xr - xl  # (nrq,)
-            dyrl = yr - yl  # (nbatch, nrq)
-            t = (xq - xl) / dxrl  # (nrq,)
+            dxrl = xr - xl  # (..., nrq)
+            dyrl = yr - yl  # (..., nrq)
+            t = (xq - xl) / dxrl  # (..., nrq)
             yq = yl + dyrl * t
             return yq
 
