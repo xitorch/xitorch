@@ -33,10 +33,10 @@ jobs:
         python -m pip install pyinstaller
     - name: Create a dummy executable file
       run: |
-        echo "import xitorch, xitorch.optimize, xitorch.integrate, xitorch.linalg, xitorch.interpolate; print('hello')" > main.py
+        echo "import xitorch, xitorch.optimize, xitorch.integrate, xitorch.linalg, xitorch.interpolate; print('hello')" > dummy.py
     - name: Build the binary
       run: |
-        pyinstaller main.py
+        pyinstaller dummy.py
     - name: Test the binary
       run: |
-        ./dist/main/main
+        ./dist/dummy/dummy
