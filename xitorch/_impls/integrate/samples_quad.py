@@ -132,7 +132,7 @@ class SimpsonSQuad(WeightBasedSQuad):
     def get_weights(self, x):
         return get_simpson_weights(x)
 
-@torch.jit.script
+# @torch.jit.script
 def get_trapz_weights(x: torch.Tensor) -> torch.Tensor:
     # x: (..., nx)
     # returns: (..., nx, nx)
@@ -144,7 +144,7 @@ def get_trapz_weights(x: torch.Tensor) -> torch.Tensor:
         res[..., i:, i - 1:i + 1] += half_dx[..., i - 1:i].unsqueeze(-1)
     return res
 
-@torch.jit.script
+# @torch.jit.script
 def get_simpson_weights(x: torch.Tensor) -> torch.Tensor:
     # x: (..., nx)
     # returns: (..., nx, nx)
@@ -185,7 +185,7 @@ def get_simpson_weights(x: torch.Tensor) -> torch.Tensor:
 
     return res
 
-@torch.jit.script
+# @torch.jit.script
 def get_cspline_grad_weights(x):
     # x: (..., nx)
     # returns: (..., nx, nx)
