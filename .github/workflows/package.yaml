@@ -3,9 +3,10 @@
 name: packageability
 
 on:
-  # push:
-  schedule:
-    - cron: '0 0 * * *'
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
 
