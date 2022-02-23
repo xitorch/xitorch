@@ -1,6 +1,6 @@
 # `xitorch`: differentiable scientific computing library
 
-![Build](https://img.shields.io/github/workflow/status/xitorch/xitorch/Python%20package)
+![Build](https://img.shields.io/github/workflow/status/xitorch/xitorch/CI)
 [![Docs](https://img.shields.io/readthedocs/xitorch)](https://xitorch.readthedocs.io/)
 [![Code coverage](https://img.shields.io/codecov/c/github/xitorch/xitorch)](https://codecov.io/gh/xitorch/xitorch)
 
