@@ -20,6 +20,7 @@ def _nonlin_solver(fcn, x0, params, method,
                    line_search=True,
                    # misc parameters
                    verbose=False,
+                   custom_terminator=None,
                    **unused):
     """
     Keyword arguments
@@ -91,7 +92,8 @@ def _nonlin_solver(fcn, x0, params, method,
 
     y = func(x)
     y_norm = y.norm()
-    stop_cond = TerminationCondition(f_tol, f_rtol, y_norm, x_tol, x_rtol)
+    stop_cond = custom_terminator if custom_terminator is not None \
+        else TerminationCondition(f_tol, f_rtol, y_norm, x_tol, x_rtol)
     if (y_norm == 0):
         return x.reshape(xshape)
 
@@ -138,7 +140,7 @@ def _nonlin_solver(fcn, x0, params, method,
         jacobian.update(xnew.clone(), ynew)
 
         # print out dx and df
-        to_stop = stop_cond.check(xnew.norm(), y_norm_new, dx_norm)
+        to_stop = stop_cond.check(xnew, ynew, dx)
         if verbose:
             if i < 10 or i % 10 == 0 or to_stop:
                 print("%6d: |dx|=%.3e, |f|=%.3e" % (i, dx_norm, y_norm))
@@ -354,7 +356,10 @@ class TerminationCondition(object):
         self.x_rtol = x_rtol
         self.f0_norm = f0_norm
 
-    def check(self, xnorm, ynorm, dxnorm):
+    def check(self, x: torch.Tensor, y: torch.Tensor, dx: torch.Tensor) -> bool:
+        xnorm = x.norm()
+        ynorm = y.norm()
+        dxnorm = dx.norm()
         xtcheck = dxnorm < self.x_tol
         xrcheck = dxnorm < self.x_rtol * xnorm
         ytcheck = ynorm < self.f_tol
