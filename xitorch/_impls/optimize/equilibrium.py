@@ -131,4 +131,4 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
         msg = ("The rootfinder does not converge after %d iterations.") % (maxiter)
         warnings.warn(ConvergenceWarning(msg))
 
-    return xn
+    return _unravel(xn)

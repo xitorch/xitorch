@@ -140,6 +140,7 @@ def test_rootfinder(dtype, device, clss):
     y = rootfinder(model.forward, y0, **fwd_options)
     f = model.forward(y)
     assert torch.allclose(f * 0, f)
+    assert y.shape == y0.shape
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=True)
@@ -190,6 +191,7 @@ def test_equil(dtype, device, clss, method):
     y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
     f = model.forward(y)
     assert torch.allclose(y, f)
+    assert y.shape == y0.shape
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=False)
