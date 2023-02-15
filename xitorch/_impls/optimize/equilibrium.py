@@ -54,8 +54,8 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
     # x0: (..., *nfeats)
     x0shape = x0.shape
     featshape = x0.shape[-feat_ndims:]
-    batch_size = np.prod(x0.shape[:-feat_ndims])
-    feat_size = np.prod(x0.shape[-feat_ndims:])
+    batch_size = int(np.prod(x0.shape[:-feat_ndims]))
+    feat_size = int(np.prod(x0.shape[-feat_ndims:]))
     dtype = x0.dtype
     device = x0.device
 
@@ -107,12 +107,12 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
     for k in range(2, maxiter):
         nsize = min(k, msize)
         g = fcollect[:, :nsize] - xcollect[:, :nsize]  # (batch_size, nsize, feat_size)
-        hmat[:, 1:nsize + 1, 1:nsize + 1] = (torch.bmm(g, g.transpose(-2, -1)) +  # (batch_size, nsize, nsize)
-                                             lmbda * torch.eye(nsize, dtype=dtype, device=device))
+        hmat[:, 1:nsize + 1, 1:nsize + 1] = torch.bmm(g, g.transpose(-2, -1)) + \
+            lmbda * torch.eye(nsize, dtype=dtype, device=device)
         # alpha: (batch_size, nsize)
         alpha = torch.linalg.solve(hmat[:, :nsize + 1, :nsize + 1], y[:, :nsize + 1])[:, 1:nsize + 1, 0]
-        xnew = (torch.einsum("bn,bnf->bf", alpha, fcollect[:, :nsize]) * beta +
-                torch.einsum("bn,bnf->bf", alpha, xcollect[:, :nsize]) * (1 - beta))
+        xnew = torch.einsum("bn,bnf->bf", alpha, fcollect[:, :nsize]) * beta + \
+            torch.einsum("bn,bnf->bf", alpha, xcollect[:, :nsize]) * (1 - beta)
         fnew = _fcn(xnew)
         xcollect[:, k % msize] = xnew
         fcollect[:, k % msize] = fnew
