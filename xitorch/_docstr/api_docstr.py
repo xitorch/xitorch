@@ -1,5 +1,6 @@
 import inspect
-from typing import Union, Any, Mapping, Sequence, Optional, Callable, List
+from typing import Union, Any, Mapping, Sequence, Optional, Callable, List, \
+    ItemsView, Generator, Tuple
 
 def get_methods_docstr(
         cls_or_func: Callable,
@@ -45,7 +46,7 @@ def get_methods_docstr(
     ignore_kwargs = ignore_kwargs + def_ignore_kwargs
 
     if isinstance(methods, dict):
-        generator = methods.items()  # type: Union[ItemsView[str, Any], Generator[Tuple[str, Any], None, None]]
+        generator: Union[ItemsView[str, Any], Generator[Tuple[str, Any], None, None]] = methods.items()
     elif isinstance(methods, list):
         generator = ((method.__name__, method) for method in methods)
     else:

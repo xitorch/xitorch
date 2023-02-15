@@ -302,8 +302,8 @@ class symeig_torchfcn(torch.autograd.Function):
 
         M = ctx.M
         A = ctx.A
-        degen_atol: Optional[float] = ctx.bck_alg_config["degen_atol"]
-        degen_rtol: Optional[float] = ctx.bck_alg_config["degen_rtol"]
+        degen_atol: Optional[float] = ctx.bck_alg_config["degen_atol"]  # type: ignore
+        degen_rtol: Optional[float] = ctx.bck_alg_config["degen_rtol"]  # type: ignore
 
         # set the default values of degen_*tol
         dtype = evals.dtype
