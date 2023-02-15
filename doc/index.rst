@@ -29,6 +29,29 @@ Why use xitorch:
 
 Source code: https://github.com/xitorch/xitorch/
 
+Example
+-------
+
+.. code-block:: python
+
+    import torch
+    from xitorch.optimize import rootfinder
+
+    def func1(y, A):  # example function
+        return torch.tanh(A @ y + 0.1) + y / 2.0
+
+    # set up the parameters and the initial guess
+    A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
+    y0 = torch.zeros((2, 1))  # zeros as the initial guess
+
+    # finding a root
+    yroot = rootfinder(func1, y0, params=(A,))
+
+    # calculate the derivatives
+    dydA, = torch.autograd.grad(yroot.sum(), (A,), create_graph=True)
+    grad2A, = torch.autograd.grad(dydA.sum(), (A,), create_graph=True)
+
+
 .. toctree::
    :maxdepth: 1
    :caption: Getting started
