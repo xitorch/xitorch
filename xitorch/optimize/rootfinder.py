@@ -177,7 +177,7 @@ def minimize(
         y0: torch.Tensor,
         params: Sequence[Any] = [],
         bck_options: Mapping[str, Any] = {},
-        method: Union[str, Callable] = None,
+        method: Union[None, str, Callable] = None,
         **fwd_options) -> torch.Tensor:
     r"""
     Solve the unbounded minimization problem:

@@ -170,7 +170,7 @@ class LinearOperator(EditableModule):
         Optional. If not implemented, it will use the adjoint trick to compute ``.rmv()``.
         Usually implemented for efficiency reasons.
         """
-        pass
+        raise NotImplementedError()
 
     # @abstractmethod # (optional)
     def _mm(self, x: torch.Tensor) -> torch.Tensor:
@@ -180,7 +180,7 @@ class LinearOperator(EditableModule):
         multiplication.
         Usually this is implemented for efficiency reasons.
         """
-        pass
+        raise NotImplementedError()
 
     # @abstractmethod
     def _rmm(self, x: torch.Tensor) -> torch.Tensor:
@@ -190,11 +190,11 @@ class LinearOperator(EditableModule):
         multiplication.
         Usually this is implemented for efficiency reasons.
         """
-        pass
+        raise NotImplementedError()
 
     # @abstractmethod
     def _fullmatrix(self) -> torch.Tensor:
-        pass
+        raise NotImplementedError()
 
     # linear operators must have a set of parameters that affects most of
     # the methods (i.e. mm, mv, rmm, rmv)
