@@ -22,7 +22,7 @@ def func1(y, A):  # example function
 
 # set up the parameters and the initial guess
 A = torch.tensor([[1.1, 0.4], [0.3, 0.8]]).requires_grad_()
-y0 = torch.zeros((2,1))  # zeros as the initial guess
+y0 = torch.zeros((2, 1))  # zeros as the initial guess
 
 # finding a root
 yroot = rootfinder(func1, y0, params=(A,))
