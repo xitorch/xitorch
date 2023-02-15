@@ -1,6 +1,5 @@
 import inspect
-from typing import Union, Any, Mapping, Sequence, Optional, Callable, List, \
-    Generator, Tuple, ItemsView
+from typing import Union, Any, Mapping, Sequence, Optional, Callable, List
 
 def get_methods_docstr(
         cls_or_func: Callable,

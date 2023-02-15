@@ -3,7 +3,8 @@ exclude =
   .git,
   __pycache__,
   build,
-  dist
+  dist,
+  doc
 max-line-length = 120
 ignore = E302,E731,W391,E221,E266,F841,E305
 per-file-ignores:
