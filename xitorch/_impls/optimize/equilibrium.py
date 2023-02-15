@@ -52,9 +52,8 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
            https://users.wpi.edu/~walker/Papers/Walker-Ni,SINUM,V49,1715-1735.pdf
     """
     # x0: (..., *nfeats)
-    x0shape = x0.shape
     featshape = x0.shape[-feat_ndims:]
-    batch_size = int(np.prod(x0.shape[:-feat_ndims]))
+    batch_shape = x0.shape[:-feat_ndims]
     feat_size = int(np.prod(x0.shape[-feat_ndims:]))
     dtype = x0.dtype
     device = x0.device
@@ -65,37 +64,36 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
     def _ravel(x: torch.Tensor) -> torch.Tensor:
         # reshape x to have a shape of (batch_size, feats_dim)
         # x: (..., *nfeats)
-        x = x.reshape(-1, *featshape)  # (batch_size, *nfeats)
-        xn = x.reshape(x.shape[0], -1)  # (batch_size, feats_dim)
+        xn = x.reshape(*batch_shape, -1)  # (..., feats_tot)
         return xn
 
     def _unravel(xn: torch.Tensor) -> torch.Tensor:
-        # xn: (batch_size, feats_dim)
-        x = xn.reshape(xn.shape[0], *featshape)  # (batch_size, *nfeats)
-        x = x.reshape(x0shape)  # (..., *nfeats)
+        # xn: (..., feats_tot)
+        x = xn.reshape(*batch_shape, *featshape)  # (..., *nfeats)
         return x
 
     def _fcn(xn: torch.Tensor) -> torch.Tensor:
-        # x: (batch_size, feats_dim)
-        fn = _ravel(fcn(_unravel(xn), *params))
-        return fn  # (batch_size, feats_dim)
+        # x: (..., feats_dim)
+        x = _unravel(xn)
+        fn = _ravel(fcn(x, *params))
+        return fn  # (..., feats_dim)
 
     xn = _ravel(x0)
     fn = _fcn(xn)
-    xcollect = torch.zeros((batch_size, msize, feat_size), dtype=dtype, device=device)
-    fcollect = torch.zeros((batch_size, msize, feat_size), dtype=dtype, device=device)
-    xcollect[:, 0] = xn
-    fcollect[:, 0] = fn
+    xcollect = torch.zeros((*batch_shape, msize, feat_size), dtype=dtype, device=device)
+    fcollect = torch.zeros((*batch_shape, msize, feat_size), dtype=dtype, device=device)
+    xcollect[..., 0, :] = xn
+    fcollect[..., 0, :] = fn
     xn = fn
     fn = _fcn(xn)
-    xcollect[:, 1] = xn
-    fcollect[:, 1] = fn
+    xcollect[..., 1, :] = xn
+    fcollect[..., 1, :] = fn
 
-    hmat = torch.zeros((batch_size, msize + 1, msize + 1), dtype=dtype, device=device)
-    y = torch.zeros((batch_size, msize + 1, 1), dtype=dtype, device=device)
-    hmat[:, 0, 1:] = 1.0
-    hmat[:, 1:, 0] = 1.0
-    y[:, 0] = 1.0
+    hmat = torch.zeros((*batch_shape, msize + 1, msize + 1), dtype=dtype, device=device)
+    y = torch.zeros((*batch_shape, msize + 1, 1), dtype=dtype, device=device)
+    hmat[..., 0, 1:] = 1.0
+    hmat[..., 1:, 0] = 1.0
+    y[..., 0, :] = 1.0
 
     devnorm = (fn - xn).norm()
     stop_cond = custom_terminator if custom_terminator is not None \
@@ -106,16 +104,17 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
     converge = False
     for k in range(2, maxiter):
         nsize = min(k, msize)
-        g = fcollect[:, :nsize] - xcollect[:, :nsize]  # (batch_size, nsize, feat_size)
-        hmat[:, 1:nsize + 1, 1:nsize + 1] = torch.bmm(g, g.transpose(-2, -1)) + \
+        g = fcollect[..., :nsize, :] - xcollect[..., :nsize, :]  # (..., nsize, feat_size)
+        # torch.bmm(g, g.transpose(-2, -1))
+        hmat[..., 1:nsize + 1, 1:nsize + 1] = torch.einsum("...nf,...mf->...nm", g, g) + \
             lmbda * torch.eye(nsize, dtype=dtype, device=device)
         # alpha: (batch_size, nsize)
-        alpha = torch.linalg.solve(hmat[:, :nsize + 1, :nsize + 1], y[:, :nsize + 1])[:, 1:nsize + 1, 0]
-        xnew = torch.einsum("bn,bnf->bf", alpha, fcollect[:, :nsize]) * beta + \
-            torch.einsum("bn,bnf->bf", alpha, xcollect[:, :nsize]) * (1 - beta)
+        alpha = torch.linalg.solve(hmat[..., :nsize + 1, :nsize + 1], y[..., :nsize + 1, :])[..., 1:nsize + 1, 0]
+        xnew = torch.einsum("...n,...nf->...f", alpha, fcollect[..., :nsize, :]) * beta + \
+            torch.einsum("...n,...nf->...f", alpha, xcollect[..., :nsize, :]) * (1 - beta)
         fnew = _fcn(xnew)
-        xcollect[:, k % msize] = xnew
-        fcollect[:, k % msize] = fnew
+        xcollect[..., k % msize, :] = xnew
+        fcollect[..., k % msize, :] = fnew
 
         # check the stopping condition
         to_stop = stop_cond.check(xnew, fnew - xnew, xnew - xn)
