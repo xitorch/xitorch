@@ -4,6 +4,7 @@ from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
 from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
     linearmixing
+from xitorch._impls.optimize.equilibrium import anderson_acc
 from xitorch._impls.optimize.minimizer import gd, adam
 from xitorch.linalg.solve import solve
 from xitorch.grad.jachess import jac
@@ -17,6 +18,12 @@ _RF_METHODS = {
     "broyden1": broyden1,
     "broyden2": broyden2,
     "linearmixing": linearmixing,
+}
+
+_EQUIL_METHODS = {
+    # equilibrium can use all rootfinder methods, but there are several methods developed specifically for
+    # equilibrium (or fixed-point iterations). This dictionary gives the list of those special methods.
+    "anderson_acc": anderson_acc,
 }
 
 _OPT_METHODS = {
@@ -90,7 +97,7 @@ def rootfinder(
 
     pfunc = get_pure_function(fcn)
     fwd_options["method"] = _get_rootfinder_default_method(method)
-    return _RootFinder.apply(pfunc, y0, pfunc, False, fwd_options, bck_options,
+    return _RootFinder.apply(pfunc, y0, pfunc, "rootfinder", fwd_options, bck_options,
                              len(params), *params, *pfunc.objparams())
 
 def equilibrium(
@@ -168,8 +175,11 @@ def equilibrium(
     def new_fcn(y, *params):
         return y - pfunc(y, *params)
 
-    fwd_options["method"] = _get_rootfinder_default_method(method)
-    return _RootFinder.apply(new_fcn, y0, new_fcn, False, fwd_options, bck_options,
+    method = _get_equilibrium_default_method(method)
+    fwd_options["method"] = method
+    fwd_fcn = pfunc if method in _EQUIL_METHODS else new_fcn
+    alg_type = "equilibrium" if method in _EQUIL_METHODS else "rootfinder"
+    return _RootFinder.apply(new_fcn, y0, fwd_fcn, alg_type, fwd_options, bck_options,
                              len(params), *params, *pfunc.objparams())
 
 def minimize(
@@ -272,12 +282,13 @@ def minimize(
     else:
         _fwd_fcn = _rf_fcn
 
-    return _RootFinder.apply(_rf_fcn, y0, _fwd_fcn, opt_method, fwd_options, bck_options,
+    alg_type = "minimizer" if opt_method else "rootfinder"
+    return _RootFinder.apply(_rf_fcn, y0, _fwd_fcn, alg_type, fwd_options, bck_options,
                              len(params), *params, *pfunc.objparams())
 
 class _RootFinder(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, fcn, y0, fwd_fcn, is_opt_method, options, bck_options, nparams, *allparams):
+    def forward(ctx, fcn, y0, fwd_fcn, alg_type, options, bck_options, nparams, *allparams):
         # fcn: a function that returns what has to be 0 (will be used in the
         #      backward, not used in the forward). For minimization, it is
         #      the gradient
@@ -296,13 +307,16 @@ class _RootFinder(torch.autograd.Function):
         with fwd_fcn.useobjparams(objparams):
 
             method = config.pop("method")
-            methods = _RF_METHODS if not is_opt_method else _OPT_METHODS
-            name = "rootfinder" if not is_opt_method else "minimizer"
+            methods = {
+                "minimizer": _OPT_METHODS,
+                "rootfinder": _RF_METHODS,
+                "equilibrium": _EQUIL_METHODS
+            }[alg_type]
+            name = alg_type
             method_fcn = get_method(name, methods, method)
             y = method_fcn(fwd_fcn, y0, params, **config)
 
         ctx.fcn = fcn
-        ctx.is_opt_method = is_opt_method
 
         # split tensors and non-tensors params
         ctx.nparams = nparams
@@ -356,6 +370,12 @@ def _get_rootfinder_default_method(method):
     else:
         return method
 
+def _get_equilibrium_default_method(method):
+    if method is None:
+        return _get_rootfinder_default_method(method)
+    else:
+        return method
+
 def _get_minimizer_default_method(method):
     if method is None:
         return "broyden1"
@@ -365,7 +385,8 @@ def _get_minimizer_default_method(method):
 
 # docstring completion
 rf_methods: List[Callable] = [broyden1, broyden2, linearmixing]
+eq_methods: List[Callable] = rf_methods + [anderson_acc]
 opt_methods: List[Callable] = [gd, adam]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
-equilibrium.__doc__ = get_methods_docstr(equilibrium, rf_methods)
+equilibrium.__doc__ = get_methods_docstr(equilibrium, eq_methods)
 minimize.__doc__ = get_methods_docstr(minimize, rf_methods + opt_methods)

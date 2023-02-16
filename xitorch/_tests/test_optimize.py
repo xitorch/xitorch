@@ -140,6 +140,7 @@ def test_rootfinder(dtype, device, clss):
     y = rootfinder(model.forward, y0, **fwd_options)
     f = model.forward(y)
     assert torch.allclose(f * 0, f)
+    assert y.shape == y0.shape
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=True)
@@ -155,18 +156,25 @@ def test_rootfinder(dtype, device, clss):
 
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
     "clss": [DummyModule, DummyNNModule],
+    "method": ["broyden1", "anderson_acc"]
 })
-def test_equil(dtype, device, clss):
+def test_equil(dtype, device, clss, method):
     torch.manual_seed(100)
     random.seed(100)
 
     nr = 2
     nbatch = 2
-    fwd_options = {
-        "method": "broyden1",
-        "f_tol": 1e-12,
-        "alpha": -0.5,
-    }
+    if method == "broyden1":
+        fwd_options = {
+            "method": "broyden1",
+            "f_tol": 1e-12,
+            "alpha": -0.5,
+        }
+    else:
+        fwd_options = {
+            "method": "anderson_acc",
+            "f_tol": 1e-12,
+        }
     bck_options = {
         # NOTE: using "cg" fails the test, and using "gmres" produces an error
         # of re-entrant
@@ -183,6 +191,7 @@ def test_equil(dtype, device, clss):
     y = equilibrium(model.forward, y0, bck_options=bck_options, **fwd_options)
     f = model.forward(y)
     assert torch.allclose(y, f)
+    assert y.shape == y0.shape
 
     def getloss(A, y0, diag, bias):
         model = clss(A, addx=False)
@@ -334,7 +343,7 @@ def test_rootfinder_methods(dtype, device, method):
     assert torch.allclose(f * 0, f)
 
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing"],
+    "method": ["broyden1", "broyden2", "linearmixing", "anderson_acc"],
 })
 def test_equil_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -351,6 +360,7 @@ def test_equil_methods(dtype, device, method):
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
         "linearmixing": default_fwd_options,
+        "anderson_acc": {"f_tol": 1e-9},
     }[method]
 
     A    = torch.nn.Parameter((torch.randn((nr, nr)) * 0.5).to(dtype).requires_grad_())
