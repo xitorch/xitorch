@@ -1,0 +1,36 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "xitorch"
+version = "0.4.0.dev20230208"
+description = "Differentiable scientific computing library"
+authors = ["mfkasim1 <firman.kasim@gmail.com>", "KarimAED <karim@aedin.dev>"]
+readme = "README.md"
+homepage = "https://xitorch.readthedocs.io/"
+repository = "https://github.com/xitorch/xitorch/tree/master/"
+license = "MIT"
+keywords = ["project", "library", "linear-algebra", "autograd", "functionals"]
+classifiers = [
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Scientific/Engineering :: Physics",
+        "Topic :: Scientific/Engineering :: Mathematics",
+        "License :: OSI Approved :: MIT License",
+
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+    ]
+
+[tool.poetry.dependencies]
+python = "<3.12,>=3.8"
+numpy = ">=1.24.1"
+scipy = ">=1.10.0"
+torch = ">=1.13.1"
+
+[tool.poetry.dev-dependencies]
+pytest = ">=6.0"
+mypy = ">=0.782"
+pytest-cov = ">=2.10"
+ninja = ">=1.10.0"
