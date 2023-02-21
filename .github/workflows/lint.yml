@@ -33,7 +33,7 @@ jobs:
         poetry install
     - name: Type check
       run: |
-        mypy
+        poetry run mypy
     - name: Style check
       run: |
-        flake8 xitorch
+        poetry run flake8 xitorch
