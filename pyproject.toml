@@ -42,6 +42,6 @@ format-jinja = """
 {%- if distance == 0 -%}
         {{ serialize_pep440(bump_version(base, index=1)) }}
 {%- else -%}
-        {{serialize_pep440(bump_version(base, index=1), dev=timestamp)}}
+        {{serialize_pep440(bump_version(base, index=1))}}.dev+{{commit}}
 {%- endif -%}
 """
