@@ -39,9 +39,9 @@ flake8 = "^6.0.0"
 enable = true
 vcs = "git"
 format-jinja = """
-{%- if branch != "master" -%}
-        {{serialize_pep440(bump_version(base), dev=timestamp)}}
+{%- if distance == 0 -%}
+        {{ serialize_pep440(bump_version(base, index=1)) }}
 {%- else -%}
-        {{serialize_pep440(bump_version(base))}}
+        {{serialize_pep440(bump_version(base, index=1), dev=timestamp)}}
 {%- endif -%}
 """
