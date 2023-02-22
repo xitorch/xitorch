@@ -4,6 +4,7 @@ on:
   push:
     branches: [ master ]
     tags: [ v* ]
+  workflow_dispatch:
 
 jobs:
   build-n-publish:
@@ -22,7 +23,7 @@ jobs:
         uses: JRubics/poetry-publish@v1.16
         with:
           python_version: ${{ matrix.python-version }}
-          poetry_version: ${{ matrix.poetry-version }}
+          poetry_version: "==${{ matrix.poetry-version }}"
           plugins: "poetry-dynamic-versioning"
           pypi_token: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_name: "testpypi"
@@ -32,6 +33,6 @@ jobs:
         uses: JRubics/poetry-publish@v1.16
         with:
           python_version: ${{ matrix.python-version }}
-          poetry_version: ${{ matrix.poetry-version }}
+          poetry_version: "==${{ matrix.poetry-version }}"
           pypi_token: ${{ secrets.PYPI_API_TOKEN }}
           plugins: "poetry-dynamic-versioning"
