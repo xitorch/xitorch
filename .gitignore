@@ -131,3 +131,4 @@ dmypy.json
 # custom
 files.txt
 .asv/*
+/poetry.lock

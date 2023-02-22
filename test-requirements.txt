@@ -1,5 +1,0 @@
-pytest>=6.0
-mypy>=0.782
-pytest-cov>=2.10
-ninja>=1.10.0
-git+https://github.com/pytorch/functorch.git@release/torch_1.10_preview

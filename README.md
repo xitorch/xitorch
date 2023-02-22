@@ -41,8 +41,8 @@ grad2A, = torch.autograd.grad(dydA.sum(), (A,), create_graph=True)
 
 ## Requirements
 
-* python 3.7 or higher
-* pytorch 1.8 or higher (install [here](https://pytorch.org/))
+* python >=3.8.1,<3.12
+* pytorch 1.13.1 or higher (install [here](https://pytorch.org/))
 
 ## Getting started
 
@@ -50,11 +50,17 @@ After fulfilling all the requirements, type the commands below to install `xitor
 
     python -m pip install xitorch
 
-Or if you want to install from source:
+Or to install from GitHub:
 
-    git clone https://github.com/xitorch/xitorch/
+    python -m pip install git+https://github.com/xitorch/xitorch.git
+
+Finally, if you want to make an editable install from source:
+
+    git clone https://github.com/xitorch/xitorch.git
     cd xitorch
     python -m pip install -e .
+
+Note that the last option is only available per [PEP 660](https://peps.python.org/pep-0660/), so you will require [pip >= 23.1](https://pip.pypa.io/en/stable/news/#v21-3)
     
 ## Used in
 
