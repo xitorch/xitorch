@@ -23,7 +23,7 @@ jobs:
         with:
           python_version: ${{ matrix.python-version }}
           poetry_version: ${{ matrix.poetry-version }}
-          plugins: ["poetry-dynamic-versioning[plugin]"]
+          plugins: "poetry-dynamic-versioning"
           pypi_token: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_name: "testpypi"
           repository_url: "https://test.pypi.org/legacy/"
@@ -34,4 +34,4 @@ jobs:
           python_version: ${{ matrix.python-version }}
           poetry_version: ${{ matrix.poetry-version }}
           pypi_token: ${{ secrets.PYPI_API_TOKEN }}
-          plugins: ["poetry-dynamic-versioning[plugin]"]
+          plugins: "poetry-dynamic-versioning"
