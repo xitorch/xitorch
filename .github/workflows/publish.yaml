@@ -23,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@master
+        with:
+          fetch-depth: '0'
       - name: Build and publish to Test PyPI
         if: ${{ !(startsWith(github.ref, 'refs/tags')) || (inputs.test == true) }}
         uses: JRubics/poetry-publish@v1.16
