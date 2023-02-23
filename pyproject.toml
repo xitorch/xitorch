@@ -38,6 +38,7 @@ flake8 = "^6.0.0"
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
+strict = true
 format-jinja = """
 {%- if distance == 0 -%}
         {{ serialize_pep440(base) }}
