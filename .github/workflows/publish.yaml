@@ -22,7 +22,7 @@ jobs:
         poetry-version: [1.2.2]
 
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@main
         with:
           fetch-depth: '0'
       - name: Build and publish to Test PyPI
