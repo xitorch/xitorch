@@ -40,8 +40,12 @@ enable = true
 vcs = "git"
 format-jinja = """
 {%- if distance == 0 -%}
-        {{ serialize_pep440(bump_version(base, index=1)) }}
+        {{ serialize_pep440(base) }}
 {%- else -%}
-        {{serialize_pep440(bump_version(base, index=1))}}.dev+{{commit}}
+        {%- if branch == 'master' -%}
+                {{serialize_pep440(bump_version(base, index=1), dev=timestamp)}}
+        {%- else -%}
+                {{serialize_pep440(bump_version(base, index=1))}}.dev+{{commit}}
+        {%- endif -%}
 {%- endif -%}
 """
