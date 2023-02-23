@@ -1,10 +1,10 @@
 name: Publish Python distributions to PyPI and TestPyPI
 
 on:
-  push:
+  - push:
     branches: [ master ]
     tags: [ v* ]
-  workflow_dispatch:
+  - workflow_dispatch:
 
 jobs:
   build-n-publish:
