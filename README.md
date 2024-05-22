@@ -42,7 +42,6 @@ grad2A, = torch.autograd.grad(dydA.sum(), (A,), create_graph=True)
 ## Requirements
 
 * python >=3.8.1,<3.12
-* pytorch 1.13.1 or higher (install [here](https://pytorch.org/))
 
 ## Getting started
 
@@ -61,7 +60,7 @@ Finally, if you want to make an editable install from source:
     python -m pip install -e .
 
 Note that the last option is only available per [PEP 660](https://peps.python.org/pep-0660/), so you will require [pip >= 23.1](https://pip.pypa.io/en/stable/news/#v21-3)
-    
+
 ## Used in
 
 * Differentiable Quantum Chemistry (DQC): https://dqc.readthedocs.io/

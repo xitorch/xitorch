@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.8]
-        poetry-version: [1.2.2]
+        # poetry-version: [1.2.2]
 
     steps:
     - uses: actions/checkout@main
@@ -26,16 +26,18 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Set up Poetry ${{ matrix.poetry-version }}
-      uses: Gr1N/setup-poetry@v8
-      with:
-        poetry-version: ${{ matrix.poetry-version }}
+    # - name: Set up Poetry ${{ matrix.poetry-version }}
+    #   uses: Gr1N/setup-poetry@v8
+    #   with:
+    #     poetry-version: ${{ matrix.poetry-version }}
     - name: Install dependencies
       run: |
-        poetry install
+        python -m pip install --upgrade pip
+        python -m pip install -e .[dev]
+        python -m pip install flake8
     - name: Type check
       run: |
-        poetry run mypy
+        mypy
     - name: Style check
       run: |
-        poetry run flake8 xitorch
+        flake8 xitorch
