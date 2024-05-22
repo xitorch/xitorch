@@ -19,7 +19,7 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
                  verbose: bool = False,
                  ) -> torch.Tensor:
     """
-    Solve the equilibrium (or fixed-point iteration) problem using Anderson acceleration.
+    Solve the equilibrium (or fixed-point iteration) problem using Anderson acceleration [3]_.
 
     Keyword arguments
     -----------------
@@ -46,7 +46,7 @@ def anderson_acc(fcn: Callable[..., torch.Tensor], x0: torch.Tensor, params: Lis
 
     References
     ----------
-    .. [1] H. F. Walker and P. Ni,
+    .. [3] H. F. Walker and P. Ni,
            "Anderson Acceleration for Fixed-Point Iterations".
            Siam J. Numer. Anal.
            https://users.wpi.edu/~walker/Papers/Walker-Ni,SINUM,V49,1715-1735.pdf
