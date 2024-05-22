@@ -524,7 +524,8 @@ def _solve_ABE(A: torch.Tensor, B: torch.Tensor, E: torch.Tensor):
     AE = A - torch.diag_embed(E.repeat_interleave(repeats=na, dim=-1), dim1=-2, dim2=-1)  # (ncols, *BAE, na, na)
     try:
         r = torch.linalg.solve(AE, B)  # (ncols, *BAEM, na, 1)
-    except torch._C._LinAlgError:  # most likely due to singular matrix (i.e., condition number is too high)
+    # most likely due to singular matrix (i.e., condition number is too high)
+    except torch._C._LinAlgError:  # type: ignore
         # add a small value to the diagonal to reduce the condition number slightly
         eps = torch.finfo(A.dtype).eps
         dAE = 10 * eps * torch.max(AE.reshape(*AE.shape[:-2], -1), dim=-1)[0][..., None, None]
