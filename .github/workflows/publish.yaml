@@ -19,34 +19,28 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9]
-    env:
-      XITORCH_BUILD: 1
+        python-version: [3.8]
+        poetry-version: [1.2.2]
 
     steps:
-      - uses: actions/checkout@master
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@main
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
-      - name: Install pypa/build
-        run: |
-          python -m pip install build twine
-      - name: Build distributions
-        run: |
-          python -m build --sdist --wheel --outdir dist/
-      - name: Publish distribution to Test PyPI
-        if: ${{ !(startsWith(github.ref, 'refs/tags')) }}
-        uses: pypa/gh-action-pypi-publish@master
+          fetch-depth: '0'
+      - name: Build and publish to Test PyPI
+        if: ${{ !(startsWith(github.ref, 'refs/tags')) || (inputs.test == true) }}
+        uses: JRubics/poetry-publish@v1.16
         with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
-      - name: Publish distribution to PyPI
-        if: startsWith(github.ref, 'refs/tags')
-        uses: pypa/gh-action-pypi-publish@master
+          python_version: ${{ matrix.python-version }}
+          poetry_version: "==${{ matrix.poetry-version }}"
+          plugins: "poetry-dynamic-versioning"
+          pypi_token: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_name: "testpypi"
+          repository_url: "https://test.pypi.org/legacy/"
+      - name: Build and publish to PyPI
+        if: ${{ startsWith(github.ref, 'refs/tags') || (inputs.test == false) }}
+        uses: JRubics/poetry-publish@v1.16
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          python_version: ${{ matrix.python-version }}
+          poetry_version: "==${{ matrix.poetry-version }}"
+          pypi_token: ${{ secrets.PYPI_API_TOKEN }}
+          plugins: "poetry-dynamic-versioning"
