@@ -20,6 +20,8 @@ classifiers = [
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ]
 
 [tool.poetry.dependencies]
@@ -43,6 +45,6 @@ format-jinja = """
 {%- if distance == 0 -%}
         {{ serialize_pep440(base) }}
 {%- else -%}
-        {{serialize_pep440(bump_version(base, index=1), dev=timestamp)}}
+        {{serialize_pep440(base, dev=0, metadata=[commit])}}
 {%- endif -%}
 """
