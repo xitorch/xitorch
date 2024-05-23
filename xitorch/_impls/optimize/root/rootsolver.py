@@ -2,18 +2,19 @@
 # https://github.com/scipy/scipy/blob/914523af3bc03fe7bf61f621363fca27e97ca1d6/scipy/optimize/nonlin.py#L221
 # and converted to PyTorch for GPU efficiency
 
+from typing import Dict, Any, Optional, Union, Tuple
 import warnings
 import torch
 import functools
-from xitorch._impls.optimize.root._jacobian import BroydenFirst, \
-    BroydenSecond, LinearMixing
+from xitorch._impls.optimize.root._jacobian import NewtonJacobian, BroydenFirst, \
+    BroydenSecond, LinearMixing, Jacobian
 from xitorch._utils.exceptions import ConvergenceWarning
 
-__all__ = ["broyden1", "broyden2", "linearmixing"]
+__all__ = ["newton", "broyden1", "broyden2", "linearmixing"]
 
-def _nonlin_solver(fcn, x0, params, method,
-                   # jacobian parameters
-                   alpha=None, uv0=None, max_rank=None,
+def _nonlin_solver(fcn, x0, params,
+                   # jacobian
+                   jacobian: Jacobian,
                    # stopping criteria
                    maxiter=None, f_tol=None, f_rtol=None, x_tol=None, x_rtol=None,
                    # algorithm parameters
@@ -25,15 +26,6 @@ def _nonlin_solver(fcn, x0, params, method,
     """
     Keyword arguments
     -----------------
-    alpha: float or None
-        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
-    uv0: tuple of tensors or str or None
-        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
-        If ``"svd"``, then it uses 1-rank svd to obtain ``u`` and ``v``.
-        If None, then ``u`` and ``v`` are zeros.
-    max_rank: int or None
-        The maximum rank of inverse Jacobian approximation. If ``None``, it
-        is ``inf``.
     maxiter: int or None
         Maximum number of iterations, or inf if it is set to None.
     f_tol: float or None
@@ -49,15 +41,6 @@ def _nonlin_solver(fcn, x0, params, method,
     verbose: bool
         Options for verbosity
     """
-
-    if method == "broyden1":
-        jacobian = BroydenFirst(alpha=alpha, uv0=uv0, max_rank=max_rank)
-    elif method == "broyden2":
-        jacobian = BroydenSecond(alpha=alpha, uv0=uv0, max_rank=max_rank)
-    elif method == "linearmixing":
-        jacobian = LinearMixing(alpha=alpha)
-    else:
-        raise RuntimeError("Unknown method: %s" % method)
 
     if maxiter is None:
         maxiter = 100 * (torch.numel(x0) + 1)
@@ -166,8 +149,36 @@ def _nonlin_solver(fcn, x0, params, method,
         x = best_x
     return _pack(x)
 
-@functools.wraps(_nonlin_solver, assigned=('__annotations__',))  # takes only the signature
-def broyden1(fcn, x0, params=(), **kwargs):
+def newton(fcn, x0, params=(), *,
+           solver_method: str = "exactsolve",
+           solver_kwargs: Optional[Dict[str, Any]] = None,
+           **kwargs):
+    """
+    Solve the root finder using the Newton method. In root finding task, Newton's method goes as follows:
+
+    .. math::
+
+        x_{n+1} = x_n - J^{-1}(x_n) f(x_n)
+
+    where :math:`J` is the Jacobian of the function :math:`f`.
+
+    Keyword arguments
+    -----------------
+    solver_method: str
+        The method to solve the linear equation (i.e., the method in computing the inverse of Jacobian above).
+        The list of available methods can be found in :class:`xitorch.linalg.solve`.
+    solver_kwargs: dict or None
+        The keyword arguments for the solver method. The list of available keyword arguments
+        can be found in :class:`xitorch.linalg.solve`.
+    """
+    jacobian = NewtonJacobian(solver_method=solver_method, solver_kwargs=solver_kwargs)
+    return _nonlin_solver(fcn, x0, params, jacobian=jacobian, **kwargs)
+
+def broyden1(fcn, x0, params=(), *,
+             alpha: Optional[float] = None,
+             uv0: Optional[Union[str, Tuple[torch.Tensor, torch.Tensor]]] = None,
+             max_rank: Optional[int] = None,
+             **kwargs):
     """
     Solve the root finder or linear equation using the first Broyden method [1]_.
     It can be used to solve minimization by finding the root of the
@@ -179,11 +190,28 @@ def broyden1(fcn, x0, params=(), **kwargs):
            "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
            Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
            https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
+
+    Keyword arguments
+    -----------------
+    alpha: float or None
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+    uv0: tuple of tensors or str or None
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+        If ``"svd"``, then it uses 1-rank svd to obtain ``u`` and ``v``.
+        If None, then ``u`` and ``v`` are zeros.
+    max_rank: int or None
+        The maximum rank of inverse Jacobian approximation. If ``None``, it
+        is ``inf``.
     """
-    return _nonlin_solver(fcn, x0, params, "broyden1", **kwargs)
+    jacobian = BroydenFirst(alpha=alpha, uv0=uv0, max_rank=max_rank)
+    return _nonlin_solver(fcn, x0, params, jacobian=jacobian, **kwargs)
 
 @functools.wraps(_nonlin_solver, assigned=('__annotations__',))  # takes only the signature
-def broyden2(fcn, x0, params=(), **kwargs):
+def broyden2(fcn, x0, params=(), *,
+             alpha: Optional[float] = None,
+             uv0: Optional[Union[str, Tuple[torch.Tensor, torch.Tensor]]] = None,
+             max_rank: Optional[int] = None,
+             **kwargs):
     """
     Solve the root finder or linear equation using the second Broyden method [2]_.
     It can be used to solve minimization by finding the root of the
@@ -195,19 +223,27 @@ def broyden2(fcn, x0, params=(), **kwargs):
            "A limited memory Broyden method to solve high-dimensional systems of nonlinear equations".
            Mathematisch Instituut, Universiteit Leiden, The Netherlands (2003).
            https://web.archive.org/web/20161022015821/http://www.math.leidenuniv.nl/scripties/Rotten.pdf
-    """
-    return _nonlin_solver(fcn, x0, params, "broyden2", **kwargs)
 
-def linearmixing(fcn, x0, params=(),
+    Keyword arguments
+    -----------------
+    alpha: float or None
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+    uv0: tuple of tensors or str or None
+        The initial guess of inverse Jacobian is ``- alpha * I + u v^T``.
+        If ``"svd"``, then it uses 1-rank svd to obtain ``u`` and ``v``.
+        If None, then ``u`` and ``v`` are zeros.
+    max_rank: int or None
+        The maximum rank of inverse Jacobian approximation. If ``None``, it
+        is ``inf``.
+    """
+    jacobian = BroydenSecond(alpha=alpha, uv0=uv0, max_rank=max_rank)
+    return _nonlin_solver(fcn, x0, params, jacobian=jacobian, **kwargs)
+
+def linearmixing(fcn, x0, params=(), *,
                  # jacobian parameters
-                 alpha=None,
-                 # stopping criteria
-                 maxiter=None, f_tol=None, f_rtol=None, x_tol=None, x_rtol=None,
-                 # algorithm parameters
-                 line_search=True,
-                 # misc parameters
-                 verbose=False,
-                 **unused):
+                 alpha: Optional[float] = None,
+                 # solver parameters
+                 **kwargs):
     """
     Solve the root finding problem by approximating the inverse of Jacobian
     to be a constant scalar.
@@ -216,37 +252,16 @@ def linearmixing(fcn, x0, params=(),
     -----------------
     alpha: float or None
         The initial guess of inverse Jacobian is ``-alpha * I``.
-    maxiter: int or None
-        Maximum number of iterations, or inf if it is set to None.
-    f_tol: float or None
-        The absolute tolerance of the norm of the output ``f``.
-    f_rtol: float or None
-        The relative tolerance of the norm of the output ``f``.
-    x_tol: float or None
-        The absolute tolerance of the norm of the input ``x``.
-    x_rtol: float or None
-        The relative tolerance of the norm of the input ``x``.
-    line_search: bool or str
-        Options to perform line search. If ``True``, it is set to ``"armijo"``.
-    verbose: bool
-        Options for verbosity
     """
-    kwargs = {
-        "alpha": alpha,
-        "maxiter": maxiter,
-        "f_tol": f_tol,
-        "x_tol": x_tol,
-        "x_rtol": x_rtol,
-        "line_search": line_search,
-        "verbose": verbose,
-        **unused
-    }
-    return _nonlin_solver(fcn, x0, params, "linearmixing", **kwargs)
+    jacobian = LinearMixing(alpha=alpha)
+    return _nonlin_solver(fcn, x0, params, jacobian=jacobian, **kwargs)
 
 
 # set the docstring of the functions
+newton.__doc__ += _nonlin_solver.__doc__  # type: ignore
 broyden1.__doc__ += _nonlin_solver.__doc__  # type: ignore
 broyden2.__doc__ += _nonlin_solver.__doc__  # type: ignore
+linearmixing.__doc__ += _nonlin_solver.__doc__  # type: ignore
 
 def _safe_norm(v):
     if not torch.isfinite(v).all():

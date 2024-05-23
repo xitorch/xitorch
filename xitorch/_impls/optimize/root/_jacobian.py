@@ -1,3 +1,4 @@
+from typing import Optional, Dict, Any
 import torch
 from abc import abstractmethod
 from xitorch.grad import jac
@@ -21,6 +22,31 @@ class Jacobian(object):
     @abstractmethod
     def update(self, x, y):
         pass
+
+class NewtonJacobian(Jacobian):
+    """
+    The exact Jacobian.
+    """
+    def __init__(self, solver_method: str = "exactsolve", solver_kwargs: Optional[Dict[str, Any]] = None):
+        self.solver_method = solver_method
+        self.solver_kwargs = solver_kwargs if solver_kwargs is not None else {}
+
+    def setup(self, x0, y0, func):
+        self.x = x0
+        self.y = y0
+        self.func = func
+
+    def solve(self, v, tol=0):
+        # v: (ny,)
+        from xitorch.linalg import solve
+
+        jaclinop = jac(self.func, (self.x.clone().requires_grad_(),), idxs=0)
+        y = solve(jaclinop, v[..., None], method=self.solver_method, **self.solver_kwargs)[..., 0]
+        return y
+
+    def update(self, x, y):
+        self.x = x
+        self.y = y
 
 class BroydenFirst(Jacobian):
     """

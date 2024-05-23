@@ -2,7 +2,7 @@ from typing import Callable, Mapping, Any, Sequence, Union, List
 import torch
 from xitorch._utils.misc import TensorNonTensorSeparator, get_method
 from xitorch._utils.assertfuncs import assert_fcn_params
-from xitorch._impls.optimize.root.rootsolver import broyden1, broyden2, \
+from xitorch._impls.optimize.root.rootsolver import newton, broyden1, broyden2, \
     linearmixing
 from xitorch._impls.optimize.equilibrium import anderson_acc
 from xitorch._impls.optimize.minimizer import gd, adam
@@ -15,6 +15,7 @@ from xitorch.debug.modes import is_debug_enabled
 __all__ = ["equilibrium", "rootfinder", "minimize"]
 
 _RF_METHODS = {
+    "newton": newton,
     "broyden1": broyden1,
     "broyden2": broyden2,
     "linearmixing": linearmixing,
@@ -384,7 +385,7 @@ def _get_minimizer_default_method(method):
 
 
 # docstring completion
-rf_methods: List[Callable] = [broyden1, broyden2, linearmixing]
+rf_methods: List[Callable] = [newton, broyden1, broyden2, linearmixing]
 eq_methods: List[Callable] = rf_methods + [anderson_acc]
 opt_methods: List[Callable] = [gd, adam]
 rootfinder.__doc__ = get_methods_docstr(rootfinder, rf_methods)
