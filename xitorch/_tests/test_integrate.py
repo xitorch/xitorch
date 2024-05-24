@@ -4,7 +4,7 @@ import numpy as np
 from functorch import vmap
 from torch.autograd import gradcheck, gradgradcheck
 import xitorch as xt
-from xitorch.integrate import quad, solve_ivp, mcquad, SQuad
+from xitorch.integrate import quad, solve_ivp, mcquad, SQuad, solve_dae
 from xitorch._tests.utils import device_dtype_float_test
 
 ################################## quadrature ##################################
@@ -438,6 +438,75 @@ def test_squad(dtype, device, imethod):
     gradgradcheck(getval, (x, y, "cumsum"), nondet_tol=1e-6)
     gradcheck(getval, (x, y, "integrate"))
     gradgradcheck(getval, (x, y, "integrate"), nondet_tol=1e-6)
+
+################################## dae ##################################
+class DAENNModuleSimple(torch.nn.Module):
+    def __init__(self, a, b):
+        super(DAENNModuleSimple, self).__init__()
+        self.a = a
+        self.b = b
+
+    def forward(self, t, y, yp, c):
+        # yp[0] + a * (y[1] + y[0]) = 0
+        # y[1] - b * y[0] - c = 0
+        # y: (2,), yp: (2,)
+        return torch.stack([yp[0] + self.a * (y[1] + y[0]), y[1] - self.b * y[0] - c])
+
+    @staticmethod
+    def generate_params(dtype, device):
+        a = torch.nn.Parameter(torch.rand((1,), dtype=dtype, device=device)[0].requires_grad_())
+        b = torch.nn.Parameter(torch.rand((1,), dtype=dtype, device=device)[0].requires_grad_())
+        c = torch.nn.Parameter(torch.randn((1,), dtype=dtype, device=device)[0].requires_grad_())
+
+        y00 = torch.rand((1,), dtype=dtype, device=device)
+        y01 = b * y00 + c
+        y0 = torch.cat([y00, y01], dim=0).requires_grad_()  # (2,)
+        return (a, b), (c,), y0
+
+    @staticmethod
+    def get_true_values(init_params, forward_params, y0, ts):
+        # compute the true value based on analytical solution
+        a, b = init_params
+        c, = forward_params
+        ts1 = ts.unsqueeze(-1)
+        yt0_true = (y0[0] + c / (b + 1)) * torch.exp(-a * (b + 1) * ts1) - c / (b + 1)  # (nt, 1)
+        yt1_true = b * yt0_true + c
+        yt_true = torch.cat([yt0_true, yt1_true], dim=1)
+        return yt_true
+
+@device_dtype_float_test(only64=True, additional_kwargs={
+    "clss": [DAENNModuleSimple],
+})
+def test_dae(dtype, device, clss):
+    torch.manual_seed(100)
+    random.seed(100)
+    nt = 5
+    t0 = 0.0
+    t1 = 0.01
+    fwd_options = {
+        "method": "bwdeuler",
+    }
+
+    init_params, forward_params, y0 = clss.generate_params(dtype, device)
+    ny = y0.shape[0]
+    ts = torch.linspace(t0, t1, nt, dtype=dtype, device=device).requires_grad_()
+    ts1 = ts.unsqueeze(-1)  # (nt, 1)
+    n_init_params = len(init_params)
+
+    def getoutput(ts, y0, *all_params):
+        init_params = all_params[:n_init_params]
+        forward_params = all_params[n_init_params:]
+        module = clss(*init_params)
+        yt = solve_dae(module.forward, ts, y0, params=forward_params, **fwd_options)
+        return yt
+
+    # test the output
+    yt = getoutput(ts, y0, *init_params, *forward_params)
+    yt_true = clss.get_true_values(init_params, forward_params, y0, ts)
+    assert torch.allclose(yt, yt_true)
+
+    # gradcheck(getoutput, (a, b, c, ts, y0))
+    # gradgradcheck(getoutput, (a, b, c, ts, y0))
 
 
 if __name__ == "__main__":
