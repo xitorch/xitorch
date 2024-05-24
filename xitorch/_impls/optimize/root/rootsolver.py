@@ -53,20 +53,19 @@ def _nonlin_solver(fcn, x0, params,
     # making the variable twice as long
     x_is_complex = torch.is_complex(x0)
 
-    def _ravel(x: torch.Tensor) -> torch.Tensor:
-        # represents x as a long real vector
-        if x_is_complex:
-            return torch.cat((x.real, x.imag), dim=0).reshape(-1)
-        else:
-            return x.reshape(-1)
+    def _ravel_complex(x: torch.Tensor) -> torch.Tensor:
+        # represents complex x as a long real vector
+        return torch.cat((x.real, x.imag), dim=0).reshape(-1)
 
-    def _pack(x: torch.Tensor) -> torch.Tensor:
-        # pack a long real vector into the shape accepted by fcn
-        if x_is_complex:
-            n = len(x) // 2
-            xreal, ximag = x[:n], x[n:]
-            x = xreal + 1j * ximag
+    def _pack_complex(x: torch.Tensor) -> torch.Tensor:
+        # pack a long real vector into a complex vector with the shape accepted by fcn
+        n = len(x) // 2
+        xreal, ximag = x[:n], x[n:]
+        x = xreal + 1j * ximag
         return x.reshape(xshape)
+
+    _ravel = _ravel_complex if x_is_complex else (lambda x: x.reshape(-1))
+    _pack = _pack_complex if x_is_complex else (lambda x: x.reshape(xshape))
 
     # shorthand for the function
     xshape = x0.shape
@@ -263,10 +262,12 @@ broyden1.__doc__ += _nonlin_solver.__doc__  # type: ignore
 broyden2.__doc__ += _nonlin_solver.__doc__  # type: ignore
 linearmixing.__doc__ += _nonlin_solver.__doc__  # type: ignore
 
-def _safe_norm(v):
-    if not torch.isfinite(v).all():
-        return torch.tensor(float("inf"), dtype=v.dtype, device=v.device)
-    return torch.norm(v)
+def _norm_sq(v):
+    # if not torch.isfinite(v).all():
+    #     return torch.tensor(float("inf"), dtype=v.dtype, device=v.device)
+    v1 = v.reshape(-1)
+    y = torch.dot(v1, v1)
+    return y
 
 def _nonline_line_search(func, x, y, dx, search_type="armijo", rdiff=1e-8, smin=1e-2):
     tmp_s = [0]
@@ -279,7 +280,7 @@ def _nonline_line_search(func, x, y, dx, search_type="armijo", rdiff=1e-8, smin=
             return tmp_phi[0]
         xt = x + s * dx
         v = func(xt)
-        p = _safe_norm(v)**2
+        p = _norm_sq(v)
         if store:
             tmp_s[0] = s
             tmp_phi[0] = p
@@ -375,8 +376,5 @@ class TerminationCondition(object):
         xnorm = x.norm()
         ynorm = y.norm()
         dxnorm = dx.norm()
-        xtcheck = dxnorm < self.x_tol
-        xrcheck = dxnorm < self.x_rtol * xnorm
-        ytcheck = ynorm < self.f_tol
-        yrcheck = ynorm < self.f_rtol * self.f0_norm
-        return xtcheck and xrcheck and ytcheck and yrcheck
+        return (dxnorm < self.x_tol) and (dxnorm < self.x_rtol * xnorm) and \
+            (ynorm < self.f_tol) and (ynorm < self.f_rtol * self.f0_norm)
