@@ -310,7 +310,7 @@ def test_minimize(dtype, device, clss, method):
 
 ############## forward methods test ##############
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing"],
+    "method": ["newton", "broyden1", "broyden2", "linearmixing"],
 })
 def test_rootfinder_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -325,6 +325,7 @@ def test_rootfinder_methods(dtype, device, method):
     }
     # list the methods and the options here
     options = {
+        "newton": default_fwd_options,
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
         "linearmixing": default_fwd_options,
@@ -343,7 +344,7 @@ def test_rootfinder_methods(dtype, device, method):
     assert torch.allclose(f * 0, f)
 
 @device_dtype_float_test(only64=True, include_complex=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing", "anderson_acc"],
+    "method": ["newton", "broyden1", "broyden2", "linearmixing", "anderson_acc"],
 })
 def test_equil_methods(dtype, device, method):
     torch.manual_seed(100)
@@ -357,6 +358,7 @@ def test_equil_methods(dtype, device, method):
     }
     # list the methods and the options here
     options = {
+        "newton": default_fwd_options,
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
         "linearmixing": default_fwd_options,
@@ -376,7 +378,7 @@ def test_equil_methods(dtype, device, method):
     assert torch.allclose(y, f)
 
 @device_dtype_float_test(only64=True, additional_kwargs={
-    "method": ["broyden1", "broyden2", "linearmixing", "gd", "adam"]
+    "method": ["newton", "broyden1", "broyden2", "linearmixing", "gd", "adam"]
 })
 def test_minimize_methods(dtype, device, method):
     torch.manual_seed(400)
@@ -402,6 +404,7 @@ def test_minimize_methods(dtype, device, method):
     }
     # list the methods and the options here
     options = {
+        "newton": default_fwd_options,
         "broyden1": default_fwd_options,
         "broyden2": default_fwd_options,
         "linearmixing": linearmixing_fwd_options,
