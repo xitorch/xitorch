@@ -1,10 +1,10 @@
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "xitorch"
-version = "0.0.0"
+version = "0.5.1"
 description = "Differentiable scientific computing library"
 authors = ["mfkasim1 <firman.kasim@gmail.com>", "KarimAED <karim@aedin.dev>"]
 readme = "README.md"
@@ -36,15 +36,3 @@ mypy = ">=0.782"
 pytest-cov = ">=2.10"
 ninja = ">=1.10.0"
 flake8 = "^6.0.0"
-
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-strict = true
-format-jinja = """
-{%- if distance == 0 -%}
-        {{ serialize_pep440(base) }}
-{%- else -%}
-        {{serialize_pep440(base, dev=0, metadata=[commit])}}
-{%- endif -%}
-"""
